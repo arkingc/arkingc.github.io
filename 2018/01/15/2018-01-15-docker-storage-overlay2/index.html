@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html>
+<head><meta name="generator" content="Hexo 3.8.0">
+
+    <!--[if lt IE 9]>
+        <style>body {display: none; background: none !important} </style>
+        <meta http-equiv="Refresh" Content="0; url=//outdatedbrowser.com/" />
+    <![endif]-->
+
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge, chrome=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="format-detection" content="telephone=no">
+<meta name="author" content="Arking">
+
+
+
+<meta name="description" content="基于Docker 17.05.x  Docker使用层存储来管理镜像层和容器层。使用存储驱动来管理层的内容，使用层的元数据存储管理层的元数据 这篇文章以overlay2作为存储驱动，通过分析源码介绍存储驱动如何管理容器层和镜像层的内容">
+<meta name="keywords" content="docker,storage">
+<meta property="og:type" content="article">
+<meta property="og:title" content=" Docker源码分析—存储驱动 ">
+<meta property="og:url" content="http://yoursite.com/2018/01/15/2018-01-15-docker-storage-overlay2/index.html">
+<meta property="og:site_name" content="Hexo">
+<meta property="og:description" content="基于Docker 17.05.x  Docker使用层存储来管理镜像层和容器层。使用存储驱动来管理层的内容，使用层的元数据存储管理层的元数据 这篇文章以overlay2作为存储驱动，通过分析源码介绍存储驱动如何管理容器层和镜像层的内容">
+<meta property="og:locale" content="default">
+<meta property="og:image" content="http://yoursite.com/img/in-post/post-docker-storagedriver/dir-tree.png">
+<meta property="og:updated_time" content="2018-12-04T12:22:05.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content=" Docker源码分析—存储驱动 ">
+<meta name="twitter:description" content="基于Docker 17.05.x  Docker使用层存储来管理镜像层和容器层。使用存储驱动来管理层的内容，使用层的元数据存储管理层的元数据 这篇文章以overlay2作为存储驱动，通过分析源码介绍存储驱动如何管理容器层和镜像层的内容">
+<meta name="twitter:image" content="http://yoursite.com/img/in-post/post-docker-storagedriver/dir-tree.png">
+
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+
+
+    <link rel="alternate" href="/atom.xml" title="Hexo" type="application/atom+xml">
+
+
+
+    <link rel="shortcut icon" href="/favicon.png">
+
+
+
+    <link href="//cdn.bootcss.com/animate.css/3.5.1/animate.min.css" rel="stylesheet">
+
+
+
+    <link href="//cdn.bootcss.com/fancybox/2.1.5/jquery.fancybox.min.css" rel="stylesheet">
+
+
+
+    <script src="//cdn.bootcss.com/pace/1.0.2/pace.min.js"></script>
+    <link href="//cdn.bootcss.com/pace/1.0.2/themes/blue/pace-theme-minimal.css" rel="stylesheet">
+
+
+<link rel="stylesheet" href="/css/style.css">
+
+
+
+<link href="//cdn.bootcss.com/font-awesome/4.6.3/css/font-awesome.min.css" rel="stylesheet">
+
+
+<title> Docker源码分析—存储驱动  | Hexo</title>
+
+<script src="//cdn.bootcss.com/jquery/2.2.4/jquery.min.js"></script>
+<script src="//cdn.bootcss.com/clipboard.js/1.5.10/clipboard.min.js"></script>
+
+<script>
+    var yiliaConfig = {
+        fancybox: true,
+        animate: true,
+        isHome: false,
+        isPost: true,
+        isArchive: false,
+        isTag: false,
+        isCategory: false,
+        fancybox_js: "//cdn.bootcss.com/fancybox/2.1.5/jquery.fancybox.min.js",
+        scrollreveal: "//cdn.bootcss.com/scrollReveal.js/3.1.4/scrollreveal.min.js",
+        search: false
+    }
+</script>
+
+
+    <script> yiliaConfig.jquery_ui = [false]; </script>
+
+
+
+    <script> yiliaConfig.rootUrl = "\/";</script>
+
+
+
+
+
+
+</head></html>
+<body>
+  <div id="container">
+    <div class="left-col">
+    <div class="overlay"></div>
+<div class="intrude-less">
+    <header id="header" class="inner">
+        <a href="/" class="profilepic">
+            <img src="/img/avatar.png" class="animated zoomIn">
+        </a>
+        <hgroup>
+          <h1 class="header-author"><a href="/">Arking</a></h1>
+        </hgroup>
+
+        
+
+        
+
+
+        
+            <div id="switch-btn" class="switch-btn">
+                <div class="icon">
+                    <div class="icon-ctn">
+                        <div class="icon-wrap icon-house" data-idx="0">
+                            <div class="birdhouse"></div>
+                            <div class="birdhouse_holes"></div>
+                        </div>
+                        <div class="icon-wrap icon-ribbon hide" data-idx="1">
+                            <div class="ribbon"></div>
+                        </div>
+                        
+                        <div class="icon-wrap icon-link hide" data-idx="2">
+                            <div class="loopback_l"></div>
+                            <div class="loopback_r"></div>
+                        </div>
+                        
+                        
+                        <div class="icon-wrap icon-me hide" data-idx="3">
+                            <div class="user"></div>
+                            <div class="shoulder"></div>
+                        </div>
+                        
+                    </div>
+                    
+                </div>
+                <div class="tips-box hide">
+                    <div class="tips-arrow"></div>
+                    <ul class="tips-inner">
+                        <li>菜单</li>
+                        <li>标签</li>
+                        
+                        <li>友情链接</li>
+                        
+                        
+                        <li>关于我</li>
+                        
+                    </ul>
+                </div>
+            </div>
+        
+
+        <div id="switch-area" class="switch-area">
+            <div class="switch-wrap">
+                <section class="switch-part switch-part1">
+                    <nav class="header-menu">
+                        <ul>
+                        
+                            <li><a href="/">主页</a></li>
+                        
+                            <li><a href="/archives/">归档</a></li>
+                        
+                            <li><a href="/tags/">标签</a></li>
+                        
+                            <li><a href="/about/">关于我</a></li>
+                        
+                        </ul>
+                    </nav>
+                    <nav class="header-nav">
+                        <ul class="social">
+                            
+                                <a class="fa Email" href="/ximingchenhust@foxmail.com" title="Email"></a>
+                            
+                                <a class="fa GitHub" href="#" title="GitHub"></a>
+                            
+                        </ul>
+                    </nav>
+                </section>
+                
+                
+                <section class="switch-part switch-part2">
+                    <div class="widget tagcloud" id="js-tagcloud">
+                        <ul class="tag-list"><li class="tag-list-item"><a class="tag-list-link" href="/tags/c/">c</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/docker/">docker</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/filesystem/">filesystem</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/linux/">linux</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/overlayfs/">overlayfs</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/storage/">storage</a></li></ul>
+                    </div>
+                </section>
+                
+                
+                
+                <section class="switch-part switch-part3">
+                    <div id="js-friends">
+                    
+                      <a class="main-nav-link switch-friends-link" href="https://hexo.io">Hexo</a>
+                    
+                      <a class="main-nav-link switch-friends-link" href="https://pages.github.com/">GitHub</a>
+                    
+                      <a class="main-nav-link switch-friends-link" href="http://moxfive.xyz/">MOxFIVE</a>
+                    
+                    </div>
+                </section>
+                
+
+                
+                
+                <section class="switch-part switch-part4">
+                
+                    <div id="js-aboutme">专注于前端</div>
+                </section>
+                
+            </div>
+        </div>
+    </header>                
+</div>
+    </div>
+    <div class="mid-col">
+      <nav id="mobile-nav">
+      <div class="overlay">
+          <div class="slider-trigger"></div>
+          <h1 class="header-author js-mobile-header hide"><a href="/" title="回到主页">Arking</a></h1>
+      </div>
+    <div class="intrude-less">
+        <header id="header" class="inner">
+            <a href="/" class="profilepic">
+                <img src="/img/avatar.png" class="animated zoomIn">
+            </a>
+            <hgroup>
+              <h1 class="header-author"><a href="/" title="回到主页">Arking</a></h1>
+            </hgroup>
+            
+            <nav class="header-menu">
+                <ul>
+                
+                    <li><a href="/">主页</a></li>
+                
+                    <li><a href="/archives/">归档</a></li>
+                
+                    <li><a href="/tags/">标签</a></li>
+                
+                    <li><a href="/about/">关于我</a></li>
+                
+                <div class="clearfix"></div>
+                </ul>
+            </nav>
+            <nav class="header-nav">
+                        <ul class="social">
+                            
+                                <a class="fa Email" target="_blank" href="/ximingchenhust@foxmail.com" title="Email"></a>
+                            
+                                <a class="fa GitHub" target="_blank" href="#" title="GitHub"></a>
+                            
+                        </ul>
+            </nav>
+        </header>                
+    </div>
+    <link class="menu-list" tags="标签" friends="友情链接" about="关于我">
+</nav>
+      <div class="body-wrap"><article id="post-2018-01-15-docker-storage-overlay2" class="article article-type-post" itemscope="" itemprop="blogPost">
+  
+    <div class="article-meta">
+      <a href="/2018/01/15/2018-01-15-docker-storage-overlay2/" class="article-date">
+      <time datetime="2018-01-14T18:57:00.000Z" itemprop="datePublished">2018-01-15</time>
+</a>
+
+
+    </div>
+  
+  <div class="article-inner">
+    
+      <input type="hidden" class="isFancy">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="article-title" itemprop="name">
+       Docker源码分析—存储驱动 
+    </h1>
+  
+
+      </header>
+      
+      <div class="article-info article-info-post">
+        
+    <div class="article-category tagcloud">
+    <a class="article-category-link" href="/categories/Docker/">Docker</a>
+    </div>
+
+
+        
+    <div class="article-tag tagcloud">
+        <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/docker/">docker</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/storage/">storage</a></li></ul>
+    </div>
+
+        <div class="clearfix"></div>
+      </div>
+      
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+          
+        <blockquote>
+<p>基于Docker 17.05.x</p>
+</blockquote>
+<p>Docker使用<a href="https://arkingc.github.io/2018/01/14/docker-layerstore/" target="_blank" rel="noopener">层存储</a>来管理镜像层和容器层。使用<strong>存储驱动</strong>来管理层的内容，使用<strong>层的元数据存储</strong>管理层的元数据</p>
+<p><strong>这篇文章以overlay2作为存储驱动</strong>，通过分析源码介绍存储驱动如何管理容器层和镜像层的内容</p>
+<a id="more"></a>
+<p><br></p>
+<h2 id="层的文件结构"><a href="#层的文件结构" class="headerlink" title="层的文件结构"></a>层的文件结构</h2><p>下图是overlay2的存储驱动目录结构：</p>
+<div align="center"> <img src="/img/in-post/post-docker-storagedriver/dir-tree.png" width="40%" height="40%"> </div>
+
+<p>存储驱动目录下存有镜像层和容器层的层目录，层目录中是一些层的描述文件。其中：</p>
+<ul>
+<li>最底层：最底层只有包含该层文件的diff目录和记录该层层标识符的link文件</li>
+<li>其它层：由于不是最底层，所以除了diff目录和link文件外，还有描述下层信息的lower文件，联合挂载目录merged，以及copy-up等操作会用到的work目录</li>
+</ul>
+<p>除此之外，存储驱动目录下还有一个l目录，这个目录是层标识符目录，里面是一些称为“层标识符”的软链接，指向每一层的“层文件”目录diff</p>
+<p>可以通过<a href="https://arkingc.github.io/2017/05/05/docker-filesystem-overlay/#overlay2" target="_blank" rel="noopener">这里</a>了解更多</p>
+<p><br></p>
+<h2 id="创建层"><a href="#创建层" class="headerlink" title="创建层"></a>创建层</h2><p>一般在下列情况情况下会创建层：</p>
+<ul>
+<li>拉取一个镜像时需要为镜像创建镜像层</li>
+<li>根据镜像创建一个容器时，需要创建一层初始化层和容器层</li>
+<li>docker commit根据容器生成镜像时，会创建一层镜像层</li>
+</ul>
+<p>创建层时，会调用overlay2实现的Create()函数，参数id是将要创建层的ID，parent是这一层的父层ID。opts是创建层时需要用到的一些参数：</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br><span class="line">89</span><br><span class="line">90</span><br><span class="line">91</span><br><span class="line">92</span><br><span class="line">93</span><br><span class="line">94</span><br><span class="line">95</span><br><span class="line">96</span><br><span class="line">97</span><br><span class="line">98</span><br><span class="line">99</span><br><span class="line">100</span><br><span class="line">101</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">func</span> <span class="params">(d *Driver)</span> <span class="title">Create</span><span class="params">(id, parent <span class="keyword">string</span>, opts *graphdriver.CreateOpts)</span> <span class="params">(retErr error)</span></span> &#123;</span><br><span class="line">	<span class="comment">/*</span></span><br><span class="line"><span class="comment">		如果存储参数不为0，但是底层文件系统又不是xfs，则输出错误信息</span></span><br><span class="line"><span class="comment">			projectQuotaSupported是全局变量，初始化为false。</span></span><br><span class="line"><span class="comment">			在调用Init()函数创建存储驱动时，如果底层文件系统是xfs，</span></span><br><span class="line"><span class="comment">			则支持磁盘配额，会将这个变量赋值为true。</span></span><br><span class="line"><span class="comment">	*/</span></span><br><span class="line">	<span class="keyword">if</span> opts != <span class="literal">nil</span> &amp;&amp; <span class="built_in">len</span>(opts.StorageOpt) != <span class="number">0</span> &amp;&amp; !projectQuotaSupported &#123;</span><br><span class="line">		<span class="keyword">return</span> fmt.Errorf(<span class="string">"--storage-opt is supported only for overlay over xfs with 'pquota' mount option"</span>)</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	<span class="comment">//得到即将创建层的层目录路径/var/lib/docker/overlay2/id</span></span><br><span class="line">	dir := d.dir(id)</span><br><span class="line"></span><br><span class="line">	<span class="comment">//获取rootUID和rootGID</span></span><br><span class="line">	rootUID, rootGID, err := idtools.GetRootUIDGID(d.uidMaps, d.gidMaps)</span><br><span class="line">	<span class="keyword">if</span> err != <span class="literal">nil</span> &#123;</span><br><span class="line">		<span class="keyword">return</span> err</span><br><span class="line">	&#125;</span><br><span class="line">	<span class="comment">//创建层overlay2目录，如果存在则设置目录的权限</span></span><br><span class="line">	<span class="keyword">if</span> err := idtools.MkdirAllAs(path.Dir(dir), <span class="number">0700</span>, rootUID, rootGID); err != <span class="literal">nil</span> &#123;</span><br><span class="line">		<span class="keyword">return</span> err</span><br><span class="line">	&#125;</span><br><span class="line">	<span class="comment">//创建层目录</span></span><br><span class="line">	<span class="keyword">if</span> err := idtools.MkdirAs(dir, <span class="number">0700</span>, rootUID, rootGID); err != <span class="literal">nil</span> &#123;</span><br><span class="line">		<span class="keyword">return</span> err</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	<span class="comment">//如果层创建失败，则最后会删除层目录</span></span><br><span class="line">	<span class="keyword">defer</span> <span class="function"><span class="keyword">func</span><span class="params">()</span></span> &#123;</span><br><span class="line">		<span class="comment">// Clean up on failure</span></span><br><span class="line">		<span class="keyword">if</span> retErr != <span class="literal">nil</span> &#123;</span><br><span class="line">			os.RemoveAll(dir)</span><br><span class="line">		&#125;</span><br><span class="line">	&#125;()</span><br><span class="line"></span><br><span class="line">	<span class="comment">//处理存储参数</span></span><br><span class="line">	<span class="keyword">if</span> opts != <span class="literal">nil</span> &amp;&amp; <span class="built_in">len</span>(opts.StorageOpt) &gt; <span class="number">0</span> &#123;</span><br><span class="line">		driver := &amp;Driver&#123;&#125;</span><br><span class="line">		<span class="comment">//解析存储参数，docker 17.05.0只支持size</span></span><br><span class="line">		<span class="keyword">if</span> err := d.parseStorageOpt(opts.StorageOpt, driver); err != <span class="literal">nil</span> &#123;</span><br><span class="line">			<span class="keyword">return</span> err</span><br><span class="line">		&#125;</span><br><span class="line"></span><br><span class="line">		<span class="comment">//如果设置了磁盘空间(size)配额，则将相应信息存到存储驱动的结构对象中</span></span><br><span class="line">		<span class="comment">//对该层能使用的磁盘空间进行限制</span></span><br><span class="line">		<span class="keyword">if</span> driver.options.quota.Size &gt; <span class="number">0</span> &#123;</span><br><span class="line">			<span class="comment">// Set container disk quota limit</span></span><br><span class="line">			<span class="keyword">if</span> err := d.quotaCtl.SetQuota(dir, driver.options.quota); err != <span class="literal">nil</span> &#123;</span><br><span class="line">				<span class="keyword">return</span> err</span><br><span class="line">			&#125;</span><br><span class="line">		&#125;</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	<span class="comment">//在层目录下创建diff目录</span></span><br><span class="line">	<span class="keyword">if</span> err := idtools.MkdirAs(path.Join(dir, <span class="string">"diff"</span>), <span class="number">0755</span>, rootUID, rootGID); err != <span class="literal">nil</span> &#123;</span><br><span class="line">		<span class="keyword">return</span> err</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	<span class="comment">//生成层标识符字符串lid。</span></span><br><span class="line">	<span class="comment">//创建层标识符的软链接，链接文件位于存储驱动目录下的l目录下，链接到层目录下的diff目录</span></span><br><span class="line">	lid := generateID(idLength)</span><br><span class="line">	<span class="keyword">if</span> err := os.Symlink(path.Join(<span class="string">".."</span>, id, <span class="string">"diff"</span>), path.Join(d.home, linkDir, lid)); err != <span class="literal">nil</span> &#123;</span><br><span class="line">		<span class="keyword">return</span> err</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	<span class="comment">//创建link文件，将层标识符信息(层标识符字符串)写入link文件中</span></span><br><span class="line">	<span class="keyword">if</span> err := ioutil.WriteFile(path.Join(dir, <span class="string">"link"</span>), []<span class="keyword">byte</span>(lid), <span class="number">0644</span>); err != <span class="literal">nil</span> &#123;</span><br><span class="line">		<span class="keyword">return</span> err</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	<span class="comment">//如果没有父层，则返回。因此，对于最底层来说，在这就返回了。</span></span><br><span class="line">	<span class="keyword">if</span> parent == <span class="string">""</span> &#123;</span><br><span class="line">		<span class="keyword">return</span> <span class="literal">nil</span></span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	<span class="comment">/*如果不是最底层，则创建work目录和merged目录*/</span></span><br><span class="line">	<span class="keyword">if</span> err := idtools.MkdirAs(path.Join(dir, <span class="string">"work"</span>), <span class="number">0700</span>, rootUID, rootGID); err != <span class="literal">nil</span> &#123;</span><br><span class="line">		<span class="keyword">return</span> err</span><br><span class="line">	&#125;</span><br><span class="line">	<span class="keyword">if</span> err := idtools.MkdirAs(path.Join(dir, <span class="string">"merged"</span>), <span class="number">0700</span>, rootUID, rootGID); err != <span class="literal">nil</span> &#123;</span><br><span class="line">		<span class="keyword">return</span> err</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	<span class="comment">/*</span></span><br><span class="line"><span class="comment">		不是最底层，除了work和merged外，还要创建lower文件，记录lower层信息</span></span><br><span class="line"><span class="comment">		所以根据父层ID(parent)读取父层目录下的lower文件，然后在结果中添加父层信息</span></span><br><span class="line"><span class="comment">		上述结果就是lower文件中的内容，将其写入lower文件</span></span><br><span class="line"><span class="comment">	*/</span></span><br><span class="line">	lower, err := d.getLower(parent)</span><br><span class="line">	<span class="keyword">if</span> err != <span class="literal">nil</span> &#123;</span><br><span class="line">		<span class="keyword">return</span> err</span><br><span class="line">	&#125;</span><br><span class="line">	<span class="keyword">if</span> lower != <span class="string">""</span> &#123;</span><br><span class="line">		<span class="keyword">if</span> err := ioutil.WriteFile(path.Join(dir, lowerFile), []<span class="keyword">byte</span>(lower), <span class="number">0666</span>); err != <span class="literal">nil</span> &#123;</span><br><span class="line">			<span class="keyword">return</span> err</span><br><span class="line">		&#125;</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	<span class="keyword">return</span> <span class="literal">nil</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>函数不短，但是实现逻辑还是很清晰的，概括起来可以分为下列步骤：</p>
+<ol>
+<li>检测是否支持磁盘配额，如果不支持并且设置了存储参数则返回错误</li>
+<li>如果1没有返回，则<strong>创建层目录</strong></li>
+<li>对存储参数进行处理，限制该层所能使用的磁盘空间</li>
+<li><strong>创建层目录下的文件</strong>，这里分为两种情况：<ul>
+<li>如果是最底层，则只创建diff目录，层标识符及link文件</li>
+<li>如果不是最底层，除了上面的文件，还会创建work目录，merged目录以及lower文件</li>
+</ul>
+</li>
+</ol>
+<h3 id="获取lower层信息"><a href="#获取lower层信息" class="headerlink" title="获取lower层信息"></a>获取lower层信息</h3><p>如果不是最底层，会创建lower文件，这里介绍一些获取lower层信息的过程，在上面的代码中lower层信息通过函数getLower来获取：</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">func</span> <span class="params">(d *Driver)</span> <span class="title">getLower</span><span class="params">(parent <span class="keyword">string</span>)</span> <span class="params">(<span class="keyword">string</span>, error)</span></span> &#123;</span><br><span class="line">	<span class="comment">//获取父层的层目录路径</span></span><br><span class="line">	parentDir := d.dir(parent)</span><br><span class="line"></span><br><span class="line">	<span class="comment">// Ensure parent exists</span></span><br><span class="line">	<span class="keyword">if</span> _, err := os.Lstat(parentDir); err != <span class="literal">nil</span> &#123;</span><br><span class="line">		<span class="keyword">return</span> <span class="string">""</span>, err</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	<span class="comment">//读取父层的层目录下的link文件</span></span><br><span class="line">	parentLink, err := ioutil.ReadFile(path.Join(parentDir, <span class="string">"link"</span>))</span><br><span class="line">	<span class="keyword">if</span> err != <span class="literal">nil</span> &#123;</span><br><span class="line">		<span class="keyword">return</span> <span class="string">""</span>, err</span><br><span class="line">	&#125;</span><br><span class="line">	<span class="comment">//将父层的层标识符路径信息 “l/层标识符” 添加到记录lower层信息的数组lowers中</span></span><br><span class="line">	lowers := []<span class="keyword">string</span>&#123;path.Join(linkDir, <span class="keyword">string</span>(parentLink))&#125;</span><br><span class="line"></span><br><span class="line">	<span class="comment">//读取父层下的lower文件</span></span><br><span class="line">	parentLower, err := ioutil.ReadFile(path.Join(parentDir, lowerFile))</span><br><span class="line">	<span class="keyword">if</span> err == <span class="literal">nil</span> &#123;</span><br><span class="line">		<span class="comment">//将父层的lower层信息添加到lowers数组</span></span><br><span class="line">		parentLowers := strings.Split(<span class="keyword">string</span>(parentLower), <span class="string">":"</span>)</span><br><span class="line">		lowers = <span class="built_in">append</span>(lowers, parentLowers...)</span><br><span class="line">	&#125;</span><br><span class="line">	<span class="comment">//如果lower层太多，最大限制是128，则返回错误</span></span><br><span class="line">	<span class="keyword">if</span> <span class="built_in">len</span>(lowers) &gt; maxDepth &#123;</span><br><span class="line">		<span class="keyword">return</span> <span class="string">""</span>, errors.New(<span class="string">"max depth exceeded"</span>)</span><br><span class="line">	&#125;</span><br><span class="line">	<span class="comment">//将lower层字符串通过':'连接成一个字符串返回</span></span><br><span class="line">	<span class="keyword">return</span> strings.Join(lowers, <span class="string">":"</span>), <span class="literal">nil</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>代码中已经有详细注释，主要逻辑就是读父层的lower文件，然后将父层信息也添加进去</p>
+<p><br></p>
+<h2 id="删除层"><a href="#删除层" class="headerlink" title="删除层"></a>删除层</h2><p>一般在下列情况下会删除层：</p>
+<ul>
+<li>删除一个镜像，会删除镜像的所有层</li>
+<li>删除一个容器，会删除为容器创建的初始化层和容器层</li>
+</ul>
+<p>删除一个层时，会调用存储驱动的Remove函数：</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">func</span> <span class="params">(d *Driver)</span> <span class="title">Remove</span><span class="params">(id <span class="keyword">string</span>)</span> <span class="title">error</span></span> &#123;</span><br><span class="line">	<span class="comment">//删除前先获得锁</span></span><br><span class="line">	d.locker.Lock(id)</span><br><span class="line">	<span class="comment">//函数返回时释放锁</span></span><br><span class="line">	<span class="keyword">defer</span> d.locker.Unlock(id)</span><br><span class="line">	<span class="comment">//获得该层的层目录路径</span></span><br><span class="line">	dir := d.dir(id)</span><br><span class="line">	<span class="comment">//获取层标识符链接文件的路径</span></span><br><span class="line">	lid, err := ioutil.ReadFile(path.Join(dir, <span class="string">"link"</span>))</span><br><span class="line">	<span class="keyword">if</span> err == <span class="literal">nil</span> &#123;</span><br><span class="line">		<span class="comment">//删除层标识符目录l下该层的层标识符链接文件</span></span><br><span class="line">		<span class="keyword">if</span> err := os.RemoveAll(path.Join(d.home, linkDir, <span class="keyword">string</span>(lid))); err != <span class="literal">nil</span> &#123;</span><br><span class="line">			logrus.Debugf(<span class="string">"Failed to remove link: %v"</span>, err)</span><br><span class="line">		&#125;</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	<span class="comment">//删除该层的层目录</span></span><br><span class="line">	<span class="keyword">if</span> err := os.RemoveAll(dir); err != <span class="literal">nil</span> &amp;&amp; !os.IsNotExist(err) &#123;</span><br><span class="line">		<span class="keyword">return</span> err</span><br><span class="line">	&#125;</span><br><span class="line">	<span class="keyword">return</span> <span class="literal">nil</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>函数主要包括2步：</p>
+<ol>
+<li>删除层的层标识符链接文件</li>
+<li>删除层目录</li>
+</ol>
+<p><br></p>
+<h2 id="容器启动与停止"><a href="#容器启动与停止" class="headerlink" title="容器启动与停止"></a>容器启动与停止</h2><p>现在，我们已经知道了解了层的创建和删除过程。但是我们一直没有提到一个问题：<strong>我们在容器内看到的文件存在哪？</strong></p>
+<p>我们已经知道层目录下有diff，merged和work 3个目录。diff存储的是该层的文件，work是执行一些特定操作时所要用到的目录，所以实际上，<strong>在容器内看到的文件，就存在于merged目录下</strong></p>
+<p><strong>merged目录在容器未运行时，是一个空目录，当容器启动时会将该容器所有层的diff目录进行联合挂载，挂载到merged目录下，挂载时使用的文件系统就是内核OverlayFS文件系统</strong></p>
+<blockquote>
+<p>如果有看过我关于内核OverlayFS相关的博文，这里应该已经对Docker的overlay2存储驱动与内核OverlayFS的关系有了一个比较清晰的认识</p>
+</blockquote>
+<p><strong>当挂载完成后，容器处于一个子文件系统命名空间，只能看到merged目录下的文件，相当于chroot命令的效果</strong></p>
+<p>所以，在停止一个容器时，实际上就是对merged目录执行一个卸载命令</p>
+<h3 id="挂载文件系统"><a href="#挂载文件系统" class="headerlink" title="挂载文件系统"></a>挂载文件系统</h3><p>容器启动时，文件系统的挂载逻辑上面已经介绍过了，就是将一系列diff目录联合挂载到容器层的merged目录下。这个操作通过overlay2存储驱动实现的Get函数来完成：</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br><span class="line">89</span><br><span class="line">90</span><br><span class="line">91</span><br><span class="line">92</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">func</span> <span class="params">(d *Driver)</span> <span class="title">Get</span><span class="params">(id <span class="keyword">string</span>, mountLabel <span class="keyword">string</span>)</span> <span class="params">(s <span class="keyword">string</span>, err error)</span></span> &#123;</span><br><span class="line">	d.locker.Lock(id)</span><br><span class="line">	<span class="keyword">defer</span> d.locker.Unlock(id)</span><br><span class="line">	<span class="comment">//获取该层的层目录路径</span></span><br><span class="line">	dir := d.dir(id)</span><br><span class="line">	<span class="keyword">if</span> _, err := os.Stat(dir); err != <span class="literal">nil</span> &#123;</span><br><span class="line">		<span class="keyword">return</span> <span class="string">""</span>, err</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	<span class="comment">//获取该层的diff目录路径</span></span><br><span class="line">	diffDir := path.Join(dir, <span class="string">"diff"</span>)</span><br><span class="line">	<span class="comment">//读取lower文件，获取lower层的层标识符信息</span></span><br><span class="line">	lowers, err := ioutil.ReadFile(path.Join(dir, lowerFile))</span><br><span class="line">	<span class="keyword">if</span> err != <span class="literal">nil</span> &#123;</span><br><span class="line">		<span class="comment">// If no lower, just return diff directory</span></span><br><span class="line">		<span class="keyword">if</span> os.IsNotExist(err) &#123;</span><br><span class="line">			<span class="keyword">return</span> diffDir, <span class="literal">nil</span></span><br><span class="line">		&#125;</span><br><span class="line">		<span class="keyword">return</span> <span class="string">""</span>, err</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	<span class="comment">//获取该层merged目录的路径</span></span><br><span class="line">	mergedDir := path.Join(dir, <span class="string">"merged"</span>)</span><br><span class="line">	<span class="comment">//曾加引用计数，如果大于1说明已经挂载了则直接返回</span></span><br><span class="line">	<span class="keyword">if</span> count := d.ctr.Increment(mergedDir); count &gt; <span class="number">1</span> &#123;</span><br><span class="line">		<span class="keyword">return</span> mergedDir, <span class="literal">nil</span></span><br><span class="line">	&#125;</span><br><span class="line">	<span class="keyword">defer</span> <span class="function"><span class="keyword">func</span><span class="params">()</span></span> &#123;</span><br><span class="line">		<span class="keyword">if</span> err != <span class="literal">nil</span> &#123;</span><br><span class="line">			<span class="keyword">if</span> c := d.ctr.Decrement(mergedDir); c &lt;= <span class="number">0</span> &#123;</span><br><span class="line">				syscall.Unmount(mergedDir, <span class="number">0</span>)</span><br><span class="line">			&#125;</span><br><span class="line">		&#125;</span><br><span class="line">	&#125;()</span><br><span class="line"></span><br><span class="line">	<span class="comment">//获取该层work目录的路径</span></span><br><span class="line">	workDir := path.Join(dir, <span class="string">"work"</span>)</span><br><span class="line">	<span class="comment">//通过:分割lower层的层标识符信息</span></span><br><span class="line">	splitLowers := strings.Split(<span class="keyword">string</span>(lowers), <span class="string">":"</span>)</span><br><span class="line">	<span class="comment">//得到lower层层标识符路径数组</span></span><br><span class="line">	absLowers := <span class="built_in">make</span>([]<span class="keyword">string</span>, <span class="built_in">len</span>(splitLowers))</span><br><span class="line">	<span class="keyword">for</span> i, s := <span class="keyword">range</span> splitLowers &#123;</span><br><span class="line">		absLowers[i] = path.Join(d.home, s)</span><br><span class="line">	&#125;</span><br><span class="line">	<span class="comment">//挂载命令的参数字符串</span></span><br><span class="line">	opts := fmt.Sprintf(<span class="string">"lowerdir=%s,upperdir=%s,workdir=%s"</span>, strings.Join(absLowers, <span class="string">":"</span>), path.Join(dir, <span class="string">"diff"</span>), path.Join(dir, <span class="string">"work"</span>))</span><br><span class="line">	<span class="comment">//挂载命令的数据</span></span><br><span class="line">	mountData := label.FormatMountLabel(opts, mountLabel)</span><br><span class="line">	<span class="comment">//挂载函数</span></span><br><span class="line">	mount := syscall.Mount</span><br><span class="line">	<span class="comment">//挂载目标目录</span></span><br><span class="line">	mountTarget := mergedDir</span><br><span class="line"></span><br><span class="line">	pageSize := syscall.Getpagesize()</span><br><span class="line"></span><br><span class="line">	<span class="comment">//go 1.7.中，可能会返回一个比系统支持更大的页大小。这个在go 1.8中解决了</span></span><br><span class="line">	<span class="comment">//所以如果是go 1.8，下面这3行代码可以删掉</span></span><br><span class="line">	<span class="keyword">if</span> pageSize &gt; <span class="number">4096</span> &#123;</span><br><span class="line">		pageSize = <span class="number">4096</span></span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	<span class="comment">// 如果挂载命令太长，一个页中放不下，则使用相对路径作为参数来挂载</span></span><br><span class="line">	<span class="keyword">if</span> <span class="built_in">len</span>(mountData) &gt; pageSize &#123;</span><br><span class="line">		opts = fmt.Sprintf(<span class="string">"lowerdir=%s,upperdir=%s,workdir=%s"</span>, <span class="keyword">string</span>(lowers), path.Join(id, <span class="string">"diff"</span>), path.Join(id, <span class="string">"work"</span>))</span><br><span class="line">		mountData = label.FormatMountLabel(opts, mountLabel)</span><br><span class="line">		<span class="keyword">if</span> <span class="built_in">len</span>(mountData) &gt; pageSize &#123;</span><br><span class="line">			<span class="keyword">return</span> <span class="string">""</span>, fmt.Errorf(<span class="string">"cannot mount layer, mount label too large %d"</span>, <span class="built_in">len</span>(mountData))</span><br><span class="line">		&#125;</span><br><span class="line"></span><br><span class="line">		mount = <span class="function"><span class="keyword">func</span><span class="params">(source <span class="keyword">string</span>, target <span class="keyword">string</span>, mType <span class="keyword">string</span>, flags <span class="keyword">uintptr</span>, label <span class="keyword">string</span>)</span> <span class="title">error</span></span> &#123;</span><br><span class="line">			<span class="keyword">return</span> mountFrom(d.home, source, target, mType, flags, label)</span><br><span class="line">		&#125;</span><br><span class="line">		mountTarget = path.Join(id, <span class="string">"merged"</span>)</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	<span class="keyword">if</span> err := mount(<span class="string">"overlay"</span>, mountTarget, <span class="string">"overlay"</span>, <span class="number">0</span>, mountData); err != <span class="literal">nil</span> &#123;</span><br><span class="line">		<span class="keyword">return</span> <span class="string">""</span>, fmt.Errorf(<span class="string">"error creating overlay mount to %s: %v"</span>, mergedDir, err)</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	<span class="comment">// chown "workdir/work" to the remapped root UID/GID. Overlay fs inside a</span></span><br><span class="line">	<span class="comment">// user namespace requires this to move a directory from lower to upper.</span></span><br><span class="line">	rootUID, rootGID, err := idtools.GetRootUIDGID(d.uidMaps, d.gidMaps)</span><br><span class="line">	<span class="keyword">if</span> err != <span class="literal">nil</span> &#123;</span><br><span class="line">		<span class="keyword">return</span> <span class="string">""</span>, err</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	<span class="keyword">if</span> err := os.Chown(path.Join(workDir, <span class="string">"work"</span>), rootUID, rootGID); err != <span class="literal">nil</span> &#123;</span><br><span class="line">		<span class="keyword">return</span> <span class="string">""</span>, err</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	<span class="keyword">return</span> mergedDir, <span class="literal">nil</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>函数完成下列操作：</p>
+<ol>
+<li>为挂载命令准备参数，设置挂载函数。包括<ul>
+<li>获取该层diff目录路径</li>
+<li>获取联合挂载的目标目录——merged目录的路径</li>
+<li>获取该层work目录路径</li>
+<li>获取链接到lower层diff目录的软连接的路径</li>
+</ul>
+</li>
+<li>根据页大小判断是否要使用相对路径进行挂载</li>
+<li>调用挂载函数执行挂载</li>
+<li>修改work目录权限</li>
+</ol>
+<blockquote>
+<p>第2步是因为”/var/lib/docker/overlay2/…“这样的字符串太长，由于overlay2最大支持128层，所以加起来字符串的长度可想而知。这有可能无法放入一个页中导致挂载失败。所以要进行一个这样的判断，这也是overlay2引入层标识符的原因</p>
+</blockquote>
+<p>在调用挂载函数后，会产生一个文件系统挂载的系统调用，进一步会进入内核，由内核OverlayFS来完成挂载操作</p>
+<h3 id="卸载文件系统"><a href="#卸载文件系统" class="headerlink" title="卸载文件系统"></a>卸载文件系统</h3><p>容器停止时，会卸载容器的文件系统。通过overlay2实现的函数Put来完成：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br></pre></td><td class="code"><pre><span class="line">func (d *Driver) Put(id <span class="built_in">string</span>) error &#123;</span><br><span class="line">	d.locker.Lock(id)</span><br><span class="line">	defer d.locker.Unlock(id)</span><br><span class="line">	<span class="comment">//获取该层路径</span></span><br><span class="line">	dir := d.dir(id)</span><br><span class="line">	<span class="comment">//读取lower文件，获取lower层信息</span></span><br><span class="line">	_, err := ioutil.ReadFile(path.Join(dir, lowerFile))</span><br><span class="line">	<span class="keyword">if</span> err != nil &#123;</span><br><span class="line">		<span class="comment">// If no lower, no mount happened and just return directly</span></span><br><span class="line">		<span class="keyword">if</span> os.IsNotExist(err) &#123;</span><br><span class="line">			<span class="keyword">return</span> nil</span><br><span class="line">		&#125;</span><br><span class="line">		<span class="keyword">return</span> err</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	<span class="comment">//获取挂载点路径，即merged目录的路径</span></span><br><span class="line">	mountpoint := path.Join(dir, <span class="string">"merged"</span>)</span><br><span class="line">	<span class="comment">//挂载时增加了引用计数，卸载时减少</span></span><br><span class="line">	<span class="keyword">if</span> count := d.ctr.Decrement(mountpoint); count &gt; <span class="number">0</span> &#123;</span><br><span class="line">		<span class="keyword">return</span> nil</span><br><span class="line">	&#125;</span><br><span class="line">	<span class="comment">//卸载</span></span><br><span class="line">	<span class="keyword">if</span> err := syscall.Unmount(mountpoint, <span class="number">0</span>); err != nil &#123;</span><br><span class="line">		logrus.Debugf(<span class="string">"Failed to unmount %s overlay: %s - %v"</span>, id, mountpoint, err)</span><br><span class="line">	&#125;</span><br><span class="line">	<span class="keyword">return</span> nil</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>如果不存在lower层，则该层不会发生挂载。所以如果读取lower文件，发现文件不存在，说明是一个最底层，直接返回。否则，获取该层的merged目录，也就是联合挂载目录，调用syscall.Unmount()卸载容器的文件系统。这个函数会产生一个卸载文件系统的系统调用，进一步进入内核，由内核OverlayFS完成文件系统的卸载工作</p>
+
+      
+    </div>
+    
+  </div>
+  
+    
+    <div class="copyright">
+        <p><span>本文标题:</span><a href="/2018/01/15/2018-01-15-docker-storage-overlay2/"> Docker源码分析—存储驱动 </a></p>
+        <p><span>文章作者:</span><a href="/" title="回到主页">Arking</a></p>
+        <p><span>发布时间:</span>2018-01-15, 02:57:00</p>
+        <p><span>最后更新:</span>2018-12-04, 20:22:05</p>
+        <p>
+            <span>原始链接:</span><a class="post-url" href="/2018/01/15/2018-01-15-docker-storage-overlay2/" title=" Docker源码分析—存储驱动 ">http://yoursite.com/2018/01/15/2018-01-15-docker-storage-overlay2/</a>
+            <span class="copy-path" data-clipboard-text="原文: http://yoursite.com/2018/01/15/2018-01-15-docker-storage-overlay2/　　作者: Arking" title="点击复制文章链接"><i class="fa fa-clipboard"></i></span>
+            <script> var clipboard = new Clipboard('.copy-path'); </script>
+        </p>
+        <p>
+            <span>许可协议:</span><i class="fa fa-creative-commons"></i> <a rel="license" href="http://creativecommons.org/licenses/by-nc-sa/4.0/" title="CC BY-NC-SA 4.0 International" target="_blank">"署名-非商用-相同方式共享 4.0"</a> 转载请保留原文链接及作者。
+        </p>
+    </div>
+
+
+
+    <nav id="article-nav">
+        
+            <div id="article-nav-newer" class="article-nav-title">
+                <a href="/2018/01/19/2018-01-19-docker-imagestore/">
+                     Docker源码分析—镜像存储 
+                </a>
+            </div>
+        
+        
+            <div id="article-nav-older" class="article-nav-title">
+                <a href="/2018/01/14/2018-01-14-docker-layerstore/">
+                     Docker源码分析—层存储 
+                </a>
+            </div>
+        
+    </nav>
+
+  
+</article>
+
+    <div id="toc" class="toc-article">
+        <strong class="toc-title">文章目录</strong>
+        
+            <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#层的文件结构"><span class="toc-number">1.</span> <span class="toc-text">层的文件结构</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#创建层"><span class="toc-number">2.</span> <span class="toc-text">创建层</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#获取lower层信息"><span class="toc-number">2.1.</span> <span class="toc-text">获取lower层信息</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#删除层"><span class="toc-number">3.</span> <span class="toc-text">删除层</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#容器启动与停止"><span class="toc-number">4.</span> <span class="toc-text">容器启动与停止</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#挂载文件系统"><span class="toc-number">4.1.</span> <span class="toc-text">挂载文件系统</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#卸载文件系统"><span class="toc-number">4.2.</span> <span class="toc-text">卸载文件系统</span></a></li></ol></li></ol>
+        
+    </div>
+    <style>
+        .left-col .switch-btn,
+        .left-col .switch-area {
+            display: none;
+        }
+        .toc-level-3 i,
+        .toc-level-3 ol {
+            display: none !important;
+        }
+    </style>
+
+    <input type="button" id="tocButton" value="隐藏目录" title="点击按钮隐藏或者显示文章目录">
+
+    <script>
+        yiliaConfig.toc = ["隐藏目录", "显示目录", !!"false"];
+    </script>
+
+
+
+    
+<div class="share">
+    
+        <div class="bdsharebuttonbox">
+            <a href="#" class="fa fa-twitter bds_twi" data-cmd="twi" title="分享到推特"></a>
+            <a href="#" class="fa fa-weibo bds_tsina" data-cmd="tsina" title="分享到新浪微博"></a>
+            <a href="#" class="fa fa-qq bds_sqq" data-cmd="sqq" title="分享给 QQ 好友"></a>
+            <a href="#" class="fa fa-files-o bds_copy" data-cmd="copy" title="复制网址"></a>
+            <a href="#" class="fa fa fa-envelope-o bds_mail" data-cmd="mail" title="通过邮件分享"></a>
+            <a href="#" class="fa fa-weixin bds_weixin" data-cmd="weixin" title="生成文章二维码"></a>
+            <a href="#" class="fa fa-share-alt bds_more" data-cmd="more"></a>
+        </div>
+        <script>
+            window._bd_share_config={
+                "common":{"bdSnsKey":{},"bdText":" Docker源码分析—存储驱动 　| Hexo　","bdMini":"2","bdMiniList":false,"bdPic":"","bdStyle":"0","bdSize":"24"},"share":{}};with(document)0[(getElementsByTagName('head')[0]||body).appendChild(createElement('script')).src='http://bdimg.share.baidu.com/static/api/js/share.js?v=89860593.js?cdnversion='+~(-new Date()/36e5)];
+        </script>
+    
+
+    
+</div>
+
+
+
+
+
+
+
+    
+
+
+
+
+    <div class="scroll" id="post-nav-button">
+        
+            <a href="/2018/01/19/2018-01-19-docker-imagestore/" title="上一篇:  Docker源码分析—镜像存储 ">
+                <i class="fa fa-angle-left"></i>
+            </a>
+        
+
+        <a title="文章列表"><i class="fa fa-bars"></i><i class="fa fa-times"></i></a>
+
+        
+            <a href="/2018/01/14/2018-01-14-docker-layerstore/" title="下一篇:  Docker源码分析—层存储 ">
+                <i class="fa fa-angle-right"></i>
+            </a>
+        
+    </div>
+
+    <ul class="post-list"><li class="post-list-item"><a class="post-list-link" href="/2018/09/05/2018-09-05-linux-kernel/">Ubuntu下内核与内核模块的编译过程</a></li><li class="post-list-item"><a class="post-list-link" href="/2018/01/19/2018-01-19-docker-imagestore/"> Docker源码分析—镜像存储 </a></li><li class="post-list-item"><a class="post-list-link" href="/2018/01/15/2018-01-15-docker-storage-overlay2/"> Docker源码分析—存储驱动 </a></li><li class="post-list-item"><a class="post-list-link" href="/2018/01/14/2018-01-14-docker-layerstore/"> Docker源码分析—层存储 </a></li><li class="post-list-item"><a class="post-list-link" href="/2018/01/12/2018-01-10-c-stack_frame/"> C函数栈帧 </a></li><li class="post-list-item"><a class="post-list-link" href="/2017/12/26/2017-12-26-linux-code-overlayfs-read_write/">内核OverlayFS—文件读写</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/12/22/2017-12-22-linux-code-overlayfs-create_delete/">内核OverlayFS—创建与删除文件</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/11/30/2017-11-30-linux-du/"> Linux查看目录大小</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/11/10/2017-11-10-linux-code-overlayfs-dir-op1/">内核OverlayFS—目录搜索</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/10/12/2017-10-12-linux-code-overlayfs-mnt/">内核OverlayFS—注册与挂载</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/09/20/2017-09-20-linux-code-overlayfs-layerinfo/">内核OverlayFS—文件层次信息</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/08/18/2017-08-18-linux-code-vfs/">Linux虚拟文件系统(VFS)</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/05/05/2017-05-05-docker-filesystem-overlay/"> Docker存储驱动—Overlay/Overlay2「译」</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/04/13/2017-04-13-docker-filesystem-aufs/"> Docker存储驱动—Aufs </a></li><li class="post-list-item"><a class="post-list-link" href="/2017/04/09/2017-04-09-linux-uuid/"> Linux存储设备的UUID</a></li></ul>
+
+
+
+
+    <script>
+        
+    </script>
+</div>
+      <footer id="footer">
+    <div class="outer">
+        <div id="footer-info">
+            <div class="footer-left">
+                <i class="fa fa-copyright"></i> 
+                2017-2018 Arking
+            </div>
+            <div class="footer-right">
+                <a href="http://hexo.io/" target="_blank" title="快速、简洁且高效的博客框架">Hexo</a>  Theme <a href="https://github.com/MOxFIVE/hexo-theme-yelee" target="_blank" title="简而不减 Hexo 双栏博客主题  v3.5">Yelee</a> by MOxFIVE <i class="fa fa-heart animated infinite pulse"></i>
+            </div>
+        </div>
+        
+            <div class="visit">
+                
+                    <span id="busuanzi_container_site_pv" style="display:none">
+                        <span id="site-visit" title="本站到访数"><i class="fa fa-user" aria-hidden="true"></i><span id="busuanzi_value_site_uv"></span>
+                        </span>
+                    </span>
+                
+                
+                    <span>| </span>
+                
+                
+                    <span id="busuanzi_container_page_pv" style="display:none">
+                        <span id="page-visit" title="本页阅读量"><i class="fa fa-eye animated infinite pulse" aria-hidden="true"></i><span id="busuanzi_value_page_pv"></span>
+                        </span>
+                    </span>
+                
+            </div>
+        
+    </div>
+</footer>
+    </div>
+    
+<script data-main="/js/main.js" src="//cdn.bootcss.com/require.js/2.2.0/require.min.js"></script>
+
+    <script>
+        $(document).ready(function() {
+            var iPad = window.navigator.userAgent.indexOf('iPad');
+            if (iPad > -1 || $(".left-col").css("display") === "none") {
+                var bgColorList = ["#9db3f4", "#414141", "#e5a859", "#f5dfc6", "#c084a0", "#847e72", "#cd8390", "#996731"];
+                var bgColor = Math.ceil(Math.random() * (bgColorList.length - 1));
+                $("body").css({"background-color": bgColorList[bgColor], "background-size": "cover"});
+            }
+            else {
+                var backgroundnum = 5;
+                var backgroundimg = "url(/background/bg-x.jpg)".replace(/x/gi, Math.ceil(Math.random() * backgroundnum));
+                $("body").css({"background": backgroundimg, "background-attachment": "fixed", "background-size": "cover"});
+            }
+        })
+    </script>
+
+
+
+
+
+<div class="scroll" id="scroll">
+    <a href="#" title="返回顶部"><i class="fa fa-arrow-up"></i></a>
+    <a href="#comments" onclick="load$hide();" title="查看评论"><i class="fa fa-comments-o"></i></a>
+    <a href="#footer" title="转到底部"><i class="fa fa-arrow-down"></i></a>
+</div>
+<script>
+    // Open in New Window
+    
+        var oOpenInNew = {
+            
+            
+            
+            
+            
+            
+             archives: ".archive-article-title", 
+             miniArchives: "a.post-list-link", 
+            
+             friends: "#js-friends a", 
+             socail: ".social a" 
+        }
+        for (var x in oOpenInNew) {
+            $(oOpenInNew[x]).attr("target", "_blank");
+        }
+    
+</script>
+
+<script async src="https://dn-lbstatics.qbox.me/busuanzi/2.3/busuanzi.pure.mini.js">
+</script>
+  </div>
+</body>
+</html>

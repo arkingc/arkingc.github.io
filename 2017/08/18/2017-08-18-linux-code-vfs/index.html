@@ -1,0 +1,925 @@
+<!DOCTYPE html>
+<html>
+<head><meta name="generator" content="Hexo 3.8.0">
+
+    <!--[if lt IE 9]>
+        <style>body {display: none; background: none !important} </style>
+        <meta http-equiv="Refresh" Content="0; url=//outdatedbrowser.com/" />
+    <![endif]-->
+
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge, chrome=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="format-detection" content="telephone=no">
+<meta name="author" content="Arking">
+
+
+
+<meta name="description" content="在Linux中，VFS为上层应用提供了访问下层文件系统的统一接口，它将文件相关的概念进行了抽象，同时提供了对这些抽象概念的操作接口">
+<meta name="keywords" content="filesystem">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Linux虚拟文件系统(VFS)">
+<meta property="og:url" content="http://yoursite.com/2017/08/18/2017-08-18-linux-code-vfs/index.html">
+<meta property="og:site_name" content="Hexo">
+<meta property="og:description" content="在Linux中，VFS为上层应用提供了访问下层文件系统的统一接口，它将文件相关的概念进行了抽象，同时提供了对这些抽象概念的操作接口">
+<meta property="og:locale" content="default">
+<meta property="og:image" content="http://yoursite.com/img/in-post/post-linux-vfs/vfs.png">
+<meta property="og:image" content="http://yoursite.com/img/in-post/post-linux-vfs/relation.png">
+<meta property="og:image" content="http://yoursite.com/img/in-post/post-linux-vfs/list.png">
+<meta property="og:image" content="http://yoursite.com/img/in-post/post-linux-vfs/super_block-1.png">
+<meta property="og:image" content="http://yoursite.com/img/in-post/post-linux-vfs/super_block-2.png">
+<meta property="og:image" content="http://yoursite.com/img/in-post/post-linux-vfs/dentry-tree.png">
+<meta property="og:updated_time" content="2018-12-04T10:03:44.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Linux虚拟文件系统(VFS)">
+<meta name="twitter:description" content="在Linux中，VFS为上层应用提供了访问下层文件系统的统一接口，它将文件相关的概念进行了抽象，同时提供了对这些抽象概念的操作接口">
+<meta name="twitter:image" content="http://yoursite.com/img/in-post/post-linux-vfs/vfs.png">
+
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+
+
+    <link rel="alternate" href="/atom.xml" title="Hexo" type="application/atom+xml">
+
+
+
+    <link rel="shortcut icon" href="/favicon.png">
+
+
+
+    <link href="//cdn.bootcss.com/animate.css/3.5.1/animate.min.css" rel="stylesheet">
+
+
+
+    <link href="//cdn.bootcss.com/fancybox/2.1.5/jquery.fancybox.min.css" rel="stylesheet">
+
+
+
+    <script src="//cdn.bootcss.com/pace/1.0.2/pace.min.js"></script>
+    <link href="//cdn.bootcss.com/pace/1.0.2/themes/blue/pace-theme-minimal.css" rel="stylesheet">
+
+
+<link rel="stylesheet" href="/css/style.css">
+
+
+
+<link href="//cdn.bootcss.com/font-awesome/4.6.3/css/font-awesome.min.css" rel="stylesheet">
+
+
+<title>Linux虚拟文件系统(VFS) | Hexo</title>
+
+<script src="//cdn.bootcss.com/jquery/2.2.4/jquery.min.js"></script>
+<script src="//cdn.bootcss.com/clipboard.js/1.5.10/clipboard.min.js"></script>
+
+<script>
+    var yiliaConfig = {
+        fancybox: true,
+        animate: true,
+        isHome: false,
+        isPost: true,
+        isArchive: false,
+        isTag: false,
+        isCategory: false,
+        fancybox_js: "//cdn.bootcss.com/fancybox/2.1.5/jquery.fancybox.min.js",
+        scrollreveal: "//cdn.bootcss.com/scrollReveal.js/3.1.4/scrollreveal.min.js",
+        search: false
+    }
+</script>
+
+
+    <script> yiliaConfig.jquery_ui = [false]; </script>
+
+
+
+    <script> yiliaConfig.rootUrl = "\/";</script>
+
+
+
+
+
+
+</head></html>
+<body>
+  <div id="container">
+    <div class="left-col">
+    <div class="overlay"></div>
+<div class="intrude-less">
+    <header id="header" class="inner">
+        <a href="/" class="profilepic">
+            <img src="/img/avatar.png" class="animated zoomIn">
+        </a>
+        <hgroup>
+          <h1 class="header-author"><a href="/">Arking</a></h1>
+        </hgroup>
+
+        
+
+        
+
+
+        
+            <div id="switch-btn" class="switch-btn">
+                <div class="icon">
+                    <div class="icon-ctn">
+                        <div class="icon-wrap icon-house" data-idx="0">
+                            <div class="birdhouse"></div>
+                            <div class="birdhouse_holes"></div>
+                        </div>
+                        <div class="icon-wrap icon-ribbon hide" data-idx="1">
+                            <div class="ribbon"></div>
+                        </div>
+                        
+                        <div class="icon-wrap icon-link hide" data-idx="2">
+                            <div class="loopback_l"></div>
+                            <div class="loopback_r"></div>
+                        </div>
+                        
+                        
+                        <div class="icon-wrap icon-me hide" data-idx="3">
+                            <div class="user"></div>
+                            <div class="shoulder"></div>
+                        </div>
+                        
+                    </div>
+                    
+                </div>
+                <div class="tips-box hide">
+                    <div class="tips-arrow"></div>
+                    <ul class="tips-inner">
+                        <li>菜单</li>
+                        <li>标签</li>
+                        
+                        <li>友情链接</li>
+                        
+                        
+                        <li>关于我</li>
+                        
+                    </ul>
+                </div>
+            </div>
+        
+
+        <div id="switch-area" class="switch-area">
+            <div class="switch-wrap">
+                <section class="switch-part switch-part1">
+                    <nav class="header-menu">
+                        <ul>
+                        
+                            <li><a href="/">主页</a></li>
+                        
+                            <li><a href="/archives/">归档</a></li>
+                        
+                            <li><a href="/tags/">标签</a></li>
+                        
+                            <li><a href="/about/">关于我</a></li>
+                        
+                        </ul>
+                    </nav>
+                    <nav class="header-nav">
+                        <ul class="social">
+                            
+                                <a class="fa Email" href="/ximingchenhust@foxmail.com" title="Email"></a>
+                            
+                                <a class="fa GitHub" href="#" title="GitHub"></a>
+                            
+                        </ul>
+                    </nav>
+                </section>
+                
+                
+                <section class="switch-part switch-part2">
+                    <div class="widget tagcloud" id="js-tagcloud">
+                        <ul class="tag-list"><li class="tag-list-item"><a class="tag-list-link" href="/tags/c/">c</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/docker/">docker</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/filesystem/">filesystem</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/linux/">linux</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/overlayfs/">overlayfs</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/storage/">storage</a></li></ul>
+                    </div>
+                </section>
+                
+                
+                
+                <section class="switch-part switch-part3">
+                    <div id="js-friends">
+                    
+                      <a class="main-nav-link switch-friends-link" href="https://hexo.io">Hexo</a>
+                    
+                      <a class="main-nav-link switch-friends-link" href="https://pages.github.com/">GitHub</a>
+                    
+                      <a class="main-nav-link switch-friends-link" href="http://moxfive.xyz/">MOxFIVE</a>
+                    
+                    </div>
+                </section>
+                
+
+                
+                
+                <section class="switch-part switch-part4">
+                
+                    <div id="js-aboutme">专注于前端</div>
+                </section>
+                
+            </div>
+        </div>
+    </header>                
+</div>
+    </div>
+    <div class="mid-col">
+      <nav id="mobile-nav">
+      <div class="overlay">
+          <div class="slider-trigger"></div>
+          <h1 class="header-author js-mobile-header hide"><a href="/" title="回到主页">Arking</a></h1>
+      </div>
+    <div class="intrude-less">
+        <header id="header" class="inner">
+            <a href="/" class="profilepic">
+                <img src="/img/avatar.png" class="animated zoomIn">
+            </a>
+            <hgroup>
+              <h1 class="header-author"><a href="/" title="回到主页">Arking</a></h1>
+            </hgroup>
+            
+            <nav class="header-menu">
+                <ul>
+                
+                    <li><a href="/">主页</a></li>
+                
+                    <li><a href="/archives/">归档</a></li>
+                
+                    <li><a href="/tags/">标签</a></li>
+                
+                    <li><a href="/about/">关于我</a></li>
+                
+                <div class="clearfix"></div>
+                </ul>
+            </nav>
+            <nav class="header-nav">
+                        <ul class="social">
+                            
+                                <a class="fa Email" target="_blank" href="/ximingchenhust@foxmail.com" title="Email"></a>
+                            
+                                <a class="fa GitHub" target="_blank" href="#" title="GitHub"></a>
+                            
+                        </ul>
+            </nav>
+        </header>                
+    </div>
+    <link class="menu-list" tags="标签" friends="友情链接" about="关于我">
+</nav>
+      <div class="body-wrap"><article id="post-2017-08-18-linux-code-vfs" class="article article-type-post" itemscope="" itemprop="blogPost">
+  
+    <div class="article-meta">
+      <a href="/2017/08/18/2017-08-18-linux-code-vfs/" class="article-date">
+      <time datetime="2017-08-17T18:51:00.000Z" itemprop="datePublished">2017-08-18</time>
+</a>
+
+
+    </div>
+  
+  <div class="article-inner">
+    
+      <input type="hidden" class="isFancy">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="article-title" itemprop="name">
+      Linux虚拟文件系统(VFS)
+    </h1>
+  
+
+      </header>
+      
+      <div class="article-info article-info-post">
+        
+    <div class="article-category tagcloud">
+    <a class="article-category-link" href="/categories/Linux内核/">Linux内核</a>
+    </div>
+
+
+        
+    <div class="article-tag tagcloud">
+        <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/filesystem/">filesystem</a></li></ul>
+    </div>
+
+        <div class="clearfix"></div>
+      </div>
+      
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+          
+        <p>在Linux中，VFS为上层应用提供了访问下层文件系统的统一接口，它将文件相关的概念进行了抽象，同时提供了对这些抽象概念的操作接口</p>
+<a id="more"></a>
+<p>考虑一个cp操作：</p>
+<div align="left"> <img src="/img/in-post/post-linux-vfs/vfs.png" width="20%" height="20%"> </div>
+
+<p><em><a href="https://book.douban.com/subject/2287506/" target="_blank" rel="noopener">图片来源: 《深入理解Linux内核》</a></em></p>
+<p>VFS将文件进行了抽象，使用一个名为file的结构体来表示，这个file结构体包含了一个f_op变量，这个变量是一个名为file_operations的结构体指针。结构体file_operations定义了一系列文件相关的操作</p>
+<p>假设/tmp/test对应的文件变量名为file_test，/floppy/TEST对应的文件变量名为file_TEST。因此，VFS并不需要关心底层文件系统是什么。对于cp操作，它只需对file_test调用一个读，将数据读入缓冲区。然后对file_TEST调用一个写，将缓冲区的数据写入file_TEST，就能完成文件的拷贝：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">file_test-&gt;f_op-&gt;read();</span><br><span class="line">file_TEST-&gt;f_op-&gt;write();</span><br></pre></td></tr></table></figure>
+<p>具体的read和write函数由每个底层文件系统自己实现</p>
+<p><br></p>
+<h2 id="VFS中的基本结构"><a href="#VFS中的基本结构" class="headerlink" title="VFS中的基本结构"></a>VFS中的基本结构</h2><p>在VFS有下列几个经常用到的结构：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:center">结构</th>
+<th style="text-align:center">描述</th>
+<th style="text-align:center">文件</th>
+<th style="text-align:center">包含的操作对象</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:center"><strong>super_block</strong></td>
+<td style="text-align:center">代表一个已挂载的<strong>文件系统</strong></td>
+<td style="text-align:center">fs.h</td>
+<td style="text-align:center">super_operations</td>
+</tr>
+<tr>
+<td style="text-align:center"><strong>inode</strong></td>
+<td style="text-align:center">代表一个特定的<strong>文件</strong>(包括目录)</td>
+<td style="text-align:center">fs.h</td>
+<td style="text-align:center">inode_operations</td>
+</tr>
+<tr>
+<td style="text-align:center"><strong>dentry</strong></td>
+<td style="text-align:center">代表一个<strong>目录项</strong></td>
+<td style="text-align:center">dcache.h</td>
+<td style="text-align:center">dentry_operations</td>
+</tr>
+<tr>
+<td style="text-align:center"><strong>file</strong></td>
+<td style="text-align:center">代表一个和某个进程相关的<strong>已打开的文件</strong></td>
+<td style="text-align:center">fs.h</td>
+<td style="text-align:center">file_operations</td>
+</tr>
+</tbody>
+</table>
+<p>“包含的操作对象”是一个包含了相关函数指针的结构体：</p>
+<ul>
+<li><strong>super_operations</strong>：包含了一些内核对特定文件系统的调用，如write_inode()和sync_fs();</li>
+<li><strong>inode_operations</strong>：包含了一些内核对特定文件的调用，如create(),link();</li>
+<li><strong>dentry_operations</strong>：包含了一些内核对特定目录项的调用，如d_compare(),d_delete();</li>
+<li><strong>file_operations</strong>：包含了一些内核对<strong>已打开文件</strong>的调用，如read(),write();</li>
+</ul>
+<p><br></p>
+<h2 id="VFS基本结构指向关系"><a href="#VFS基本结构指向关系" class="headerlink" title="VFS基本结构指向关系"></a>VFS基本结构指向关系</h2><p>除了这4个最基本的结构，还有诸如file_system_type，vfsmount等一些常用的结构。这些常见结构体之间的指向关系如下图：</p>
+<div align="center"> <img src="/img/in-post/post-linux-vfs/relation.png" width="50%" height="50%"> </div>
+
+<p>为了后面分析每个结构在内核中的组织关系，这里不得不提一下内核中的3个链表相关的结构体，这3个结构体在内核代码中十分常见：</p>
+<div align="center"> <img src="/img/in-post/post-linux-vfs/list.png" width="50%" height="50%"> </div>
+
+<ul>
+<li>list_head用于组织双向链表，如果将链表的首尾节点互连还可以组织成环状双链表</li>
+<li>hlist_head为hash链表中的一个节点，这个节点是一个链表的头结点。这里需要注意的是hlist_node的pprev成员是一个指向hlist_node指针的指针。和list_head中的prev成员不一样。使用指向指针的指针，可以使得头结点的后一个节点通过pprev来指向头结点(hlist_head)中的first成员，因此头结点可以节省一个成员变量的空间。当hash链表很大时，可以节省大量的内存空间</li>
+</ul>
+<p>与一般的链表的实现不同，在Linux内核中，链表节点都是作为结构体的一部分来将这些结构体前后串连起来：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">student</span>&#123;</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">list_head</span> <span class="title">list_node</span>;</span><span class="comment">//链表节点</span></span><br><span class="line">	<span class="keyword">char</span>* name;</span><br><span class="line">	<span class="keyword">char</span>* ID;</span><br><span class="line">	...</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+<p>而一般的链表实现则是将结构体实现为链表节点：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">student</span>&#123;</span><span class="comment">//结构体student本身就是一个链表节点</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">student</span> *<span class="title">prev</span>;</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">student</span> *<span class="title">next</span>;</span></span><br><span class="line">	<span class="keyword">char</span>* name;</span><br><span class="line">	<span class="keyword">char</span>* ID;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>由于不是这篇文章的重点，这里简单了解下就好，具体原因以及使用方法会在其它篇幅中进行介绍</p>
+<p><br></p>
+<h2 id="super-block"><a href="#super-block" class="headerlink" title="super_block"></a>super_block</h2><p>每个super_block可以看成是一个已挂载的文件系统实例，它被每个底层文件系统(ext2,ext3,ext4,sysfs等)实现，用来存储描述特定文件系统的信息。<br>创建、管理、销毁一个super_block对象的代码在fs/super.c中</p>
+<p>每当一个文件系统被挂载时，它会调用alloc_super()方法，这个方法会去磁盘上读取superblock信息，然后用这些信息来初始化一个super_block对象</p>
+<p><strong>和super_block相关的链表有2个</strong>：</p>
+<p>1）<strong>全局super_block链表</strong>：这个链表包含了系统中的所有super_block(不止一种文件系统的super_block)。通过一个list_head类型的<strong>全局变量super_blocks</strong>来访问，内核中使用宏实现这个全局变量的初始化：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">static</span> <span class="title">LIST_HEAD</span><span class="params">(super_blocks)</span></span>;</span><br><span class="line"><span class="meta">#<span class="meta-keyword">define</span> LIST_HEAD_INIT(name) &#123; &amp;(name), &amp;(name) &#125;<span class="comment">//前后指针指向自身</span></span></span><br><span class="line"></span><br><span class="line"><span class="meta">#<span class="meta-keyword">define</span> LIST_HEAD(name) \</span></span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">list_head</span> <span class="title">name</span> = <span class="title">LIST_HEAD_INIT</span>(<span class="title">name</span>)</span></span><br></pre></td></tr></table></figure>
+<p>此后，当有新的文件系统挂载时，它会通过自身super_block结构中list_head类型的<strong>成员s_list</strong>链接到super_blocks上，形成一个全局的链表：</p>
+<div align="center"> <img src="/img/in-post/post-linux-vfs/super_block-1.png" width="50%" height="50%"> </div>
+
+<p>2）<strong>特定文件系统的super_block链表</strong>：这个链表包含了某个特定文件系统的所有super_block</p>
+<p>一个文件系统类型(如ext4)，可以有多个super_block实例。举例来说，我的Linux系统中，划分了3个分区分别挂载在/，/home，/boot目录上，挂载的文件系统都是ext4，因此，这3个ext4文件系统实例都有自己的super_block，它们通过super_block中hlist_node类型的<strong>成员s_instances</strong>链接成“ext4的super_block链表”。可以通过file_system_type的<strong>fs_supers成员</strong>来访问：</p>
+<div align="center"> <img src="/img/in-post/post-linux-vfs/super_block-2.png" width="50%" height="50%"> </div>
+
+<h3 id="super-block操作"><a href="#super-block操作" class="headerlink" title="super_block操作"></a>super_block操作</h3><p>super_operations中包含了文件系统相关的一系列函数指针。例如，如果文件系统想写它的super_block，可以通过如下方式：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">//sb为super_block指针</span></span><br><span class="line">sb-&gt;s_op-&gt;write_super(sb);</span><br></pre></td></tr></table></figure>
+<p>这里给出一些关键的super_block操作：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:center">操作</th>
+<th style="text-align:center">描述</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:center">struct inode * <strong>alloc_inode</strong>(struct super_block *sb)</td>
+<td style="text-align:center">在文件系统sb下，创建并初始化一个inode</td>
+</tr>
+<tr>
+<td style="text-align:center">void <strong>destroy_inode</strong>(struct inode *inode)</td>
+<td style="text-align:center">将inode释放</td>
+</tr>
+<tr>
+<td style="text-align:center">void <strong>dirty_inode</strong>(struct inode *inode)</td>
+<td style="text-align:center">当inode被修改时，日志文件系统会使用这个功能来更新日志</td>
+</tr>
+<tr>
+<td style="text-align:center">void <strong>write_inode</strong>(struct inode *inode, int wait)</td>
+<td style="text-align:center">将inode同步到磁盘，wait参数指明了操作是否应该同步</td>
+</tr>
+<tr>
+<td style="text-align:center">void <strong>drop_inode</strong>(struct inode *inode)</td>
+<td style="text-align:center">当inode失去最后一个引用时被调用，一般的Unix文件系统不定义这个功能。在这种情况下，VFS会简单的删除掉这个inode</td>
+</tr>
+<tr>
+<td style="text-align:center">void <strong>delete_inode</strong>(struct inode *inode)</td>
+<td style="text-align:center">将inode从磁盘中删除</td>
+</tr>
+<tr>
+<td style="text-align:center">void <strong>put_super</strong>(struct super_block *sb)</td>
+<td style="text-align:center">在卸载文件系统时被VFS调用，来释放sb结构，调用者必须获得相应的锁</td>
+</tr>
+<tr>
+<td style="text-align:center">void <strong>write_super</strong>(struct super_block *sb)</td>
+<td style="text-align:center">更新sb对应磁盘中的superblock，这个操作用来同步磁盘和内存中的超级块信息。调用前必须获得相应的锁</td>
+</tr>
+<tr>
+<td style="text-align:center">int <strong>sync_fs</strong>(struct super_block *sb, int wait)</td>
+<td style="text-align:center">同步文件系统元数据到磁盘，wait参数指明操作是否是同步的</td>
+</tr>
+<tr>
+<td style="text-align:center">void <strong>write_super_lockfs</strong>(struct super_block *sb)</td>
+<td style="text-align:center">防止sb被修改，同时更新sb数据到磁盘。目前被LVM使用</td>
+</tr>
+<tr>
+<td style="text-align:center">void <strong>unlockfs</strong>(struct super_block *sb)</td>
+<td style="text-align:center">write_super_lockfs调用后被调用，此后可以修改sb</td>
+</tr>
+<tr>
+<td style="text-align:center">int <strong>statfs</strong>(struct super_block *sb, struct statfs *statfs)</td>
+<td style="text-align:center">被VFS调用获取文件系统统计信息，存入statfs中</td>
+</tr>
+<tr>
+<td style="text-align:center">int <strong>remount_fs</strong>(struct super_block *sb, int *flags, char *data)</td>
+<td style="text-align:center">当文件系统被重新挂载到一个新的挂载点时被调用，必须获得相应锁</td>
+</tr>
+<tr>
+<td style="text-align:center">void <strong>clear_inode</strong>(struct inode *inode)</td>
+<td style="text-align:center">释放inode被清除任何存放相关数据的页</td>
+</tr>
+</tbody>
+</table>
+<p><br></p>
+<h2 id="inode"><a href="#inode" class="headerlink" title="inode"></a>inode</h2><p>inode包含了内核操作一个文件或者目录的所有信息，这些信息从磁盘中的inode读取，并存入到内存的inode结构中。每个inode代表一个文件，但是<strong>只有当具体文件被访问时，内存中才会构造这个文件对应的inode结构</strong></p>
+<p>一些没有inode的文件系统通常将文件的信息作为文件的一部分存储在文件中，而Unix风格的文件系统(有inode)则是将文件数据和控制信息分开存储</p>
+<p>inode结构中使用一个union(联合体)来指定这个inode代表的文件类型(设备文件、管道等)</p>
+<p>一些文件系统可能不支持inode中的一些属性。比如说，一些文件系统不记录访问时间戳(access timestamp)，这些文件系统可以使用它们觉得合适的方式来实现这些特征。例如，将对应的值(i_atime)设置为0，让i_atime的值和i_mtime相等，仅在内存中更新更新i_atime的值但是并不将其刷新到磁盘中</p>
+<h3 id="inode操作"><a href="#inode操作" class="headerlink" title="inode操作"></a>inode操作</h3><p>每当VFS需要对一个inode执行一些操作时，它会调用当前文件系统实现的指定inode操作。调用方式如下：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">//i表示inode指针，func为具体操作</span></span><br><span class="line">i-&gt;i_op-&gt;func(i)</span><br></pre></td></tr></table></figure>
+<p>如果在ext3下，则是调用ext3为inode实现的func，如果在ext4下，则是调用ext4为inode实现的func</p>
+<p>一些关键的inode操作如下:</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:center">操作</th>
+<th style="text-align:center">描述</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:center">int <strong>create</strong>(struct inode *dir,struct dentry *dentry,int mode)</td>
+<td style="text-align:center">VFS通过create和open系统调用来调用这个函数，根据指定的mode创建一个和dentry关联的inode</td>
+</tr>
+<tr>
+<td style="text-align:center">struct dentry<em> <strong>lookup</strong>(struct inode \</em>dir,struct dentry *dentry)</td>
+<td style="text-align:center">在目录中查找和dentry中指定文件名对应的inode</td>
+</tr>
+<tr>
+<td style="text-align:center">int <strong>link</strong>(struct dentry *old_dentry,struct inode *dir,struct dentry *dentry)</td>
+<td style="text-align:center">被系统调用link调用，为目录dir中的old_dentry创建一个硬链接dentry</td>
+</tr>
+<tr>
+<td style="text-align:center">int <strong>unlink</strong>(struct inode *dir,struct dentry *dentry)</td>
+<td style="text-align:center">被系统调用unlink调用，从目录dir中移除dentry对应的inode</td>
+</tr>
+<tr>
+<td style="text-align:center">int <strong>syslink</strong>(struct inode *dir,struct dentry *dentry,const char *sysname)</td>
+<td style="text-align:center">被系统调用syslink调用，创建一个名为sysname的符号链接指向目录dir中dentry代表的文件</td>
+</tr>
+<tr>
+<td style="text-align:center">int <strong>mkdir</strong>(struct inode *dir,struct dentry *dentry,int mode)</td>
+<td style="text-align:center">被系统调用mkdir调用，根据mode创建一个新的目录</td>
+</tr>
+<tr>
+<td style="text-align:center">int <strong>rmdir</strong>(struct inode *dir,struct dentry *dentry)</td>
+<td style="text-align:center">被系统调用rmdir调用，从目录dir中删除dentry指向的目录</td>
+</tr>
+<tr>
+<td style="text-align:center">int <strong>mknod</strong>(struct inode *dir,struct dentry *dentry,int mode,dev_t rdev)</td>
+<td style="text-align:center">被系统调用mknod调用，创建一个文件，这个文件被rdev以及目录dir中的dentry引用，mode指定了初始权限</td>
+</tr>
+<tr>
+<td style="text-align:center">int <strong>rename</strong>(struct inode *old_dir,struct dentry *old_dentry,struct inode *new_dir,struct dentry *new_dentry)</td>
+<td style="text-align:center">将old_dir目录下old_dentry指定的文件重命名为new_dentry目录下dentry指定的文件</td>
+</tr>
+<tr>
+<td style="text-align:center">void <strong>truncate</strong>(struct inode *inode)</td>
+<td style="text-align:center">修改文件的大小，调用前，inode的i_size域必须被设置为期望的新值</td>
+</tr>
+<tr>
+<td style="text-align:center">int <strong>permission</strong>(struct inode *inode, int mask)</td>
+<td style="text-align:center">检查inode对应的文件是否具有mask权限，具有则返回0，否则返回一个负值。大多数文件系统将这个函数指针设为NULL而使用通用VFS的方法，简单的比较mask和inode中i_mode成员对应的位</td>
+</tr>
+<tr>
+<td style="text-align:center">int <strong>setattr</strong>(struct dentry *dentry, struct iattr *attr)</td>
+<td style="text-align:center">被notify_change调用，在inode被修改后，通知一个“改变事件”</td>
+</tr>
+<tr>
+<td style="text-align:center">int <strong>getattr</strong>(struct vfsmount *mnt, struct dentry *dentry,struct kstat *stat)</td>
+<td style="text-align:center">当通知一个inode需要从磁盘中刷新时，被VFS调用</td>
+</tr>
+<tr>
+<td style="text-align:center">int <strong>setxattr</strong>(struct dentry *dentry, const char *name,const void *value,size_t size, int flags)</td>
+<td style="text-align:center">将dentry对应文件的name扩展属性的值设置为value</td>
+</tr>
+<tr>
+<td style="text-align:center">ssize_t <strong>getxattr</strong>(struct dentry *dentry, const char *name,void *value, size_t size)</td>
+<td style="text-align:center">将dentry对应文件的name扩展属性的值拷贝到value中</td>
+</tr>
+<tr>
+<td style="text-align:center">ssize_t <strong>listxattr</strong>(struct dentry *dentry, char *list, size_t size)</td>
+<td style="text-align:center">将dentry对应文件的所以属性拷贝到list指向的缓冲中</td>
+</tr>
+<tr>
+<td style="text-align:center">int <strong>removexattr</strong>(struct dentry *dentry,const char *name)</td>
+<td style="text-align:center">删除dentry对应文件的name属性</td>
+</tr>
+</tbody>
+</table>
+<h2 id="dentry"><a href="#dentry" class="headerlink" title="dentry"></a>dentry</h2><p>dentry在内核中的主要是用于<strong>路径查找</strong>。和super_block以及inode不同，<strong>它是一个内存结构，并没有对应的磁盘数据</strong></p>
+<p>在Linux执行文件打开操作时，如根据路径/root/file打开文件时，在解析过程中，如果内核中的dentry树没有这个路径。会在dentry树中生成表示这样一个路径的几个dentry，在这个例子中根目录“/”，子目录“root”，文件“file”都对应一个dentry。如果内核的dentry树中存在代表根目录/的dentry，则进一步查找root，这样一直递归，进行路径搜索：</p>
+<div align="center"> <img src="/img/in-post/post-linux-vfs/dentry-tree.png" width="20%" height="20%"> </div>
+
+<p>一个有效的dentry可能处于下列<strong>3种状态</strong>中的一种：<strong>used、unused、negative</strong></p>
+<ul>
+<li><strong>used dentry</strong>： 一个used dentry对应一个有效的inode(d_inode成员指向对应的inode)，表明这个dentry有一个或多个users(d_count为正)。used dentry被VFS使用，它们指向有效的数据，因此不能被销毁</li>
+<li><strong>unused dentry</strong>：一个unused dentry对应一个有效的inode(d_inode成员指向对应的inode)，但是VFS当前未使用该dentry(d_count为0)。不过，因为这些dentry仍然指向有效的对象，可能被再次使用，因此它们也被缓存。但是在内存紧张的情况下，它们也可能被销毁</li>
+<li><strong>negative dentry</strong>： 一个negative dentry没有相应的inode(d_inode为NULL)，这是由于相应的inode已经被删掉或者路径名本身就不正确。negative dentry也会被缓存，因为它可以加速查找速率。想象一下一个daemon程序不停的尝试打开一个不存在的文件，如果不缓存，在路径解析时，会带来巨大的开销，因此缓存是值得的。不过和unused dentry一样，在内存紧张时，它也可能被销毁</li>
+</ul>
+<p>由于路径解析过程中，一个个生成dentry，如果解析完后就扔掉则太浪费。因此，内核把dentry缓存在<strong>dcache</strong>(dentry cache)中</p>
+<p><strong>dcache</strong>(dentry cache)由3部分组成：</p>
+<ul>
+<li><strong>used dentry list：</strong> dentry对应inode的i_dentry成员串连组成的链表，因为一个inode可能对应多个dentry(如硬链接),因此一个inode的i_dentry可能包含多个dentry</li>
+<li><strong>unused and negative dentry list：</strong>LRU双链表，从头部插入节点，因此头部是最新的节点。当需要内存时，从尾部删除节点</li>
+<li><strong>hash table and hash function：</strong>用来快速的解析一个路径为多个dentry</li>
+</ul>
+<p>哈希表由数组dentry_hashtable表示，数组的每个元素都是指向相同hash值的dentry对象组成的链表。数组的大小取决于物理RAM的大小</p>
+<p>实际的哈希值由d_hash()得到。通过d_lookup()查询哈希表，如果dentry在哈希表中则返回，否则返回NULL</p>
+<p>和dentry相关的inode不会被释放，因为dentry对inode的引用使得引用计数为正，这就使得缓存dentry的同时会将inode一起缓存。换而言之，只要dentry被缓存，相应的inode也会被缓存(icache)</p>
+<h3 id="dentry操作"><a href="#dentry操作" class="headerlink" title="dentry操作"></a>dentry操作</h3><p>一些关键的目录项操作如下：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:center">操作</th>
+<th style="text-align:center">描述</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:center">int <strong>d_revalidate</strong>(struct dentry *dentry, struct nameidata *)</td>
+<td style="text-align:center">当VFS准备从dcache中使用dentry时，使dnetry有效。大多数文件系统将这个函数指针设为NULL，因为它们在dcache中的dentry总是有效</td>
+</tr>
+<tr>
+<td style="text-align:center">int <strong>d_hash</strong>(struct dentry *dentry, struct qstr *name)</td>
+<td style="text-align:center">当VFS准备将一个dentry添加到哈希表时调用这个函数，为dentry生成一个哈希值</td>
+</tr>
+<tr>
+<td style="text-align:center">int <strong>d_compare</strong>(struct dentry *dentry, struct qstr *name1, struct qstr *name2)</td>
+<td style="text-align:center">VFS调用这个函数来比较两个函数名name1和name2,函数需要dcache_lock</td>
+</tr>
+<tr>
+<td style="text-align:center">int <strong>d_delete</strong>(struct dentry *dentry)</td>
+<td style="text-align:center">当dentry的d_count减为0时被调用，函数需要dcache_lock以及dentry的d_lock</td>
+</tr>
+<tr>
+<td style="text-align:center">void <strong>d_release</strong>(struct dentry *dentry)</td>
+<td style="text-align:center">当dentry将要被释放时被VFS调用，默认的功能啥事也不做</td>
+</tr>
+<tr>
+<td style="text-align:center">void <strong>d_iput</strong>(struct dentry *dentry, struct inode *inode)</td>
+<td style="text-align:center">将dentry失去关联的inode时被VFS调用，默认情况下，VFS仅仅调用iput()功能来释放inode。如果重写了这个函数，也必须在函数内调用iput()</td>
+</tr>
+</tbody>
+</table>
+<p><br></p>
+<h2 id="file"><a href="#file" class="headerlink" title="file"></a>file</h2><p>file用来表示一个<strong>被进程打开的文件</strong>。进程直接处理file而不是super_block、inode或者dentry。它是一个已打开文件的内存表示，<strong>在open系统调用被调用时创建，在系统调用close被调用时销毁</strong>。所以文件相关的调用定义在file操作表</p>
+<p>由于file表示进程已打开的文件，不同进程可能打开相同的文件，因此磁盘中同一文件在内存中可能有多个file，所以dentry才代表实际打开的文件，同一文件的dentry和inode是唯一的</p>
+<p>和dentry一样，file没有相对应的磁盘结构。因此在file结构中没有flag用于表示file是否被修改而应该同步数据到磁盘中。通过file中的f_dentry索引到file对应的dentry，这个dentry又可以索引到对应的inode,则两者可以反映这个实际文件是否已经被修改</p>
+<h3 id="file操作"><a href="#file操作" class="headerlink" title="file操作"></a>file操作</h3><p>file操作和标准Unix系统调用十分相似，下面列举了一些关键的file操作：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:center">操作</th>
+<th style="text-align:center">描述</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:center">loff_t <strong>llseek</strong>(struct file *file,loff_t offset, int origin)</td>
+<td style="text-align:center">根据offset更新文件指针file</td>
+</tr>
+<tr>
+<td style="text-align:center">ssize_t <strong>read</strong>(struct file *file,char *buf, size_t count,loff_t *offset)</td>
+<td style="text-align:center">从文件file偏移量offset处，读取count字节的数据到buf中</td>
+</tr>
+<tr>
+<td style="text-align:center">ssize_t <strong>aio_read</strong>(struct kiocb *iocb,char *buf, size_t count,loff_t offset)</td>
+<td style="text-align:center">被系统调用aio_read调用，对iocb中描述的文件执行一个异步读操作</td>
+</tr>
+<tr>
+<td style="text-align:center">ssize_t <strong>write</strong>(struct file *file,const char *buf, size_t count,loff_t *offset))</td>
+<td style="text-align:center">被系统调用write调用，从buf中读取数据，以file的offset为起始位置，写count字节数据</td>
+</tr>
+<tr>
+<td style="text-align:center">ssize_t <strong>aio_write</strong>(struct kiocb *iocb, const char *buf,size_t count, loff_t offset)</td>
+<td style="text-align:center">发起一个异步写操作</td>
+</tr>
+<tr>
+<td style="text-align:center">int <strong>readdir</strong>(struct file *file, void *dirent,filldir_t filldir)</td>
+<td style="text-align:center">被系统调用readdir调用，返回目录列表中的下一个目录</td>
+</tr>
+<tr>
+<td style="text-align:center">unsigned int <strong>poll</strong>(struct file *file,struct poll_table_struct *poll_table)</td>
+<td style="text-align:center">被系统调用poll调用，等待file的一个活动</td>
+</tr>
+<tr>
+<td style="text-align:center">int <strong>ioctl</strong>(struct inode *inode, struct file *file,unsigned int cmd,unsigned long arg)</td>
+<td style="text-align:center">被系统调用ioctl调用，将一个命令和一系列参数发送给一个设备。当file是一个打开的设备节点时会使用此函数，调用者必须持有BKL(Big Kernel Lock)</td>
+</tr>
+<tr>
+<td style="text-align:center">int <strong>unlocked_ioctl</strong>(struct file *file, unsigned int cmd,unsigned long arg)</td>
+<td style="text-align:center">和ioctl功能相同，只是不需要调用者持有BKL</td>
+</tr>
+<tr>
+<td style="text-align:center">int <strong>mmap</strong>(struct file *file,struct vm_area_struct *vma)</td>
+<td style="text-align:center">被系统调用mmap调用，将file映射到指定的地址空间</td>
+</tr>
+<tr>
+<td style="text-align:center">int <strong>open</strong>(struct inode *inode, struct file *file)</td>
+<td style="text-align:center">被系统调用open调用，生产一个file，并将其连接到inode</td>
+</tr>
+<tr>
+<td style="text-align:center">int <strong>flush</strong>(struct file *file)</td>
+<td style="text-align:center">当file的引用计数减少时被调用，其意图取决于具体文件系统</td>
+</tr>
+<tr>
+<td style="text-align:center">int <strong>release</strong>(struct inode *inode, struct file *file)</td>
+<td style="text-align:center">当file最后一个引用被销毁时调用(比如，最后一个进程执行close操作)，其意图取决于文件系统</td>
+</tr>
+<tr>
+<td style="text-align:center">int <strong>fsync</strong>(struct file *file, struct dentry *dentry,int datasync)</td>
+<td style="text-align:center">将file所有缓存的数据写入到磁盘</td>
+</tr>
+<tr>
+<td style="text-align:center">int <strong>aio_fsync</strong>(struct kiocb *iocb, int datasync)</td>
+<td style="text-align:center">将iocb指定file的所有缓存的数据写入到磁盘</td>
+</tr>
+<tr>
+<td style="text-align:center">int <strong>fasync</strong>(int fd, struct file *file, int on)</td>
+<td style="text-align:center">关掉或者开启异步I/O的信号通知</td>
+</tr>
+<tr>
+<td style="text-align:center">int <strong>lock</strong>(struct file *file, int cmd, struct file_lock *lock)</td>
+<td style="text-align:center">给file上锁</td>
+</tr>
+<tr>
+<td style="text-align:center">ssize_t <strong>readv</strong>(struct file *file,const struct iovec *vector,unsigned long count,loff_t *offset)</td>
+<td style="text-align:center">被系统调用readv调用，从file中读取数据到iovec指定的buffer中</td>
+</tr>
+<tr>
+<td style="text-align:center">ssize_t <strong>writev</strong>(struct file *file,const struct iovec *vector,unsigned long count,loff_t *offset)</td>
+<td style="text-align:center">被系统调用writev调用，将iovec指定的buffer中的数据写入到file中</td>
+</tr>
+<tr>
+<td style="text-align:center">ssize_t <strong>sendfile</strong>(struct file *file, loff_t *offset,size_t size,read_actor_t actor,void *target)</td>
+<td style="text-align:center">被系统调用sendfile调用，从一个文件向另一个文件拷贝数据，数据拷贝完全在内核中进行，没有内核与用户空间之间数据拷贝的开销</td>
+</tr>
+<tr>
+<td style="text-align:center">ssize_t <strong>sendpage</strong>(struct file *file, struct page *page,int offset, size_t size,loff_t *pos, int more)</td>
+<td style="text-align:center">将一个文件中的数据发送到另一个文件中</td>
+</tr>
+</tbody>
+</table>
+<p><br></p>
+<h2 id="内核源码"><a href="#内核源码" class="headerlink" title="内核源码"></a>内核源码</h2><p><strong>内核版本：4.4.68</strong></p>
+<h3 id="super-block-1"><a href="#super-block-1" class="headerlink" title="super_block"></a>super_block</h3><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br><span class="line">89</span><br><span class="line">90</span><br><span class="line">91</span><br><span class="line">92</span><br><span class="line">93</span><br><span class="line">94</span><br><span class="line">95</span><br><span class="line">96</span><br><span class="line">97</span><br><span class="line">98</span><br><span class="line">99</span><br><span class="line">100</span><br><span class="line">101</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">super_block</span> &#123;</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">list_head</span>	<span class="title">s_list</span>;</span>		<span class="comment">/* Keep this first */</span></span><br><span class="line">	<span class="keyword">dev_t</span>			s_dev;		<span class="comment">/* search index; _not_ kdev_t */</span></span><br><span class="line">	<span class="keyword">unsigned</span> <span class="keyword">char</span>		s_blocksize_bits;	<span class="comment">//块大小(bits)</span></span><br><span class="line">	<span class="keyword">unsigned</span> <span class="keyword">long</span>		s_blocksize;	<span class="comment">//块大小(bytes)</span></span><br><span class="line">	<span class="keyword">loff_t</span>			s_maxbytes;		<span class="comment">//最大文件大小</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">file_system_type</span>	*<span class="title">s_type</span>;</span>	<span class="comment">//文件系统类型</span></span><br><span class="line">	<span class="keyword">const</span> <span class="class"><span class="keyword">struct</span> <span class="title">super_operations</span>	*<span class="title">s_op</span>;</span></span><br><span class="line">	<span class="keyword">const</span> <span class="class"><span class="keyword">struct</span> <span class="title">dquot_operations</span>	*<span class="title">dq_op</span>;</span></span><br><span class="line">	<span class="keyword">const</span> <span class="class"><span class="keyword">struct</span> <span class="title">quotactl_ops</span>	*<span class="title">s_qcop</span>;</span></span><br><span class="line">	<span class="keyword">const</span> <span class="class"><span class="keyword">struct</span> <span class="title">export_operations</span> *<span class="title">s_export_op</span>;</span></span><br><span class="line">	<span class="keyword">unsigned</span> <span class="keyword">long</span>		s_flags;</span><br><span class="line">	<span class="keyword">unsigned</span> <span class="keyword">long</span>		s_iflags;	<span class="comment">/* internal SB_I_* flags */</span></span><br><span class="line">	<span class="keyword">unsigned</span> <span class="keyword">long</span>		s_magic;</span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">dentry</span>		*<span class="title">s_root</span>;</span>	<span class="comment">//目录挂载点</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">rw_semaphore</span>	<span class="title">s_umount</span>;</span></span><br><span class="line">	<span class="keyword">int</span>			s_count;	<span class="comment">//引用计数</span></span><br><span class="line">	<span class="keyword">atomic_t</span>		s_active;</span><br><span class="line"><span class="meta">#<span class="meta-keyword">ifdef</span> CONFIG_SECURITY</span></span><br><span class="line">	<span class="keyword">void</span>                    *s_security;</span><br><span class="line"><span class="meta">#<span class="meta-keyword">endif</span></span></span><br><span class="line">	<span class="keyword">const</span> <span class="class"><span class="keyword">struct</span> <span class="title">xattr_handler</span> **<span class="title">s_xattr</span>;</span></span><br><span class="line"></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">hlist_bl_head</span>	<span class="title">s_anon</span>;</span>		<span class="comment">/* anonymous dentries for (nfs) exporting */</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">list_head</span>	<span class="title">s_mounts</span>;</span>	<span class="comment">/* list of mounts; _not_ for fs use */</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">block_device</span>	*<span class="title">s_bdev</span>;</span>	<span class="comment">//指向文件系统存在的块设备指针</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">backing_dev_info</span> *<span class="title">s_bdi</span>;</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">mtd_info</span>		*<span class="title">s_mtd</span>;</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">hlist_node</span>	<span class="title">s_instances</span>;</span></span><br><span class="line">	<span class="keyword">unsigned</span> <span class="keyword">int</span>		s_quota_types;	<span class="comment">/* Bitmask of supported quota types */</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">quota_info</span>	<span class="title">s_dquot</span>;</span>	<span class="comment">/* Diskquota specific options */</span></span><br><span class="line"></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">sb_writers</span>	<span class="title">s_writers</span>;</span></span><br><span class="line"></span><br><span class="line">	<span class="keyword">char</span> s_id[<span class="number">32</span>];				<span class="comment">/* Informational name */</span></span><br><span class="line">	u8 s_uuid[<span class="number">16</span>];				<span class="comment">/* UUID */</span></span><br><span class="line"></span><br><span class="line">	<span class="keyword">void</span> 			*s_fs_info;	<span class="comment">/* Filesystem private info */</span></span><br><span class="line">	<span class="keyword">unsigned</span> <span class="keyword">int</span>		s_max_links;</span><br><span class="line">	<span class="keyword">fmode_t</span>			s_mode;</span><br><span class="line"></span><br><span class="line">	<span class="comment">/* Granularity of c/m/atime in ns.</span></span><br><span class="line"><span class="comment">	   Cannot be worse than a second */</span></span><br><span class="line">	u32		   s_time_gran;</span><br><span class="line"></span><br><span class="line">	<span class="comment">/*</span></span><br><span class="line"><span class="comment">	 * The next field is for VFS *only*. No filesystems have any business</span></span><br><span class="line"><span class="comment">	 * even looking at it. You had been warned.</span></span><br><span class="line"><span class="comment">	 */</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">mutex</span> <span class="title">s_vfs_rename_mutex</span>;</span>	<span class="comment">/* Kludge */</span></span><br><span class="line"></span><br><span class="line">	<span class="comment">/*</span></span><br><span class="line"><span class="comment">	 * Filesystem subtype.  If non-empty the filesystem type field</span></span><br><span class="line"><span class="comment">	 * in /proc/mounts will be "type.subtype"</span></span><br><span class="line"><span class="comment">	 */</span></span><br><span class="line">	<span class="keyword">char</span> *s_subtype;</span><br><span class="line"></span><br><span class="line">	<span class="comment">/*</span></span><br><span class="line"><span class="comment">	 * Saved mount options for lazy filesystems using</span></span><br><span class="line"><span class="comment">	 * generic_show_options()</span></span><br><span class="line"><span class="comment">	 */</span></span><br><span class="line">	<span class="keyword">char</span> __rcu *s_options;</span><br><span class="line">	<span class="keyword">const</span> <span class="class"><span class="keyword">struct</span> <span class="title">dentry_operations</span> *<span class="title">s_d_op</span>;</span> <span class="comment">/* default d_op for dentries */</span></span><br><span class="line"></span><br><span class="line">	<span class="comment">/*</span></span><br><span class="line"><span class="comment">	 * Saved pool identifier for cleancache (-1 means none)</span></span><br><span class="line"><span class="comment">	 */</span></span><br><span class="line">	<span class="keyword">int</span> cleancache_poolid;</span><br><span class="line"></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">shrinker</span> <span class="title">s_shrink</span>;</span>	<span class="comment">/* per-sb shrinker handle */</span></span><br><span class="line"></span><br><span class="line">	<span class="comment">/* Number of inodes with nlink == 0 but still referenced */</span></span><br><span class="line">	<span class="keyword">atomic_long_t</span> s_remove_count;</span><br><span class="line"></span><br><span class="line">	<span class="comment">/* Being remounted read-only */</span></span><br><span class="line">	<span class="keyword">int</span> s_readonly_remount;</span><br><span class="line"></span><br><span class="line">	<span class="comment">/* AIO completions deferred from interrupt context */</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">workqueue_struct</span> *<span class="title">s_dio_done_wq</span>;</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">hlist_head</span> <span class="title">s_pins</span>;</span></span><br><span class="line"></span><br><span class="line">	<span class="comment">/*</span></span><br><span class="line"><span class="comment">	 * Keep the lru lists last in the structure so they always sit on their</span></span><br><span class="line"><span class="comment">	 * own individual cachelines.</span></span><br><span class="line"><span class="comment">	 */</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">list_lru</span>		<span class="title">s_dentry_lru</span> ____<span class="title">cacheline_aligned_in_smp</span>;</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">list_lru</span>		<span class="title">s_inode_lru</span> ____<span class="title">cacheline_aligned_in_smp</span>;</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">rcu_head</span>		<span class="title">rcu</span>;</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">work_struct</span>	<span class="title">destroy_work</span>;</span></span><br><span class="line"></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">mutex</span>		<span class="title">s_sync_lock</span>;</span>	<span class="comment">/* sync serialisation lock */</span></span><br><span class="line"></span><br><span class="line">	<span class="comment">/*</span></span><br><span class="line"><span class="comment">	 * Indicates how deep in a filesystem stack this SB is</span></span><br><span class="line"><span class="comment">	 */</span></span><br><span class="line">	<span class="keyword">int</span> s_stack_depth;</span><br><span class="line"></span><br><span class="line">	<span class="comment">/* s_inode_list_lock protects s_inodes */</span></span><br><span class="line">	<span class="keyword">spinlock_t</span>		s_inode_list_lock ____cacheline_aligned_in_smp;</span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">list_head</span>	<span class="title">s_inodes</span>;</span>	<span class="comment">/* all inodes */</span></span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+<h3 id="super-operations"><a href="#super-operations" class="headerlink" title="super_operations"></a>super_operations</h3><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">super_operations</span> &#123;</span></span><br><span class="line">   	<span class="class"><span class="keyword">struct</span> <span class="title">inode</span> *(*<span class="title">alloc_inode</span>)(<span class="title">struct</span> <span class="title">super_block</span> *<span class="title">sb</span>);</span></span><br><span class="line">	<span class="keyword">void</span> (*destroy_inode)(struct inode *);</span><br><span class="line"></span><br><span class="line">   	<span class="keyword">void</span> (*dirty_inode) (struct inode *, <span class="keyword">int</span> flags);</span><br><span class="line">	<span class="keyword">int</span> (*write_inode) (struct inode *, struct writeback_control *wbc);</span><br><span class="line">	<span class="keyword">int</span> (*drop_inode) (struct inode *);</span><br><span class="line">	<span class="keyword">void</span> (*evict_inode) (struct inode *);</span><br><span class="line">	<span class="keyword">void</span> (*put_super) (struct super_block *);</span><br><span class="line">	<span class="keyword">int</span> (*sync_fs)(struct super_block *sb, <span class="keyword">int</span> wait);</span><br><span class="line">	<span class="keyword">int</span> (*freeze_super) (struct super_block *);</span><br><span class="line">	<span class="keyword">int</span> (*freeze_fs) (struct super_block *);</span><br><span class="line">	<span class="keyword">int</span> (*thaw_super) (struct super_block *);</span><br><span class="line">	<span class="keyword">int</span> (*unfreeze_fs) (struct super_block *);</span><br><span class="line">	<span class="keyword">int</span> (*statfs) (struct dentry *, struct kstatfs *);</span><br><span class="line">	<span class="keyword">int</span> (*remount_fs) (struct super_block *, <span class="keyword">int</span> *, <span class="keyword">char</span> *);</span><br><span class="line">	<span class="keyword">void</span> (*umount_begin) (struct super_block *);</span><br><span class="line"></span><br><span class="line">	<span class="keyword">int</span> (*show_options)(struct seq_file *, struct dentry *);</span><br><span class="line">	<span class="keyword">int</span> (*show_devname)(struct seq_file *, struct dentry *);</span><br><span class="line">	<span class="keyword">int</span> (*show_path)(struct seq_file *, struct dentry *);</span><br><span class="line">	<span class="keyword">int</span> (*show_stats)(struct seq_file *, struct dentry *);</span><br><span class="line"><span class="meta">#<span class="meta-keyword">ifdef</span> CONFIG_QUOTA</span></span><br><span class="line">	<span class="keyword">ssize_t</span> (*quota_read)(struct super_block *, <span class="keyword">int</span>, <span class="keyword">char</span> *, <span class="keyword">size_t</span>, <span class="keyword">loff_t</span>);</span><br><span class="line">	<span class="keyword">ssize_t</span> (*quota_write)(struct super_block *, <span class="keyword">int</span>, <span class="keyword">const</span> <span class="keyword">char</span> *, <span class="keyword">size_t</span>, <span class="keyword">loff_t</span>);</span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">dquot</span> **(*<span class="title">get_dquots</span>)(<span class="title">struct</span> <span class="title">inode</span> *);</span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">endif</span></span></span><br><span class="line">	<span class="keyword">int</span> (*bdev_try_to_free_page)(struct super_block*, struct page*, <span class="keyword">gfp_t</span>);</span><br><span class="line">	<span class="keyword">long</span> (*nr_cached_objects)(struct super_block *,</span><br><span class="line">				  struct shrink_control *);</span><br><span class="line">	<span class="keyword">long</span> (*free_cached_objects)(struct super_block *,</span><br><span class="line">				    struct shrink_control *);</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+<h3 id="inode-1"><a href="#inode-1" class="headerlink" title="inode"></a>inode</h3><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br><span class="line">89</span><br><span class="line">90</span><br><span class="line">91</span><br><span class="line">92</span><br><span class="line">93</span><br><span class="line">94</span><br><span class="line">95</span><br><span class="line">96</span><br><span class="line">97</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">inode</span> &#123;</span></span><br><span class="line">	<span class="keyword">umode_t</span>			i_mode;		<span class="comment">//访问权限</span></span><br><span class="line">	<span class="keyword">unsigned</span> <span class="keyword">short</span>		i_opflags;</span><br><span class="line">	<span class="keyword">kuid_t</span>			i_uid;		<span class="comment">//拥有者的用户ID</span></span><br><span class="line">	<span class="keyword">kgid_t</span>			i_gid;		<span class="comment">//拥有者的组ID</span></span><br><span class="line">	<span class="keyword">unsigned</span> <span class="keyword">int</span>		i_flags;</span><br><span class="line"></span><br><span class="line"><span class="meta">#<span class="meta-keyword">ifdef</span> CONFIG_FS_POSIX_ACL</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">posix_acl</span>	*<span class="title">i_acl</span>;</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">posix_acl</span>	*<span class="title">i_default_acl</span>;</span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">endif</span></span></span><br><span class="line"></span><br><span class="line">	<span class="keyword">const</span> <span class="class"><span class="keyword">struct</span> <span class="title">inode_operations</span>	*<span class="title">i_op</span>;</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">super_block</span>	*<span class="title">i_sb</span>;</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">address_space</span>	*<span class="title">i_mapping</span>;</span></span><br><span class="line"></span><br><span class="line"><span class="meta">#<span class="meta-keyword">ifdef</span> CONFIG_SECURITY</span></span><br><span class="line">	<span class="keyword">void</span>			*i_security;</span><br><span class="line"><span class="meta">#<span class="meta-keyword">endif</span></span></span><br><span class="line"></span><br><span class="line">	<span class="comment">/* Stat data, not accessed from path walking */</span></span><br><span class="line">	<span class="keyword">unsigned</span> <span class="keyword">long</span>		i_ino;	<span class="comment">//inode号</span></span><br><span class="line">	<span class="comment">/*</span></span><br><span class="line"><span class="comment">	 * Filesystems may only read i_nlink directly.  They shall use the</span></span><br><span class="line"><span class="comment">	 * following functions for modification:</span></span><br><span class="line"><span class="comment">	 *</span></span><br><span class="line"><span class="comment">	 *    (set|clear|inc|drop)_nlink</span></span><br><span class="line"><span class="comment">	 *    inode_(inc|dec)_link_count</span></span><br><span class="line"><span class="comment">	 */</span></span><br><span class="line">	<span class="keyword">union</span> &#123;</span><br><span class="line">		<span class="keyword">const</span> <span class="keyword">unsigned</span> <span class="keyword">int</span> i_nlink;</span><br><span class="line">		<span class="keyword">unsigned</span> <span class="keyword">int</span> __i_nlink;</span><br><span class="line">	&#125;;</span><br><span class="line">	<span class="keyword">dev_t</span>			i_rdev;</span><br><span class="line">	<span class="keyword">loff_t</span>			i_size;		<span class="comment">//文件大小(byte)</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">timespec</span>		<span class="title">i_atime</span>;</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">timespec</span>		<span class="title">i_mtime</span>;</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">timespec</span>		<span class="title">i_ctime</span>;</span></span><br><span class="line">	<span class="keyword">spinlock_t</span>		i_lock;	<span class="comment">/* i_blocks, i_bytes, maybe i_size */</span></span><br><span class="line">	<span class="keyword">unsigned</span> <span class="keyword">short</span>          i_bytes;</span><br><span class="line">	<span class="keyword">unsigned</span> <span class="keyword">int</span>		i_blkbits;		<span class="comment">//block大小(bit)</span></span><br><span class="line">	<span class="keyword">blkcnt_t</span>		i_blocks;			<span class="comment">//文件大小(block)</span></span><br><span class="line"></span><br><span class="line"><span class="meta">#<span class="meta-keyword">ifdef</span> __NEED_I_SIZE_ORDERED</span></span><br><span class="line">	<span class="keyword">seqcount_t</span>		i_size_seqcount;</span><br><span class="line"><span class="meta">#<span class="meta-keyword">endif</span></span></span><br><span class="line"></span><br><span class="line">	<span class="comment">/* Misc */</span></span><br><span class="line">	<span class="keyword">unsigned</span> <span class="keyword">long</span>		i_state;</span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">mutex</span>		<span class="title">i_mutex</span>;</span></span><br><span class="line"></span><br><span class="line">	<span class="keyword">unsigned</span> <span class="keyword">long</span>		dirtied_when;	<span class="comment">/* jiffies of first dirtying */</span></span><br><span class="line">	<span class="keyword">unsigned</span> <span class="keyword">long</span>		dirtied_time_when;</span><br><span class="line"></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">hlist_node</span>	<span class="title">i_hash</span>;</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">list_head</span>	<span class="title">i_io_list</span>;</span>	<span class="comment">/* backing dev IO list */</span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">ifdef</span> CONFIG_CGROUP_WRITEBACK</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">bdi_writeback</span>	*<span class="title">i_wb</span>;</span>		<span class="comment">/* the associated cgroup wb */</span></span><br><span class="line"></span><br><span class="line">	<span class="comment">/* foreign inode detection, see wbc_detach_inode() */</span></span><br><span class="line">	<span class="keyword">int</span>			i_wb_frn_winner;</span><br><span class="line">	u16			i_wb_frn_avg_time;</span><br><span class="line">	u16			i_wb_frn_history;</span><br><span class="line"><span class="meta">#<span class="meta-keyword">endif</span></span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">list_head</span>	<span class="title">i_lru</span>;</span>		<span class="comment">/* inode LRU list */</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">list_head</span>	<span class="title">i_sb_list</span>;</span></span><br><span class="line">	<span class="keyword">union</span> &#123;</span><br><span class="line">		<span class="class"><span class="keyword">struct</span> <span class="title">hlist_head</span>	<span class="title">i_dentry</span>;</span></span><br><span class="line">		<span class="class"><span class="keyword">struct</span> <span class="title">rcu_head</span>		<span class="title">i_rcu</span>;</span></span><br><span class="line">	&#125;;</span><br><span class="line">	u64			i_version;</span><br><span class="line">	<span class="keyword">atomic_t</span>		i_count;		<span class="comment">//引用数</span></span><br><span class="line">	<span class="keyword">atomic_t</span>		i_dio_count;</span><br><span class="line">	<span class="keyword">atomic_t</span>		i_writecount;</span><br><span class="line"><span class="meta">#<span class="meta-keyword">ifdef</span> CONFIG_IMA</span></span><br><span class="line">	<span class="keyword">atomic_t</span>		i_readcount; <span class="comment">/* struct files open RO */</span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">endif</span></span></span><br><span class="line">	<span class="keyword">const</span> <span class="class"><span class="keyword">struct</span> <span class="title">file_operations</span>	*<span class="title">i_fop</span>;</span>	<span class="comment">/* former -&gt;i_op-&gt;default_file_ops */</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">file_lock_context</span>	*<span class="title">i_flctx</span>;</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">address_space</span>	<span class="title">i_data</span>;</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">list_head</span>	<span class="title">i_devices</span>;</span></span><br><span class="line">	<span class="keyword">union</span> &#123;</span><br><span class="line">		<span class="class"><span class="keyword">struct</span> <span class="title">pipe_inode_info</span>	*<span class="title">i_pipe</span>;</span></span><br><span class="line">		<span class="class"><span class="keyword">struct</span> <span class="title">block_device</span>	*<span class="title">i_bdev</span>;</span></span><br><span class="line">		<span class="class"><span class="keyword">struct</span> <span class="title">cdev</span>		*<span class="title">i_cdev</span>;</span></span><br><span class="line">		<span class="keyword">char</span>			*i_link;</span><br><span class="line">	&#125;;</span><br><span class="line"></span><br><span class="line">	__u32			i_generation;</span><br><span class="line"></span><br><span class="line"><span class="meta">#<span class="meta-keyword">ifdef</span> CONFIG_FSNOTIFY</span></span><br><span class="line">	__u32			i_fsnotify_mask; <span class="comment">/* all events this inode cares about */</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">hlist_head</span>	<span class="title">i_fsnotify_marks</span>;</span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">endif</span></span></span><br><span class="line"></span><br><span class="line">	<span class="keyword">void</span>			*i_private; <span class="comment">/* fs or device private pointer */</span></span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+<h3 id="inode-operations"><a href="#inode-operations" class="headerlink" title="inode_operations"></a>inode_operations</h3><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">inode_operations</span> &#123;</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">dentry</span> * (*<span class="title">lookup</span>) (<span class="title">struct</span> <span class="title">inode</span> *,<span class="title">struct</span> <span class="title">dentry</span> *, <span class="title">unsigned</span> <span class="title">int</span>);</span></span><br><span class="line">	<span class="keyword">const</span> <span class="keyword">char</span> * (*follow_link) (struct dentry *, <span class="keyword">void</span> **);</span><br><span class="line">	<span class="keyword">int</span> (*permission) (struct inode *, <span class="keyword">int</span>);</span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">posix_acl</span> * (*<span class="title">get_acl</span>)(<span class="title">struct</span> <span class="title">inode</span> *, <span class="title">int</span>);</span></span><br><span class="line"></span><br><span class="line">	<span class="keyword">int</span> (*readlink) (struct dentry *, <span class="keyword">char</span> __user *,<span class="keyword">int</span>);</span><br><span class="line">	<span class="keyword">void</span> (*put_link) (struct inode *, <span class="keyword">void</span> *);</span><br><span class="line"></span><br><span class="line">	<span class="keyword">int</span> (*create) (struct inode *,struct dentry *, <span class="keyword">umode_t</span>, <span class="keyword">bool</span>);</span><br><span class="line">	<span class="keyword">int</span> (*link) (struct dentry *,struct inode *,struct dentry *);</span><br><span class="line">	<span class="keyword">int</span> (*unlink) (struct inode *,struct dentry *);</span><br><span class="line">	<span class="keyword">int</span> (*symlink) (struct inode *,struct dentry *,<span class="keyword">const</span> <span class="keyword">char</span> *);</span><br><span class="line">	<span class="keyword">int</span> (*mkdir) (struct inode *,struct dentry *,<span class="keyword">umode_t</span>);</span><br><span class="line">	<span class="keyword">int</span> (*rmdir) (struct inode *,struct dentry *);</span><br><span class="line">	<span class="keyword">int</span> (*mknod) (struct inode *,struct dentry *,<span class="keyword">umode_t</span>,<span class="keyword">dev_t</span>);</span><br><span class="line">	<span class="keyword">int</span> (*rename) (struct inode *, struct dentry *,</span><br><span class="line">			struct inode *, struct dentry *);</span><br><span class="line">	<span class="keyword">int</span> (*rename2) (struct inode *, struct dentry *,</span><br><span class="line">			struct inode *, struct dentry *, <span class="keyword">unsigned</span> <span class="keyword">int</span>);</span><br><span class="line">	<span class="keyword">int</span> (*setattr) (struct dentry *, struct iattr *);</span><br><span class="line">	<span class="keyword">int</span> (*getattr) (struct vfsmount *mnt, struct dentry *, struct kstat *);</span><br><span class="line">	<span class="keyword">int</span> (*setxattr) (struct dentry *, <span class="keyword">const</span> <span class="keyword">char</span> *,<span class="keyword">const</span> <span class="keyword">void</span> *,<span class="keyword">size_t</span>,<span class="keyword">int</span>);</span><br><span class="line">	<span class="keyword">ssize_t</span> (*getxattr) (struct dentry *, <span class="keyword">const</span> <span class="keyword">char</span> *, <span class="keyword">void</span> *, <span class="keyword">size_t</span>);</span><br><span class="line">	<span class="keyword">ssize_t</span> (*listxattr) (struct dentry *, <span class="keyword">char</span> *, <span class="keyword">size_t</span>);</span><br><span class="line">	<span class="keyword">int</span> (*removexattr) (struct dentry *, <span class="keyword">const</span> <span class="keyword">char</span> *);</span><br><span class="line">	<span class="keyword">int</span> (*fiemap)(struct inode *, struct fiemap_extent_info *, u64 start,</span><br><span class="line">		      u64 len);</span><br><span class="line">	<span class="keyword">int</span> (*update_time)(struct inode *, struct timespec *, <span class="keyword">int</span>);</span><br><span class="line">	<span class="keyword">int</span> (*atomic_open)(struct inode *, struct dentry *,</span><br><span class="line">			   struct file *, <span class="keyword">unsigned</span> open_flag,</span><br><span class="line">			   <span class="keyword">umode_t</span> create_mode, <span class="keyword">int</span> *opened);</span><br><span class="line">	<span class="keyword">int</span> (*tmpfile) (struct inode *, struct dentry *, <span class="keyword">umode_t</span>);</span><br><span class="line">	<span class="keyword">int</span> (*set_acl)(struct inode *, struct posix_acl *, <span class="keyword">int</span>);</span><br><span class="line">&#125; ____cacheline_aligned;</span><br></pre></td></tr></table></figure>
+<h3 id="dentry-1"><a href="#dentry-1" class="headerlink" title="dentry"></a>dentry</h3><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">dentry</span> &#123;</span></span><br><span class="line">	<span class="comment">/* RCU lookup touched fields */</span></span><br><span class="line">	<span class="keyword">unsigned</span> <span class="keyword">int</span> d_flags;		<span class="comment">/* protected by d_lock */</span></span><br><span class="line">	<span class="keyword">seqcount_t</span> d_seq;		<span class="comment">/* per dentry seqlock */</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">hlist_bl_node</span> <span class="title">d_hash</span>;</span>	<span class="comment">/* lookup hash list */</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">dentry</span> *<span class="title">d_parent</span>;</span>	<span class="comment">/* parent directory */</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">qstr</span> <span class="title">d_name</span>;</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">inode</span> *<span class="title">d_inode</span>;</span>		<span class="comment">/* Where the name belongs to - NULL is</span></span><br><span class="line"><span class="comment">					 * negative */</span></span><br><span class="line">	<span class="keyword">unsigned</span> <span class="keyword">char</span> d_iname[DNAME_INLINE_LEN];	<span class="comment">/* small names */</span></span><br><span class="line"></span><br><span class="line">	<span class="comment">/* Ref lookup also touches following */</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">lockref</span> <span class="title">d_lockref</span>;</span>	<span class="comment">/* per-dentry lock and refcount */</span></span><br><span class="line">	<span class="keyword">const</span> <span class="class"><span class="keyword">struct</span> <span class="title">dentry_operations</span> *<span class="title">d_op</span>;</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">super_block</span> *<span class="title">d_sb</span>;</span>	<span class="comment">/* The root of the dentry tree */</span></span><br><span class="line">	<span class="keyword">unsigned</span> <span class="keyword">long</span> d_time;		<span class="comment">/* used by d_revalidate */</span></span><br><span class="line">	<span class="keyword">void</span> *d_fsdata;			<span class="comment">/* fs-specific data */</span></span><br><span class="line"></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">list_head</span> <span class="title">d_lru</span>;</span>		<span class="comment">/* LRU list */</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">list_head</span> <span class="title">d_child</span>;</span>	<span class="comment">/* child of parent list */</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">list_head</span> <span class="title">d_subdirs</span>;</span>	<span class="comment">/* our children */</span></span><br><span class="line">	<span class="comment">/*</span></span><br><span class="line"><span class="comment">	 * d_alias and d_rcu can share memory</span></span><br><span class="line"><span class="comment">	 */</span></span><br><span class="line">	<span class="keyword">union</span> &#123;</span><br><span class="line">		<span class="class"><span class="keyword">struct</span> <span class="title">hlist_node</span> <span class="title">d_alias</span>;</span>	<span class="comment">/* inode alias list */</span></span><br><span class="line">	 	<span class="class"><span class="keyword">struct</span> <span class="title">rcu_head</span> <span class="title">d_rcu</span>;</span></span><br><span class="line">	&#125; d_u;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+<h3 id="dentry-operations"><a href="#dentry-operations" class="headerlink" title="dentry_operations"></a>dentry_operations</h3><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">dentry_operations</span> &#123;</span></span><br><span class="line">	<span class="keyword">int</span> (*d_revalidate)(struct dentry *, <span class="keyword">unsigned</span> <span class="keyword">int</span>);</span><br><span class="line">	<span class="keyword">int</span> (*d_weak_revalidate)(struct dentry *, <span class="keyword">unsigned</span> <span class="keyword">int</span>);</span><br><span class="line">	<span class="keyword">int</span> (*d_hash)(<span class="keyword">const</span> struct dentry *, struct qstr *);</span><br><span class="line">	<span class="keyword">int</span> (*d_compare)(<span class="keyword">const</span> struct dentry *, <span class="keyword">const</span> struct dentry *,</span><br><span class="line">			<span class="keyword">unsigned</span> <span class="keyword">int</span>, <span class="keyword">const</span> <span class="keyword">char</span> *, <span class="keyword">const</span> struct qstr *);</span><br><span class="line">	<span class="keyword">int</span> (*d_delete)(<span class="keyword">const</span> struct dentry *);</span><br><span class="line">	<span class="keyword">void</span> (*d_release)(struct dentry *);</span><br><span class="line">	<span class="keyword">void</span> (*d_prune)(struct dentry *);</span><br><span class="line">	<span class="keyword">void</span> (*d_iput)(struct dentry *, struct inode *);</span><br><span class="line">	<span class="keyword">char</span> *(*d_dname)(struct dentry *, <span class="keyword">char</span> *, <span class="keyword">int</span>);</span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">vfsmount</span> *(*<span class="title">d_automount</span>)(<span class="title">struct</span> <span class="title">path</span> *);</span></span><br><span class="line">	<span class="keyword">int</span> (*d_manage)(struct dentry *, <span class="keyword">bool</span>);</span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">inode</span> *(*<span class="title">d_select_inode</span>)(<span class="title">struct</span> <span class="title">dentry</span> *, <span class="title">unsigned</span>);</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">dentry</span> *(*<span class="title">d_real</span>)(<span class="title">struct</span> <span class="title">dentry</span> *, <span class="title">struct</span> <span class="title">inode</span> *);</span></span><br><span class="line">&#125; ____cacheline_aligned;</span><br></pre></td></tr></table></figure>
+<h3 id="file-1"><a href="#file-1" class="headerlink" title="file"></a>file</h3><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">file</span> &#123;</span></span><br><span class="line">	<span class="keyword">union</span> &#123;</span><br><span class="line">		<span class="class"><span class="keyword">struct</span> <span class="title">llist_node</span>	<span class="title">fu_llist</span>;</span></span><br><span class="line">		<span class="class"><span class="keyword">struct</span> <span class="title">rcu_head</span> 	<span class="title">fu_rcuhead</span>;</span></span><br><span class="line">	&#125; f_u;</span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">path</span>		<span class="title">f_path</span>;</span>		<span class="comment">//包含了对应的dentry</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">inode</span>		*<span class="title">f_inode</span>;</span>	<span class="comment">/* cached value */</span></span><br><span class="line">	<span class="keyword">const</span> <span class="class"><span class="keyword">struct</span> <span class="title">file_operations</span>	*<span class="title">f_op</span>;</span></span><br><span class="line"></span><br><span class="line">	<span class="comment">/*</span></span><br><span class="line"><span class="comment">	 * Protects f_ep_links, f_flags.</span></span><br><span class="line"><span class="comment">	 * Must not be taken from IRQ context.</span></span><br><span class="line"><span class="comment">	 */</span></span><br><span class="line">	<span class="keyword">spinlock_t</span>		f_lock;</span><br><span class="line">	<span class="keyword">atomic_long_t</span>		f_count;</span><br><span class="line">	<span class="keyword">unsigned</span> <span class="keyword">int</span> 		f_flags;</span><br><span class="line">	<span class="keyword">fmode_t</span>			f_mode;</span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">mutex</span>		<span class="title">f_pos_lock</span>;</span></span><br><span class="line">	<span class="keyword">loff_t</span>			f_pos;</span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">fown_struct</span>	<span class="title">f_owner</span>;</span></span><br><span class="line">	<span class="keyword">const</span> <span class="class"><span class="keyword">struct</span> <span class="title">cred</span>	*<span class="title">f_cred</span>;</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">file_ra_state</span>	<span class="title">f_ra</span>;</span></span><br><span class="line"></span><br><span class="line">	u64			f_version;</span><br><span class="line"><span class="meta">#<span class="meta-keyword">ifdef</span> CONFIG_SECURITY</span></span><br><span class="line">	<span class="keyword">void</span>			*f_security;</span><br><span class="line"><span class="meta">#<span class="meta-keyword">endif</span></span></span><br><span class="line">	<span class="comment">/* needed for tty driver, and maybe others */</span></span><br><span class="line">	<span class="keyword">void</span>			*private_data;</span><br><span class="line"></span><br><span class="line"><span class="meta">#<span class="meta-keyword">ifdef</span> CONFIG_EPOLL</span></span><br><span class="line">	<span class="comment">/* Used by fs/eventpoll.c to link all the hooks to this file */</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">list_head</span>	<span class="title">f_ep_links</span>;</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">list_head</span>	<span class="title">f_tfile_llink</span>;</span></span><br><span class="line"><span class="meta">#<span class="meta-keyword">endif</span> <span class="comment">/* #ifdef CONFIG_EPOLL */</span></span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">address_space</span>	*<span class="title">f_mapping</span>;</span></span><br><span class="line">&#125; __attribute__((aligned(<span class="number">4</span>)));	<span class="comment">/* lest something weird decides that 2 is OK */</span></span><br></pre></td></tr></table></figure>
+<h3 id="file-operations"><a href="#file-operations" class="headerlink" title="file_operations"></a>file_operations</h3><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">file_operations</span> &#123;</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">module</span> *<span class="title">owner</span>;</span></span><br><span class="line">	<span class="keyword">loff_t</span> (*llseek) (struct file *, <span class="keyword">loff_t</span>, <span class="keyword">int</span>);</span><br><span class="line">	<span class="keyword">ssize_t</span> (*read) (struct file *, <span class="keyword">char</span> __user *, <span class="keyword">size_t</span>, <span class="keyword">loff_t</span> *);</span><br><span class="line">	<span class="keyword">ssize_t</span> (*write) (struct file *, <span class="keyword">const</span> <span class="keyword">char</span> __user *, <span class="keyword">size_t</span>, <span class="keyword">loff_t</span> *);</span><br><span class="line">	<span class="keyword">ssize_t</span> (*read_iter) (struct kiocb *, struct iov_iter *);</span><br><span class="line">	<span class="keyword">ssize_t</span> (*write_iter) (struct kiocb *, struct iov_iter *);</span><br><span class="line">	<span class="keyword">int</span> (*iterate) (struct file *, struct dir_context *);</span><br><span class="line">	<span class="function"><span class="keyword">unsigned</span> <span class="title">int</span> <span class="params">(*poll)</span> <span class="params">(struct file *, struct poll_table_struct *)</span></span>;</span><br><span class="line">	<span class="keyword">long</span> (*unlocked_ioctl) (struct file *, <span class="keyword">unsigned</span> <span class="keyword">int</span>, <span class="keyword">unsigned</span> <span class="keyword">long</span>);</span><br><span class="line">	<span class="keyword">long</span> (*compat_ioctl) (struct file *, <span class="keyword">unsigned</span> <span class="keyword">int</span>, <span class="keyword">unsigned</span> <span class="keyword">long</span>);</span><br><span class="line">	<span class="keyword">int</span> (*mmap) (struct file *, struct vm_area_struct *);</span><br><span class="line">	<span class="keyword">int</span> (*open) (struct inode *, struct file *);</span><br><span class="line">	<span class="keyword">int</span> (*flush) (struct file *, <span class="keyword">fl_owner_t</span> id);</span><br><span class="line">	<span class="keyword">int</span> (*release) (struct inode *, struct file *);</span><br><span class="line">	<span class="keyword">int</span> (*fsync) (struct file *, <span class="keyword">loff_t</span>, <span class="keyword">loff_t</span>, <span class="keyword">int</span> datasync);</span><br><span class="line">	<span class="keyword">int</span> (*aio_fsync) (struct kiocb *, <span class="keyword">int</span> datasync);</span><br><span class="line">	<span class="keyword">int</span> (*fasync) (<span class="keyword">int</span>, struct file *, <span class="keyword">int</span>);</span><br><span class="line">	<span class="keyword">int</span> (*lock) (struct file *, <span class="keyword">int</span>, struct file_lock *);</span><br><span class="line">	<span class="keyword">ssize_t</span> (*sendpage) (struct file *, struct page *, <span class="keyword">int</span>, <span class="keyword">size_t</span>, <span class="keyword">loff_t</span> *, <span class="keyword">int</span>);</span><br><span class="line">	<span class="function"><span class="keyword">unsigned</span> <span class="title">long</span> <span class="params">(*get_unmapped_area)</span><span class="params">(struct file *, <span class="keyword">unsigned</span> <span class="keyword">long</span>, <span class="keyword">unsigned</span> <span class="keyword">long</span>, <span class="keyword">unsigned</span> <span class="keyword">long</span>, <span class="keyword">unsigned</span> <span class="keyword">long</span>)</span></span>;</span><br><span class="line">	<span class="keyword">int</span> (*check_flags)(<span class="keyword">int</span>);</span><br><span class="line">	<span class="keyword">int</span> (*flock) (struct file *, <span class="keyword">int</span>, struct file_lock *);</span><br><span class="line">	<span class="keyword">ssize_t</span> (*splice_write)(struct pipe_inode_info *, struct file *, <span class="keyword">loff_t</span> *, <span class="keyword">size_t</span>, <span class="keyword">unsigned</span> <span class="keyword">int</span>);</span><br><span class="line">	<span class="keyword">ssize_t</span> (*splice_read)(struct file *, <span class="keyword">loff_t</span> *, struct pipe_inode_info *, <span class="keyword">size_t</span>, <span class="keyword">unsigned</span> <span class="keyword">int</span>);</span><br><span class="line">	<span class="keyword">int</span> (*setlease)(struct file *, <span class="keyword">long</span>, struct file_lock **, <span class="keyword">void</span> **);</span><br><span class="line">	<span class="keyword">long</span> (*fallocate)(struct file *file, <span class="keyword">int</span> mode, <span class="keyword">loff_t</span> offset,</span><br><span class="line">			  <span class="keyword">loff_t</span> len);</span><br><span class="line">	<span class="keyword">void</span> (*show_fdinfo)(struct seq_file *m, struct file *f);</span><br><span class="line"><span class="meta">#<span class="meta-keyword">ifndef</span> CONFIG_MMU</span></span><br><span class="line">	<span class="keyword">unsigned</span> (*mmap_capabilities)(struct file *);</span><br><span class="line"><span class="meta">#<span class="meta-keyword">endif</span></span></span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+      
+    </div>
+    
+  </div>
+  
+    
+    <div class="copyright">
+        <p><span>本文标题:</span><a href="/2017/08/18/2017-08-18-linux-code-vfs/">Linux虚拟文件系统(VFS)</a></p>
+        <p><span>文章作者:</span><a href="/" title="回到主页">Arking</a></p>
+        <p><span>发布时间:</span>2017-08-18, 02:51:00</p>
+        <p><span>最后更新:</span>2018-12-04, 18:03:44</p>
+        <p>
+            <span>原始链接:</span><a class="post-url" href="/2017/08/18/2017-08-18-linux-code-vfs/" title="Linux虚拟文件系统(VFS)">http://yoursite.com/2017/08/18/2017-08-18-linux-code-vfs/</a>
+            <span class="copy-path" data-clipboard-text="原文: http://yoursite.com/2017/08/18/2017-08-18-linux-code-vfs/　　作者: Arking" title="点击复制文章链接"><i class="fa fa-clipboard"></i></span>
+            <script> var clipboard = new Clipboard('.copy-path'); </script>
+        </p>
+        <p>
+            <span>许可协议:</span><i class="fa fa-creative-commons"></i> <a rel="license" href="http://creativecommons.org/licenses/by-nc-sa/4.0/" title="CC BY-NC-SA 4.0 International" target="_blank">"署名-非商用-相同方式共享 4.0"</a> 转载请保留原文链接及作者。
+        </p>
+    </div>
+
+
+
+    <nav id="article-nav">
+        
+            <div id="article-nav-newer" class="article-nav-title">
+                <a href="/2017/09/20/2017-09-20-linux-code-overlayfs-layerinfo/">
+                    内核OverlayFS—文件层次信息
+                </a>
+            </div>
+        
+        
+            <div id="article-nav-older" class="article-nav-title">
+                <a href="/2017/05/05/2017-05-05-docker-filesystem-overlay/">
+                     Docker存储驱动—Overlay/Overlay2「译」
+                </a>
+            </div>
+        
+    </nav>
+
+  
+</article>
+
+    <div id="toc" class="toc-article">
+        <strong class="toc-title">文章目录</strong>
+        
+            <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#VFS中的基本结构"><span class="toc-number">1.</span> <span class="toc-text">VFS中的基本结构</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#VFS基本结构指向关系"><span class="toc-number">2.</span> <span class="toc-text">VFS基本结构指向关系</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#super-block"><span class="toc-number">3.</span> <span class="toc-text">super_block</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#super-block操作"><span class="toc-number">3.1.</span> <span class="toc-text">super_block操作</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#inode"><span class="toc-number">4.</span> <span class="toc-text">inode</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#inode操作"><span class="toc-number">4.1.</span> <span class="toc-text">inode操作</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#dentry"><span class="toc-number">5.</span> <span class="toc-text">dentry</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#dentry操作"><span class="toc-number">5.1.</span> <span class="toc-text">dentry操作</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#file"><span class="toc-number">6.</span> <span class="toc-text">file</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#file操作"><span class="toc-number">6.1.</span> <span class="toc-text">file操作</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#内核源码"><span class="toc-number">7.</span> <span class="toc-text">内核源码</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#super-block-1"><span class="toc-number">7.1.</span> <span class="toc-text">super_block</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#super-operations"><span class="toc-number">7.2.</span> <span class="toc-text">super_operations</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#inode-1"><span class="toc-number">7.3.</span> <span class="toc-text">inode</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#inode-operations"><span class="toc-number">7.4.</span> <span class="toc-text">inode_operations</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#dentry-1"><span class="toc-number">7.5.</span> <span class="toc-text">dentry</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#dentry-operations"><span class="toc-number">7.6.</span> <span class="toc-text">dentry_operations</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#file-1"><span class="toc-number">7.7.</span> <span class="toc-text">file</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#file-operations"><span class="toc-number">7.8.</span> <span class="toc-text">file_operations</span></a></li></ol></li></ol>
+        
+    </div>
+    <style>
+        .left-col .switch-btn,
+        .left-col .switch-area {
+            display: none;
+        }
+        .toc-level-3 i,
+        .toc-level-3 ol {
+            display: none !important;
+        }
+    </style>
+
+    <input type="button" id="tocButton" value="隐藏目录" title="点击按钮隐藏或者显示文章目录">
+
+    <script>
+        yiliaConfig.toc = ["隐藏目录", "显示目录", !!"false"];
+    </script>
+
+
+
+    
+<div class="share">
+    
+        <div class="bdsharebuttonbox">
+            <a href="#" class="fa fa-twitter bds_twi" data-cmd="twi" title="分享到推特"></a>
+            <a href="#" class="fa fa-weibo bds_tsina" data-cmd="tsina" title="分享到新浪微博"></a>
+            <a href="#" class="fa fa-qq bds_sqq" data-cmd="sqq" title="分享给 QQ 好友"></a>
+            <a href="#" class="fa fa-files-o bds_copy" data-cmd="copy" title="复制网址"></a>
+            <a href="#" class="fa fa fa-envelope-o bds_mail" data-cmd="mail" title="通过邮件分享"></a>
+            <a href="#" class="fa fa-weixin bds_weixin" data-cmd="weixin" title="生成文章二维码"></a>
+            <a href="#" class="fa fa-share-alt bds_more" data-cmd="more"></a>
+        </div>
+        <script>
+            window._bd_share_config={
+                "common":{"bdSnsKey":{},"bdText":"Linux虚拟文件系统(VFS)　| Hexo　","bdMini":"2","bdMiniList":false,"bdPic":"","bdStyle":"0","bdSize":"24"},"share":{}};with(document)0[(getElementsByTagName('head')[0]||body).appendChild(createElement('script')).src='http://bdimg.share.baidu.com/static/api/js/share.js?v=89860593.js?cdnversion='+~(-new Date()/36e5)];
+        </script>
+    
+
+    
+</div>
+
+
+
+
+
+
+
+    
+
+
+
+
+    <div class="scroll" id="post-nav-button">
+        
+            <a href="/2017/09/20/2017-09-20-linux-code-overlayfs-layerinfo/" title="上一篇: 内核OverlayFS—文件层次信息">
+                <i class="fa fa-angle-left"></i>
+            </a>
+        
+
+        <a title="文章列表"><i class="fa fa-bars"></i><i class="fa fa-times"></i></a>
+
+        
+            <a href="/2017/05/05/2017-05-05-docker-filesystem-overlay/" title="下一篇:  Docker存储驱动—Overlay/Overlay2「译」">
+                <i class="fa fa-angle-right"></i>
+            </a>
+        
+    </div>
+
+    <ul class="post-list"><li class="post-list-item"><a class="post-list-link" href="/2018/09/05/2018-09-05-linux-kernel/">Ubuntu下内核与内核模块的编译过程</a></li><li class="post-list-item"><a class="post-list-link" href="/2018/01/19/2018-01-19-docker-imagestore/"> Docker源码分析—镜像存储 </a></li><li class="post-list-item"><a class="post-list-link" href="/2018/01/15/2018-01-15-docker-storage-overlay2/"> Docker源码分析—存储驱动 </a></li><li class="post-list-item"><a class="post-list-link" href="/2018/01/14/2018-01-14-docker-layerstore/"> Docker源码分析—层存储 </a></li><li class="post-list-item"><a class="post-list-link" href="/2018/01/12/2018-01-10-c-stack_frame/"> C函数栈帧 </a></li><li class="post-list-item"><a class="post-list-link" href="/2017/12/26/2017-12-26-linux-code-overlayfs-read_write/">内核OverlayFS—文件读写</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/12/22/2017-12-22-linux-code-overlayfs-create_delete/">内核OverlayFS—创建与删除文件</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/11/30/2017-11-30-linux-du/"> Linux查看目录大小</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/11/10/2017-11-10-linux-code-overlayfs-dir-op1/">内核OverlayFS—目录搜索</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/10/12/2017-10-12-linux-code-overlayfs-mnt/">内核OverlayFS—注册与挂载</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/09/20/2017-09-20-linux-code-overlayfs-layerinfo/">内核OverlayFS—文件层次信息</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/08/18/2017-08-18-linux-code-vfs/">Linux虚拟文件系统(VFS)</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/05/05/2017-05-05-docker-filesystem-overlay/"> Docker存储驱动—Overlay/Overlay2「译」</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/04/13/2017-04-13-docker-filesystem-aufs/"> Docker存储驱动—Aufs </a></li><li class="post-list-item"><a class="post-list-link" href="/2017/04/09/2017-04-09-linux-uuid/"> Linux存储设备的UUID</a></li></ul>
+
+
+
+
+    <script>
+        
+    </script>
+</div>
+      <footer id="footer">
+    <div class="outer">
+        <div id="footer-info">
+            <div class="footer-left">
+                <i class="fa fa-copyright"></i> 
+                2017-2018 Arking
+            </div>
+            <div class="footer-right">
+                <a href="http://hexo.io/" target="_blank" title="快速、简洁且高效的博客框架">Hexo</a>  Theme <a href="https://github.com/MOxFIVE/hexo-theme-yelee" target="_blank" title="简而不减 Hexo 双栏博客主题  v3.5">Yelee</a> by MOxFIVE <i class="fa fa-heart animated infinite pulse"></i>
+            </div>
+        </div>
+        
+            <div class="visit">
+                
+                    <span id="busuanzi_container_site_pv" style="display:none">
+                        <span id="site-visit" title="本站到访数"><i class="fa fa-user" aria-hidden="true"></i><span id="busuanzi_value_site_uv"></span>
+                        </span>
+                    </span>
+                
+                
+                    <span>| </span>
+                
+                
+                    <span id="busuanzi_container_page_pv" style="display:none">
+                        <span id="page-visit" title="本页阅读量"><i class="fa fa-eye animated infinite pulse" aria-hidden="true"></i><span id="busuanzi_value_page_pv"></span>
+                        </span>
+                    </span>
+                
+            </div>
+        
+    </div>
+</footer>
+    </div>
+    
+<script data-main="/js/main.js" src="//cdn.bootcss.com/require.js/2.2.0/require.min.js"></script>
+
+    <script>
+        $(document).ready(function() {
+            var iPad = window.navigator.userAgent.indexOf('iPad');
+            if (iPad > -1 || $(".left-col").css("display") === "none") {
+                var bgColorList = ["#9db3f4", "#414141", "#e5a859", "#f5dfc6", "#c084a0", "#847e72", "#cd8390", "#996731"];
+                var bgColor = Math.ceil(Math.random() * (bgColorList.length - 1));
+                $("body").css({"background-color": bgColorList[bgColor], "background-size": "cover"});
+            }
+            else {
+                var backgroundnum = 5;
+                var backgroundimg = "url(/background/bg-x.jpg)".replace(/x/gi, Math.ceil(Math.random() * backgroundnum));
+                $("body").css({"background": backgroundimg, "background-attachment": "fixed", "background-size": "cover"});
+            }
+        })
+    </script>
+
+
+
+
+
+<div class="scroll" id="scroll">
+    <a href="#" title="返回顶部"><i class="fa fa-arrow-up"></i></a>
+    <a href="#comments" onclick="load$hide();" title="查看评论"><i class="fa fa-comments-o"></i></a>
+    <a href="#footer" title="转到底部"><i class="fa fa-arrow-down"></i></a>
+</div>
+<script>
+    // Open in New Window
+    
+        var oOpenInNew = {
+            
+            
+            
+            
+            
+            
+             archives: ".archive-article-title", 
+             miniArchives: "a.post-list-link", 
+            
+             friends: "#js-friends a", 
+             socail: ".social a" 
+        }
+        for (var x in oOpenInNew) {
+            $(oOpenInNew[x]).attr("target", "_blank");
+        }
+    
+</script>
+
+<script async src="https://dn-lbstatics.qbox.me/busuanzi/2.3/busuanzi.pure.mini.js">
+</script>
+  </div>
+</body>
+</html>

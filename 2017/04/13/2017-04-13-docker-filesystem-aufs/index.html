@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html>
+<head><meta name="generator" content="Hexo 3.8.0">
+
+    <!--[if lt IE 9]>
+        <style>body {display: none; background: none !important} </style>
+        <meta http-equiv="Refresh" Content="0; url=//outdatedbrowser.com/" />
+    <![endif]-->
+
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge, chrome=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="format-detection" content="telephone=no">
+<meta name="author" content="Arking">
+
+
+
+<meta name="description" content="docker支持的存储驱动有aufs、overlayFS、devicemapper、btrfs、zfs和vfs; 这篇文章主要谈谈aufs；">
+<meta name="keywords" content="storage">
+<meta property="og:type" content="article">
+<meta property="og:title" content=" Docker存储驱动—Aufs ">
+<meta property="og:url" content="http://yoursite.com/2017/04/13/2017-04-13-docker-filesystem-aufs/index.html">
+<meta property="og:site_name" content="Hexo">
+<meta property="og:description" content="docker支持的存储驱动有aufs、overlayFS、devicemapper、btrfs、zfs和vfs; 这篇文章主要谈谈aufs；">
+<meta property="og:locale" content="default">
+<meta property="og:image" content="http://yoursite.com/img/in-post/post-docker-filesystem/aufs-struct.png">
+<meta property="og:image" content="http://yoursite.com/img/in-post/post-docker-filesystem/aufs-layers.jpg">
+<meta property="og:updated_time" content="2018-12-04T09:07:42.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content=" Docker存储驱动—Aufs ">
+<meta name="twitter:description" content="docker支持的存储驱动有aufs、overlayFS、devicemapper、btrfs、zfs和vfs; 这篇文章主要谈谈aufs；">
+<meta name="twitter:image" content="http://yoursite.com/img/in-post/post-docker-filesystem/aufs-struct.png">
+
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+
+
+    <link rel="alternate" href="/atom.xml" title="Hexo" type="application/atom+xml">
+
+
+
+    <link rel="shortcut icon" href="/favicon.png">
+
+
+
+    <link href="//cdn.bootcss.com/animate.css/3.5.1/animate.min.css" rel="stylesheet">
+
+
+
+    <link href="//cdn.bootcss.com/fancybox/2.1.5/jquery.fancybox.min.css" rel="stylesheet">
+
+
+
+    <script src="//cdn.bootcss.com/pace/1.0.2/pace.min.js"></script>
+    <link href="//cdn.bootcss.com/pace/1.0.2/themes/blue/pace-theme-minimal.css" rel="stylesheet">
+
+
+<link rel="stylesheet" href="/css/style.css">
+
+
+
+<link href="//cdn.bootcss.com/font-awesome/4.6.3/css/font-awesome.min.css" rel="stylesheet">
+
+
+<title> Docker存储驱动—Aufs  | Hexo</title>
+
+<script src="//cdn.bootcss.com/jquery/2.2.4/jquery.min.js"></script>
+<script src="//cdn.bootcss.com/clipboard.js/1.5.10/clipboard.min.js"></script>
+
+<script>
+    var yiliaConfig = {
+        fancybox: true,
+        animate: true,
+        isHome: false,
+        isPost: true,
+        isArchive: false,
+        isTag: false,
+        isCategory: false,
+        fancybox_js: "//cdn.bootcss.com/fancybox/2.1.5/jquery.fancybox.min.js",
+        scrollreveal: "//cdn.bootcss.com/scrollReveal.js/3.1.4/scrollreveal.min.js",
+        search: false
+    }
+</script>
+
+
+    <script> yiliaConfig.jquery_ui = [false]; </script>
+
+
+
+    <script> yiliaConfig.rootUrl = "\/";</script>
+
+
+
+
+
+
+</head></html>
+<body>
+  <div id="container">
+    <div class="left-col">
+    <div class="overlay"></div>
+<div class="intrude-less">
+    <header id="header" class="inner">
+        <a href="/" class="profilepic">
+            <img src="/img/avatar.png" class="animated zoomIn">
+        </a>
+        <hgroup>
+          <h1 class="header-author"><a href="/">Arking</a></h1>
+        </hgroup>
+
+        
+
+        
+
+
+        
+            <div id="switch-btn" class="switch-btn">
+                <div class="icon">
+                    <div class="icon-ctn">
+                        <div class="icon-wrap icon-house" data-idx="0">
+                            <div class="birdhouse"></div>
+                            <div class="birdhouse_holes"></div>
+                        </div>
+                        <div class="icon-wrap icon-ribbon hide" data-idx="1">
+                            <div class="ribbon"></div>
+                        </div>
+                        
+                        <div class="icon-wrap icon-link hide" data-idx="2">
+                            <div class="loopback_l"></div>
+                            <div class="loopback_r"></div>
+                        </div>
+                        
+                        
+                        <div class="icon-wrap icon-me hide" data-idx="3">
+                            <div class="user"></div>
+                            <div class="shoulder"></div>
+                        </div>
+                        
+                    </div>
+                    
+                </div>
+                <div class="tips-box hide">
+                    <div class="tips-arrow"></div>
+                    <ul class="tips-inner">
+                        <li>菜单</li>
+                        <li>标签</li>
+                        
+                        <li>友情链接</li>
+                        
+                        
+                        <li>关于我</li>
+                        
+                    </ul>
+                </div>
+            </div>
+        
+
+        <div id="switch-area" class="switch-area">
+            <div class="switch-wrap">
+                <section class="switch-part switch-part1">
+                    <nav class="header-menu">
+                        <ul>
+                        
+                            <li><a href="/">主页</a></li>
+                        
+                            <li><a href="/archives/">归档</a></li>
+                        
+                            <li><a href="/tags/">标签</a></li>
+                        
+                            <li><a href="/about/">关于我</a></li>
+                        
+                        </ul>
+                    </nav>
+                    <nav class="header-nav">
+                        <ul class="social">
+                            
+                                <a class="fa Email" href="/ximingchenhust@foxmail.com" title="Email"></a>
+                            
+                                <a class="fa GitHub" href="#" title="GitHub"></a>
+                            
+                        </ul>
+                    </nav>
+                </section>
+                
+                
+                <section class="switch-part switch-part2">
+                    <div class="widget tagcloud" id="js-tagcloud">
+                        <ul class="tag-list"><li class="tag-list-item"><a class="tag-list-link" href="/tags/c/">c</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/docker/">docker</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/filesystem/">filesystem</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/linux/">linux</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/overlayfs/">overlayfs</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/storage/">storage</a></li></ul>
+                    </div>
+                </section>
+                
+                
+                
+                <section class="switch-part switch-part3">
+                    <div id="js-friends">
+                    
+                      <a class="main-nav-link switch-friends-link" href="https://hexo.io">Hexo</a>
+                    
+                      <a class="main-nav-link switch-friends-link" href="https://pages.github.com/">GitHub</a>
+                    
+                      <a class="main-nav-link switch-friends-link" href="http://moxfive.xyz/">MOxFIVE</a>
+                    
+                    </div>
+                </section>
+                
+
+                
+                
+                <section class="switch-part switch-part4">
+                
+                    <div id="js-aboutme">专注于前端</div>
+                </section>
+                
+            </div>
+        </div>
+    </header>                
+</div>
+    </div>
+    <div class="mid-col">
+      <nav id="mobile-nav">
+      <div class="overlay">
+          <div class="slider-trigger"></div>
+          <h1 class="header-author js-mobile-header hide"><a href="/" title="回到主页">Arking</a></h1>
+      </div>
+    <div class="intrude-less">
+        <header id="header" class="inner">
+            <a href="/" class="profilepic">
+                <img src="/img/avatar.png" class="animated zoomIn">
+            </a>
+            <hgroup>
+              <h1 class="header-author"><a href="/" title="回到主页">Arking</a></h1>
+            </hgroup>
+            
+            <nav class="header-menu">
+                <ul>
+                
+                    <li><a href="/">主页</a></li>
+                
+                    <li><a href="/archives/">归档</a></li>
+                
+                    <li><a href="/tags/">标签</a></li>
+                
+                    <li><a href="/about/">关于我</a></li>
+                
+                <div class="clearfix"></div>
+                </ul>
+            </nav>
+            <nav class="header-nav">
+                        <ul class="social">
+                            
+                                <a class="fa Email" target="_blank" href="/ximingchenhust@foxmail.com" title="Email"></a>
+                            
+                                <a class="fa GitHub" target="_blank" href="#" title="GitHub"></a>
+                            
+                        </ul>
+            </nav>
+        </header>                
+    </div>
+    <link class="menu-list" tags="标签" friends="友情链接" about="关于我">
+</nav>
+      <div class="body-wrap"><article id="post-2017-04-13-docker-filesystem-aufs" class="article article-type-post" itemscope="" itemprop="blogPost">
+  
+    <div class="article-meta">
+      <a href="/2017/04/13/2017-04-13-docker-filesystem-aufs/" class="article-date">
+      <time datetime="2017-04-13T02:51:00.000Z" itemprop="datePublished">2017-04-13</time>
+</a>
+
+
+    </div>
+  
+  <div class="article-inner">
+    
+      <input type="hidden" class="isFancy">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="article-title" itemprop="name">
+       Docker存储驱动—Aufs 
+    </h1>
+  
+
+      </header>
+      
+      <div class="article-info article-info-post">
+        
+    <div class="article-category tagcloud">
+    <a class="article-category-link" href="/categories/Docker/">Docker</a>
+    </div>
+
+
+        
+    <div class="article-tag tagcloud">
+        <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/storage/">storage</a></li></ul>
+    </div>
+
+        <div class="clearfix"></div>
+      </div>
+      
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+          
+        <blockquote>
+<p>docker支持的存储驱动有aufs、overlayFS、devicemapper、btrfs、zfs和vfs;</p>
+<p>这篇文章主要谈谈aufs；</p>
+</blockquote>
+<a id="more"></a>
+<h2 id="使用Aufs进行联合挂载"><a href="#使用Aufs进行联合挂载" class="headerlink" title="使用Aufs进行联合挂载"></a>使用Aufs进行联合挂载</h2><p>AUFS 是一种 Union File System（联合文件系统），它可以把不同位置的目录合并mount到同一目录下。其中，最上层目录<strong>读写</strong>(r/w)，低层目录都为<strong>只读</strong>(read only)</p>
+<p>创建两个目录upper/以及lower/，一个联合挂载目录mnt/，在目录下创建文件，其结构如下：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">chenximing@chenximing-MS-7823:~/aufs$ tree upper/ lower/ mnt/</span><br><span class="line">upper/</span><br><span class="line">├── file</span><br><span class="line">└── file1</span><br><span class="line">lower/</span><br><span class="line">├── file</span><br><span class="line">└── file2</span><br><span class="line">mnt/</span><br></pre></td></tr></table></figure>
+<p>文件的内容如下:</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">chenximing@chenximing-MS-7823:~/aufs$ cat upper/file upper/file1</span><br><span class="line">file <span class="keyword">in</span> upper</span><br><span class="line">file1 <span class="keyword">in</span> upper</span><br><span class="line">chenximing@chenximing-MS-7823:~/aufs$ cat lower/file lower/file2</span><br><span class="line">file <span class="keyword">in</span> lower</span><br><span class="line">file2 <span class="keyword">in</span> lower</span><br></pre></td></tr></table></figure>
+<p>通过aufs将upper/和lower/联合挂载到mnt目录下。<strong>upper/属于读写层</strong>，<strong>lower/属于只读层</strong>。aufs根据权限(如果指定了)首先mount lower/，然后mount upper/：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">chenximing@chenximing-MS-7823:~/aufs$ sudo mount -t aufs -o <span class="built_in">dirs</span>=upper/:lower/ none mnt/</span><br><span class="line">chenximing@chenximing-MS-7823:~/aufs$ tree mnt</span><br><span class="line">mnt</span><br><span class="line">├── file</span><br><span class="line">├── file1</span><br><span class="line">└── file2</span><br><span class="line"></span><br><span class="line">0 directories, 3 files</span><br></pre></td></tr></table></figure>
+<p>整个的结构看起来像下面这样：</p>
+<p><img src="/img/in-post/post-docker-filesystem/aufs-struct.png" style="zoom:150%" align="center"></p>
+<p>图中可以反映出，联合挂载使用了一种<strong>覆盖/合并</strong>的机制：</p>
+<ul>
+<li>相同文件，上层会覆盖下层的文件</li>
+<li>相同目录，会进行合并。(在上面例子中添加文件upper/dir/f1和lower/dir/f2，则联合挂载后会有一个目录dir包含f1和f2)</li>
+</ul>
+<p>所以说upper/file会覆盖lower/file，而file1则是upper/file1，file2则是lower/file2：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">chenximing@chenximing-MS-7823:~/aufs$ cat mnt/file mnt/file1 mnt/file2</span><br><span class="line">file <span class="keyword">in</span> upper</span><br><span class="line">file1 <span class="keyword">in</span> upper</span><br><span class="line">file2 <span class="keyword">in</span> lower</span><br></pre></td></tr></table></figure>
+<h3 id="文件读"><a href="#文件读" class="headerlink" title="文件读"></a>文件读</h3><p>读一个文件时，会<strong>由上往下</strong>进行查找，如果读的文件在upper中，则直接读取upper层中的文件。否则，继续向下层查找，直到找到或者查找完所有层为止。因此，如果使用的低层越多，如果文件存在最底层，则会带来一定的查找开销</p>
+<p>由于aaa/为<strong>顶层读写层</strong>，因此对file1和file2进行修改将会<strong>直接修改aaa/中file1和file2内容</strong>。不会影响bbb/中的内容</p>
+<h3 id="文件写"><a href="#文件写" class="headerlink" title="文件写"></a>文件写</h3><p>首先会进行查找，对与找到的文件可能触发不同的写行为:</p>
+<ul>
+<li>如果是一个读写层的文件：由于文件权限为读写，因此可以修改，直接对读写层的文件进行写</li>
+<li>如果是一个只读层的文件：由于文件权限为只读，所以无法修改，因此会触发copy-on-write，将文件拷贝至读写层后，对拷贝后的文件写</li>
+</ul>
+<p>所以如果修改file或file1，会直接对upper/file或upper/file1进行修改。修改file2，会先将lower/file拷贝至upper/目录，然后修改：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">#1.对读写层文件写</span></span><br><span class="line">chenximing@chenximing-MS-7823:~/aufs$ <span class="built_in">echo</span> modify file1 &gt; mnt/file1</span><br><span class="line">chenximing@chenximing-MS-7823:~/aufs$ tree upper/ lower/</span><br><span class="line">upper/</span><br><span class="line">├── file</span><br><span class="line">├── file1 <span class="comment">#直接写file1</span></span><br><span class="line">lower/</span><br><span class="line">├── file</span><br><span class="line">└── file2</span><br><span class="line"></span><br><span class="line">0 directories, 4 files</span><br><span class="line">chenximing@chenximing-MS-7823:~/aufs$ cat mnt/file1 upper/file1</span><br><span class="line">modify file1</span><br><span class="line">modify file1</span><br><span class="line"></span><br><span class="line"><span class="comment">#2.对只读层文件写</span></span><br><span class="line">chenximing@chenximing-MS-7823:~/aufs$ <span class="built_in">echo</span> modify file2 &gt; mnt/file2</span><br><span class="line">chenximing@chenximing-MS-7823:~/aufs$ tree upper/ lower/</span><br><span class="line">upper/</span><br><span class="line">├── file</span><br><span class="line">├── file1</span><br><span class="line">└── file2 <span class="comment">#对lower/file2执行copy-on-write得到，然后写</span></span><br><span class="line">lower/</span><br><span class="line">├── file</span><br><span class="line">└── file2</span><br><span class="line"></span><br><span class="line">0 directories, 5 files</span><br><span class="line">chenximing@chenximing-MS-7823:~/aufs$ cat mnt/file2 upper/file2 lower/file2</span><br><span class="line">modify file2</span><br><span class="line">modify file2</span><br><span class="line">file2 <span class="keyword">in</span> lower <span class="comment">#并没有改变只读层的文件</span></span><br></pre></td></tr></table></figure>
+<h3 id="删除文件"><a href="#删除文件" class="headerlink" title="删除文件"></a>删除文件</h3><p>删除文件也会根据查找结果，触发不同的删除行为：</p>
+<ul>
+<li>如果文件<strong>只存在读写层</strong>：由于只读层不存在同名文件，因此直接删除读写层中的文件</li>
+<li>如果文件<strong>只存在只读层</strong>：由于只读层文件无法修改，所以在upper层创建一个whiteout文件隐藏只读层中的文件</li>
+<li>如果文件<strong>同时存在读写层和只读层</strong>：首先删除读写层中的文件，然后创建whiteout文件隐藏只读层中的同名文件</li>
+</ul>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">#1.文件只存在读写层</span></span><br><span class="line">chenximing@chenximing-MS-7823:~/aufs$ rm mnt/file1</span><br><span class="line">chenximing@chenximing-MS-7823:~/aufs$ tree upper/ lower/ mnt/</span><br><span class="line">upper/ <span class="comment">#upper中的file1被删除</span></span><br><span class="line">└── file</span><br><span class="line">└── file2</span><br><span class="line">lower/</span><br><span class="line">├── file</span><br><span class="line">└── file2</span><br><span class="line">mnt/ <span class="comment">#联合挂载目录中看到file1已经被删除了</span></span><br><span class="line">└── file</span><br><span class="line">└── file2</span><br><span class="line"></span><br><span class="line">0 directories, 6 files</span><br><span class="line"></span><br><span class="line"><span class="comment">#2.文件只存在只读层</span></span><br><span class="line">chenximing@chenximing-MS-7823:~/aufs$ rm mnt/file2</span><br><span class="line">chenximing@chenximing-MS-7823:~/aufs$ tree upper/ lower/ mnt/</span><br><span class="line">upper/</span><br><span class="line">└── file</span><br><span class="line">lower/</span><br><span class="line">├── file</span><br><span class="line">└── file2 <span class="comment">#只读层中的文件并未被删除</span></span><br><span class="line">mnt/ <span class="comment">#联合挂载目录中看到file2已经被删除了</span></span><br><span class="line">└── file</span><br><span class="line"></span><br><span class="line">0 directories, 4 files</span><br><span class="line"><span class="comment">#upper下的.wh.file2隐藏了lower/file2，因此mnt中对file2不可见</span></span><br><span class="line">chenximing@chenximing-MS-7823:~/aufs$ ls -a upper/</span><br><span class="line">.  ..  file  .wh.file2  .wh..wh.aufs  .wh..wh.orph  .wh..wh.plnk</span><br><span class="line"></span><br><span class="line"><span class="comment">#3.文件同时存在读写层和只读层</span></span><br><span class="line">chenximing@chenximing-MS-7823:~/aufs$ rm mnt/file</span><br><span class="line">chenximing@chenximing-MS-7823:~/aufs$ tree upper/ lower/ mnt/</span><br><span class="line">upper/ <span class="comment">#只读层的file被删除</span></span><br><span class="line">lower/ </span><br><span class="line">├── file <span class="comment">#读写层的file并未被删除</span></span><br><span class="line">└── file2</span><br><span class="line">mnt/ <span class="comment">#联合挂载目录中看到file已经被删除了</span></span><br><span class="line"></span><br><span class="line">0 directories, 2 files</span><br><span class="line">chenximing@chenximing-MS-7823:~/aufs$ ls -a upper/</span><br><span class="line">.  ..  .wh.file  .wh.file2  .wh..wh.aufs  .wh..wh.orph  .wh..wh.plnk</span><br></pre></td></tr></table></figure>
+<h2 id="Docker中的Aufs存储驱动"><a href="#Docker中的Aufs存储驱动" class="headerlink" title="Docker中的Aufs存储驱动"></a>Docker中的Aufs存储驱动</h2><p><img src="/img/in-post/post-docker-filesystem/aufs-layers.jpg" alt=""></p>
+<p><em><a href="https://docs.docker.com/engine/userguide/storagedriver/images/aufs_layers.jpg" target="_blank" rel="noopener">图片来源: Docker文档</a></em></p>
+<p>上图是一个docker容器的层次化结构，docker容器由镜像生成，镜像由多层的<strong>只读的镜像层</strong>组成。每run一个docker容器时，会根据使用的镜像，在只读层上创建一层<strong>读写层(容器层)</strong></p>
+<p>容器和镜像存储在/var/lib/docker/aufs/目录下，aufs目录包含了三个目录：diff、layers、mnt</p>
+<p><strong>镜像层和容器层的层次关系记录在layers目录下，镜像和容器层存储在diff目录下，联合挂载目录则是在mnt下</strong>：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">chenximing@chenximing-MS-7823:~/aufs$ sudo ls /var/lib/docker/aufs</span><br><span class="line">diff  layers  mnt</span><br><span class="line"></span><br><span class="line"><span class="comment">#拉取镜像前diff目录为空，因为没有镜像层和容器层</span></span><br><span class="line">chenximing@chenximing-MS-7823:~/aufs$ sudo ls /var/lib/docker/aufs/diff</span><br></pre></td></tr></table></figure>
+<h3 id="镜像层"><a href="#镜像层" class="headerlink" title="镜像层"></a>镜像层</h3><p>上面提到，镜像层在diff目录中，使用<code>docker pull ubuntu</code>命令拉取一个ubuntu镜像后再观察这个目录：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">#包含5层镜像层</span></span><br><span class="line">chenximing@chenximing-MS-7823:~/aufs$ sudo ls /var/lib/docker/aufs/diff</span><br><span class="line">2fd1123336697985b55ecc4f58d471ed9c9a8d64d09b54df90d6882ef2a85f2a</span><br><span class="line">6c8288af68cf7fa75239560127afbeccb5dae236173c7807a9970f91839c9269</span><br><span class="line">78e6c0be52f62583e8c9b26f90548ad5b4629e0fa84d6e9430b4bc742d2cfc4e</span><br><span class="line">df229100e0eced9e2fbc4dbdeb55e6ed602d917fc27aa14a29c5a11bdc1c27ba</span><br><span class="line">ebc2d2b2d9ee5bcaf02263d24ca0cd016e0a812c76cad7921a49b75aa604d513</span><br><span class="line"></span><br><span class="line"><span class="comment">#每层镜像的内容</span></span><br><span class="line">chenximing@chenximing-MS-7823:~/aufs$ sudo tree -L 2 /var/lib/docker/aufs/diff</span><br><span class="line">/var/lib/docker/aufs/diff</span><br><span class="line">├── 2fd1123336697985b55ecc4f58d471ed9c9a8d64d09b54df90d6882ef2a85f2a</span><br><span class="line">│   ├── bin</span><br><span class="line">│   ├── boot</span><br><span class="line">│   ├── dev</span><br><span class="line">│   ├── etc</span><br><span class="line">│   ├── home</span><br><span class="line">│   ├── lib</span><br><span class="line">│   ├── lib64</span><br><span class="line">│   ├── media</span><br><span class="line">│   ├── mnt</span><br><span class="line">│   ├── opt</span><br><span class="line">│   ├── proc</span><br><span class="line">│   ├── root</span><br><span class="line">│   ├── run</span><br><span class="line">│   ├── sbin</span><br><span class="line">│   ├── srv</span><br><span class="line">│   ├── sys</span><br><span class="line">│   ├── tmp</span><br><span class="line">│   ├── usr</span><br><span class="line">│   └── var</span><br><span class="line">├── 6c8288af68cf7fa75239560127afbeccb5dae236173c7807a9970f91839c9269</span><br><span class="line">│   ├── etc</span><br><span class="line">│   ├── sbin</span><br><span class="line">│   ├── usr</span><br><span class="line">│   └── var</span><br><span class="line">├── 78e6c0be52f62583e8c9b26f90548ad5b4629e0fa84d6e9430b4bc742d2cfc4e</span><br><span class="line">│   └── etc</span><br><span class="line">├── df229100e0eced9e2fbc4dbdeb55e6ed602d917fc27aa14a29c5a11bdc1c27ba</span><br><span class="line">│   └── var</span><br><span class="line">└── ebc2d2b2d9ee5bcaf02263d24ca0cd016e0a812c76cad7921a49b75aa604d513</span><br><span class="line">    └── run</span><br><span class="line"></span><br><span class="line">31 directories, 0 files</span><br></pre></td></tr></table></figure>
+<p>在拉取一个ubuntu镜像后，diff中创建了5个目录，对于ubuntu镜像的5层镜像层，上面我们可以看到每层的内容。再看看联合挂载目录mnt：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">chenximing@chenximing-MS-7823:~/aufs$ sudo tree -L 2 /var/lib/docker/aufs/mnt</span><br><span class="line">/var/lib/docker/aufs/mnt</span><br><span class="line">├── 2fd1123336697985b55ecc4f58d471ed9c9a8d64d09b54df90d6882ef2a85f2a</span><br><span class="line">├── 6c8288af68cf7fa75239560127afbeccb5dae236173c7807a9970f91839c9269</span><br><span class="line">├── 78e6c0be52f62583e8c9b26f90548ad5b4629e0fa84d6e9430b4bc742d2cfc4e</span><br><span class="line">├── df229100e0eced9e2fbc4dbdeb55e6ed602d917fc27aa14a29c5a11bdc1c27ba</span><br><span class="line">└── ebc2d2b2d9ee5bcaf02263d24ca0cd016e0a812c76cad7921a49b75aa604d513</span><br><span class="line"></span><br><span class="line">5 directories, 0 files</span><br></pre></td></tr></table></figure>
+<h3 id="容器层"><a href="#容器层" class="headerlink" title="容器层"></a>容器层</h3><p>使用命令<code>docker create -it --name ct ubuntu /bin/bash</code>创建一个容器，看看有什么变化：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line">root@chenximing-MS-7823:~/aufs$ ls /var/lib/docker/aufs/diff</span><br><span class="line">2fd1123336697985b55ecc4f58d471ed9c9a8d64d09b54df90d6882ef2a85f2a</span><br><span class="line">6c8288af68cf7fa75239560127afbeccb5dae236173c7807a9970f91839c9269</span><br><span class="line">78e6c0be52f62583e8c9b26f90548ad5b4629e0fa84d6e9430b4bc742d2cfc4e</span><br><span class="line">b451c296ac5ac40e64a9bff28cf1409ea2b47c41be05e87430d46d3958f179e2</span><br><span class="line">b451c296ac5ac40e64a9bff28cf1409ea2b47c41be05e87430d46d3958f179e2-init</span><br><span class="line">df229100e0eced9e2fbc4dbdeb55e6ed602d917fc27aa14a29c5a11bdc1c27ba</span><br><span class="line">ebc2d2b2d9ee5bcaf02263d24ca0cd016e0a812c76cad7921a49b75aa604d513</span><br><span class="line"></span><br><span class="line">root@chenximing-MS-7823:/home/chenximing/aufs$ tree -L 2 /var/lib/docker/aufs/diff/b45*</span><br><span class="line">/var/lib/docker/aufs/diff/b451c296ac5ac40e64a9bff28cf1409ea2b47c41be05e87430d46d3958f179e2</span><br><span class="line">/var/lib/docker/aufs/diff/b451c296ac5ac40e64a9bff28cf1409ea2b47c41be05e87430d46d3958f179e2-init</span><br><span class="line">├── dev</span><br><span class="line">│   └── console</span><br><span class="line">└── etc</span><br><span class="line">    ├── hostname</span><br><span class="line">    ├── hosts</span><br><span class="line">    ├── mtab -&gt; /proc/mounts</span><br><span class="line">    └── resolv.conf</span><br><span class="line"></span><br><span class="line">2 directories, 5 files</span><br></pre></td></tr></table></figure>
+<p>从上面可以看出，<strong>创建一个容器，实际上就是创建了一层读写层(容器层)</strong>,也就是上面的“b45…9e2”目录</p>
+<p>初始化层“b5..9e2-init”用来初始化容器环境，由于hostname这些信息每个容器独有，而容器层可能会被提交成镜像，从而成为一个镜像层，所以这些文件不适合放在容器层中</p>
+<p>mnt目录下也创建了对应的联合挂载目录，目录同样为空：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">chenximing@chenximing-MS-7823:~/aufs$ sudo tree -L 2 /var/lib/docker/aufs/mnt</span><br><span class="line">/var/lib/docker/aufs/mnt</span><br><span class="line">├── 2fd1123336697985b55ecc4f58d471ed9c9a8d64d09b54df90d6882ef2a85f2a</span><br><span class="line">├── 6c8288af68cf7fa75239560127afbeccb5dae236173c7807a9970f91839c9269</span><br><span class="line">├── 78e6c0be52f62583e8c9b26f90548ad5b4629e0fa84d6e9430b4bc742d2cfc4e</span><br><span class="line">├── b451c296ac5ac40e64a9bff28cf1409ea2b47c41be05e87430d46d3958f179e2 </span><br><span class="line">├── b451c296ac5ac40e64a9bff28cf1409ea2b47c41be05e87430d46d3958f179e2-init</span><br><span class="line">├── df229100e0eced9e2fbc4dbdeb55e6ed602d917fc27aa14a29c5a11bdc1c27ba</span><br><span class="line">└── ebc2d2b2d9ee5bcaf02263d24ca0cd016e0a812c76cad7921a49b75aa604d513</span><br></pre></td></tr></table></figure>
+<h3 id="启动容器"><a href="#启动容器" class="headerlink" title="启动容器"></a>启动容器</h3><p>为什么联合挂载目录在拉取一个镜像和创建一个容器后都是空？原因在于容器并没有启动，因此何来联合挂载。<strong>容器启动就是将diff目录下的镜像层与容器层联合挂载到mnt目录下</strong>，使用<code>docker start ct</code>启动容器，再次观察mnt目录：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br></pre></td><td class="code"><pre><span class="line">root@chenximing-MS-7823:/home/chenximing/aufs$ tree -L 2 /var/lib/docker/aufs/mnt</span><br><span class="line">/var/lib/docker/aufs/mnt</span><br><span class="line">├── 2fd1123336697985b55ecc4f58d471ed9c9a8d64d09b54df90d6882ef2a85f2a</span><br><span class="line">├── 6c8288af68cf7fa75239560127afbeccb5dae236173c7807a9970f91839c9269</span><br><span class="line">├── 78e6c0be52f62583e8c9b26f90548ad5b4629e0fa84d6e9430b4bc742d2cfc4e</span><br><span class="line">├── b451c296ac5ac40e64a9bff28cf1409ea2b47c41be05e87430d46d3958f179e2</span><br><span class="line">│   ├── bin</span><br><span class="line">│   ├── boot</span><br><span class="line">│   ├── dev</span><br><span class="line">│   ├── etc</span><br><span class="line">│   ├── home</span><br><span class="line">│   ├── lib</span><br><span class="line">│   ├── lib64</span><br><span class="line">│   ├── media</span><br><span class="line">│   ├── mnt</span><br><span class="line">│   ├── opt</span><br><span class="line">│   ├── proc</span><br><span class="line">│   ├── root</span><br><span class="line">│   ├── run</span><br><span class="line">│   ├── sbin</span><br><span class="line">│   ├── srv</span><br><span class="line">│   ├── sys</span><br><span class="line">│   ├── tmp</span><br><span class="line">│   ├── usr</span><br><span class="line">│   └── var</span><br><span class="line">├── b451c296ac5ac40e64a9bff28cf1409ea2b47c41be05e87430d46d3958f179e2-init</span><br><span class="line">├── df229100e0eced9e2fbc4dbdeb55e6ed602d917fc27aa14a29c5a11bdc1c27ba</span><br><span class="line">└── ebc2d2b2d9ee5bcaf02263d24ca0cd016e0a812c76cad7921a49b75aa604d513</span><br><span class="line"></span><br><span class="line">26 directories, 0 files</span><br></pre></td></tr></table></figure>
+<p>容器层对应的联合挂载目录此时以及不为空了，目录下的内容就是我们在容器内使用<code>ls /</code>看到的文件</p>
+<h3 id="查看容器-镜像层次关系"><a href="#查看容器-镜像层次关系" class="headerlink" title="查看容器/镜像层次关系"></a>查看容器/镜像层次关系</h3><p>现在我们知道一个镜像通常对应多次镜像层，如果你想知道一个容器的镜像层和容器层的上下关系，可以通过layers目录查找上下层关系。layers目录中包含了与diff目录下容器和镜像层目录同名的文件，这些文件中记录了位于该层下面的层的id。可以使用cat命令查看</p>
+<p>除此之外，也可以通过下面的方法查看：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">root@chenximing-MS-7823:/var/lib/docker/aufs$ cat /sys/fs/aufs/si_5124fe8368e572f5/br[0-6]*</span><br><span class="line">/var/lib/docker/aufs/diff/b451c296ac5ac40e64a9bff28cf1409ea2b47c41be05e87430d46d3958f179e2=rw</span><br><span class="line">/var/lib/docker/aufs/diff/b451c296ac5ac40e64a9bff28cf1409ea2b47c41be05e87430d46d3958f179e2-init=ro+wh</span><br><span class="line">/var/lib/docker/aufs/diff/ebc2d2b2d9ee5bcaf02263d24ca0cd016e0a812c76cad7921a49b75aa604d513=ro+wh</span><br><span class="line">/var/lib/docker/aufs/diff/78e6c0be52f62583e8c9b26f90548ad5b4629e0fa84d6e9430b4bc742d2cfc4e=ro+wh</span><br><span class="line">/var/lib/docker/aufs/diff/df229100e0eced9e2fbc4dbdeb55e6ed602d917fc27aa14a29c5a11bdc1c27ba=ro+wh</span><br><span class="line">/var/lib/docker/aufs/diff/6c8288af68cf7fa75239560127afbeccb5dae236173c7807a9970f91839c9269=ro+wh</span><br><span class="line">/var/lib/docker/aufs/diff/2fd1123336697985b55ecc4f58d471ed9c9a8d64d09b54df90d6882ef2a85f2a=ro+wh</span><br></pre></td></tr></table></figure>
+<h2 id="结语"><a href="#结语" class="headerlink" title="结语"></a>结语</h2><p>实际上<strong>docker的aufs存储驱动本质上是利用了aufs文件系统来实现镜像和容器的层次管理</strong>，使用aufs存储驱动时，容器内的读写最终都会由aufs文件系统来处理</p>
+<p>docker使用aufs作为存储驱动时,通过将<strong>只读的镜像层</strong>和<strong>读写的容器层</strong>联合挂载到同一目录下，将多层合并成文件系统的单层表示。所有的变化都只是记录在容器层，因此它的优势很明显：</p>
+<ul>
+<li>能够实现镜像共享，使用相同镜像的容器只是在镜像上创建了一个容器层(读写层)。因此能够节省存储资源，同时加速容器的创建和启动时间</li>
+<li>同时，由于aufs出现较早，因此比较稳定，在大量生产中实践过，有较强的社区支持</li>
+</ul>
+<p>但是它也存在缺陷：</p>
+<ul>
+<li>没有并入Linux内核，只支持ubuntu</li>
+<li>它是文件级的存储，对只读层大文件的修改，引发的copy-on-write会带来很大的I/O开销</li>
+</ul>
+<h2 id="参考"><a href="#参考" class="headerlink" title="参考"></a>参考</h2><ul>
+<li><em><a href="http://www.cnblogs.com/sammyliu/p/5931383.html" target="_blank" rel="noopener">Docker存储-Aufs</a></em></li>
+<li><em><a href="http://dockone.io/article/1513" target="_blank" rel="noopener">Docker五种存储驱动原理及应用场景和性能测试对比</a></em></li>
+</ul>
+
+      
+    </div>
+    
+  </div>
+  
+    
+    <div class="copyright">
+        <p><span>本文标题:</span><a href="/2017/04/13/2017-04-13-docker-filesystem-aufs/"> Docker存储驱动—Aufs </a></p>
+        <p><span>文章作者:</span><a href="/" title="回到主页">Arking</a></p>
+        <p><span>发布时间:</span>2017-04-13, 10:51:00</p>
+        <p><span>最后更新:</span>2018-12-04, 17:07:42</p>
+        <p>
+            <span>原始链接:</span><a class="post-url" href="/2017/04/13/2017-04-13-docker-filesystem-aufs/" title=" Docker存储驱动—Aufs ">http://yoursite.com/2017/04/13/2017-04-13-docker-filesystem-aufs/</a>
+            <span class="copy-path" data-clipboard-text="原文: http://yoursite.com/2017/04/13/2017-04-13-docker-filesystem-aufs/　　作者: Arking" title="点击复制文章链接"><i class="fa fa-clipboard"></i></span>
+            <script> var clipboard = new Clipboard('.copy-path'); </script>
+        </p>
+        <p>
+            <span>许可协议:</span><i class="fa fa-creative-commons"></i> <a rel="license" href="http://creativecommons.org/licenses/by-nc-sa/4.0/" title="CC BY-NC-SA 4.0 International" target="_blank">"署名-非商用-相同方式共享 4.0"</a> 转载请保留原文链接及作者。
+        </p>
+    </div>
+
+
+
+    <nav id="article-nav">
+        
+            <div id="article-nav-newer" class="article-nav-title">
+                <a href="/2017/05/05/2017-05-05-docker-filesystem-overlay/">
+                     Docker存储驱动—Overlay/Overlay2「译」
+                </a>
+            </div>
+        
+        
+            <div id="article-nav-older" class="article-nav-title">
+                <a href="/2017/04/09/2017-04-09-linux-uuid/">
+                     Linux存储设备的UUID
+                </a>
+            </div>
+        
+    </nav>
+
+  
+</article>
+
+    <div id="toc" class="toc-article">
+        <strong class="toc-title">文章目录</strong>
+        
+            <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#使用Aufs进行联合挂载"><span class="toc-number">1.</span> <span class="toc-text">使用Aufs进行联合挂载</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#文件读"><span class="toc-number">1.1.</span> <span class="toc-text">文件读</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#文件写"><span class="toc-number">1.2.</span> <span class="toc-text">文件写</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#删除文件"><span class="toc-number">1.3.</span> <span class="toc-text">删除文件</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#Docker中的Aufs存储驱动"><span class="toc-number">2.</span> <span class="toc-text">Docker中的Aufs存储驱动</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#镜像层"><span class="toc-number">2.1.</span> <span class="toc-text">镜像层</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#容器层"><span class="toc-number">2.2.</span> <span class="toc-text">容器层</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#启动容器"><span class="toc-number">2.3.</span> <span class="toc-text">启动容器</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#查看容器-镜像层次关系"><span class="toc-number">2.4.</span> <span class="toc-text">查看容器/镜像层次关系</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#结语"><span class="toc-number">3.</span> <span class="toc-text">结语</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#参考"><span class="toc-number">4.</span> <span class="toc-text">参考</span></a></li></ol>
+        
+    </div>
+    <style>
+        .left-col .switch-btn,
+        .left-col .switch-area {
+            display: none;
+        }
+        .toc-level-3 i,
+        .toc-level-3 ol {
+            display: none !important;
+        }
+    </style>
+
+    <input type="button" id="tocButton" value="隐藏目录" title="点击按钮隐藏或者显示文章目录">
+
+    <script>
+        yiliaConfig.toc = ["隐藏目录", "显示目录", !!"false"];
+    </script>
+
+
+
+    
+<div class="share">
+    
+        <div class="bdsharebuttonbox">
+            <a href="#" class="fa fa-twitter bds_twi" data-cmd="twi" title="分享到推特"></a>
+            <a href="#" class="fa fa-weibo bds_tsina" data-cmd="tsina" title="分享到新浪微博"></a>
+            <a href="#" class="fa fa-qq bds_sqq" data-cmd="sqq" title="分享给 QQ 好友"></a>
+            <a href="#" class="fa fa-files-o bds_copy" data-cmd="copy" title="复制网址"></a>
+            <a href="#" class="fa fa fa-envelope-o bds_mail" data-cmd="mail" title="通过邮件分享"></a>
+            <a href="#" class="fa fa-weixin bds_weixin" data-cmd="weixin" title="生成文章二维码"></a>
+            <a href="#" class="fa fa-share-alt bds_more" data-cmd="more"></a>
+        </div>
+        <script>
+            window._bd_share_config={
+                "common":{"bdSnsKey":{},"bdText":" Docker存储驱动—Aufs 　| Hexo　","bdMini":"2","bdMiniList":false,"bdPic":"","bdStyle":"0","bdSize":"24"},"share":{}};with(document)0[(getElementsByTagName('head')[0]||body).appendChild(createElement('script')).src='http://bdimg.share.baidu.com/static/api/js/share.js?v=89860593.js?cdnversion='+~(-new Date()/36e5)];
+        </script>
+    
+
+    
+</div>
+
+
+
+
+
+
+
+    
+
+
+
+
+    <div class="scroll" id="post-nav-button">
+        
+            <a href="/2017/05/05/2017-05-05-docker-filesystem-overlay/" title="上一篇:  Docker存储驱动—Overlay/Overlay2「译」">
+                <i class="fa fa-angle-left"></i>
+            </a>
+        
+
+        <a title="文章列表"><i class="fa fa-bars"></i><i class="fa fa-times"></i></a>
+
+        
+            <a href="/2017/04/09/2017-04-09-linux-uuid/" title="下一篇:  Linux存储设备的UUID">
+                <i class="fa fa-angle-right"></i>
+            </a>
+        
+    </div>
+
+    <ul class="post-list"><li class="post-list-item"><a class="post-list-link" href="/2018/09/05/2018-09-05-linux-kernel/">Ubuntu下内核与内核模块的编译过程</a></li><li class="post-list-item"><a class="post-list-link" href="/2018/01/19/2018-01-19-docker-imagestore/"> Docker源码分析—镜像存储 </a></li><li class="post-list-item"><a class="post-list-link" href="/2018/01/15/2018-01-15-docker-storage-overlay2/"> Docker源码分析—存储驱动 </a></li><li class="post-list-item"><a class="post-list-link" href="/2018/01/14/2018-01-14-docker-layerstore/"> Docker源码分析—层存储 </a></li><li class="post-list-item"><a class="post-list-link" href="/2018/01/12/2018-01-10-c-stack_frame/"> C函数栈帧 </a></li><li class="post-list-item"><a class="post-list-link" href="/2017/12/26/2017-12-26-linux-code-overlayfs-read_write/">内核OverlayFS—文件读写</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/12/22/2017-12-22-linux-code-overlayfs-create_delete/">内核OverlayFS—创建与删除文件</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/11/30/2017-11-30-linux-du/"> Linux查看目录大小</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/11/10/2017-11-10-linux-code-overlayfs-dir-op1/">内核OverlayFS—目录搜索</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/10/12/2017-10-12-linux-code-overlayfs-mnt/">内核OverlayFS—注册与挂载</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/09/20/2017-09-20-linux-code-overlayfs-layerinfo/">内核OverlayFS—文件层次信息</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/08/18/2017-08-18-linux-code-vfs/">Linux虚拟文件系统(VFS)</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/05/05/2017-05-05-docker-filesystem-overlay/"> Docker存储驱动—Overlay/Overlay2「译」</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/04/13/2017-04-13-docker-filesystem-aufs/"> Docker存储驱动—Aufs </a></li><li class="post-list-item"><a class="post-list-link" href="/2017/04/09/2017-04-09-linux-uuid/"> Linux存储设备的UUID</a></li></ul>
+
+
+
+
+    <script>
+        
+    </script>
+</div>
+      <footer id="footer">
+    <div class="outer">
+        <div id="footer-info">
+            <div class="footer-left">
+                <i class="fa fa-copyright"></i> 
+                2017-2018 Arking
+            </div>
+            <div class="footer-right">
+                <a href="http://hexo.io/" target="_blank" title="快速、简洁且高效的博客框架">Hexo</a>  Theme <a href="https://github.com/MOxFIVE/hexo-theme-yelee" target="_blank" title="简而不减 Hexo 双栏博客主题  v3.5">Yelee</a> by MOxFIVE <i class="fa fa-heart animated infinite pulse"></i>
+            </div>
+        </div>
+        
+            <div class="visit">
+                
+                    <span id="busuanzi_container_site_pv" style="display:none">
+                        <span id="site-visit" title="本站到访数"><i class="fa fa-user" aria-hidden="true"></i><span id="busuanzi_value_site_uv"></span>
+                        </span>
+                    </span>
+                
+                
+                    <span>| </span>
+                
+                
+                    <span id="busuanzi_container_page_pv" style="display:none">
+                        <span id="page-visit" title="本页阅读量"><i class="fa fa-eye animated infinite pulse" aria-hidden="true"></i><span id="busuanzi_value_page_pv"></span>
+                        </span>
+                    </span>
+                
+            </div>
+        
+    </div>
+</footer>
+    </div>
+    
+<script data-main="/js/main.js" src="//cdn.bootcss.com/require.js/2.2.0/require.min.js"></script>
+
+    <script>
+        $(document).ready(function() {
+            var iPad = window.navigator.userAgent.indexOf('iPad');
+            if (iPad > -1 || $(".left-col").css("display") === "none") {
+                var bgColorList = ["#9db3f4", "#414141", "#e5a859", "#f5dfc6", "#c084a0", "#847e72", "#cd8390", "#996731"];
+                var bgColor = Math.ceil(Math.random() * (bgColorList.length - 1));
+                $("body").css({"background-color": bgColorList[bgColor], "background-size": "cover"});
+            }
+            else {
+                var backgroundnum = 5;
+                var backgroundimg = "url(/background/bg-x.jpg)".replace(/x/gi, Math.ceil(Math.random() * backgroundnum));
+                $("body").css({"background": backgroundimg, "background-attachment": "fixed", "background-size": "cover"});
+            }
+        })
+    </script>
+
+
+
+
+
+<div class="scroll" id="scroll">
+    <a href="#" title="返回顶部"><i class="fa fa-arrow-up"></i></a>
+    <a href="#comments" onclick="load$hide();" title="查看评论"><i class="fa fa-comments-o"></i></a>
+    <a href="#footer" title="转到底部"><i class="fa fa-arrow-down"></i></a>
+</div>
+<script>
+    // Open in New Window
+    
+        var oOpenInNew = {
+            
+            
+            
+            
+            
+            
+             archives: ".archive-article-title", 
+             miniArchives: "a.post-list-link", 
+            
+             friends: "#js-friends a", 
+             socail: ".social a" 
+        }
+        for (var x in oOpenInNew) {
+            $(oOpenInNew[x]).attr("target", "_blank");
+        }
+    
+</script>
+
+<script async src="https://dn-lbstatics.qbox.me/busuanzi/2.3/busuanzi.pure.mini.js">
+</script>
+  </div>
+</body>
+</html>

@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html>
+<head><meta name="generator" content="Hexo 3.8.0">
+
+    <!--[if lt IE 9]>
+        <style>body {display: none; background: none !important} </style>
+        <meta http-equiv="Refresh" Content="0; url=//outdatedbrowser.com/" />
+    <![endif]-->
+
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge, chrome=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="format-detection" content="telephone=no">
+<meta name="author" content="Arking">
+
+
+
+<meta name="description" content="内核版本为4.4.68  这篇文章通过内核源码分析OverlayFS的注册与挂载过程 假设你对OverlayFS的层次关系已经有一个基本的了解。如果对OverlayFS的层以及联合挂载没有概念，建议先补充下相关知识，因为挂载OverlayFS时会使用到层 分析会尽可能避开公有部分(每种文件系统注册和挂载过程中都会涉及的内容)，而更多的关注OverlayFS独有部分">
+<meta name="keywords" content="filesystem,overlayfs">
+<meta property="og:type" content="article">
+<meta property="og:title" content="内核OverlayFS—注册与挂载">
+<meta property="og:url" content="http://yoursite.com/2017/10/12/2017-10-12-linux-code-overlayfs-mnt/index.html">
+<meta property="og:site_name" content="Hexo">
+<meta property="og:description" content="内核版本为4.4.68  这篇文章通过内核源码分析OverlayFS的注册与挂载过程 假设你对OverlayFS的层次关系已经有一个基本的了解。如果对OverlayFS的层以及联合挂载没有概念，建议先补充下相关知识，因为挂载OverlayFS时会使用到层 分析会尽可能避开公有部分(每种文件系统注册和挂载过程中都会涉及的内容)，而更多的关注OverlayFS独有部分">
+<meta property="og:locale" content="default">
+<meta property="og:image" content="http://yoursite.com/img/in-post/post-linux-vfs/filesystem_list.png">
+<meta property="og:image" content="http://yoursite.com/img/in-post/post-kernel-overlayfs/df.png">
+<meta property="og:image" content="http://yoursite.com/img/in-post/post-kernel-overlayfs/dir-op1-dir_tree.png">
+<meta property="og:image" content="http://yoursite.com/img/in-post/post-kernel-overlayfs/fill_1.png">
+<meta property="og:image" content="http://yoursite.com/img/in-post/post-kernel-overlayfs/fill_2.png">
+<meta property="og:updated_time" content="2018-12-04T09:50:11.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="内核OverlayFS—注册与挂载">
+<meta name="twitter:description" content="内核版本为4.4.68  这篇文章通过内核源码分析OverlayFS的注册与挂载过程 假设你对OverlayFS的层次关系已经有一个基本的了解。如果对OverlayFS的层以及联合挂载没有概念，建议先补充下相关知识，因为挂载OverlayFS时会使用到层 分析会尽可能避开公有部分(每种文件系统注册和挂载过程中都会涉及的内容)，而更多的关注OverlayFS独有部分">
+<meta name="twitter:image" content="http://yoursite.com/img/in-post/post-linux-vfs/filesystem_list.png">
+
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+
+
+    <link rel="alternate" href="/atom.xml" title="Hexo" type="application/atom+xml">
+
+
+
+    <link rel="shortcut icon" href="/favicon.png">
+
+
+
+    <link href="//cdn.bootcss.com/animate.css/3.5.1/animate.min.css" rel="stylesheet">
+
+
+
+    <link href="//cdn.bootcss.com/fancybox/2.1.5/jquery.fancybox.min.css" rel="stylesheet">
+
+
+
+    <script src="//cdn.bootcss.com/pace/1.0.2/pace.min.js"></script>
+    <link href="//cdn.bootcss.com/pace/1.0.2/themes/blue/pace-theme-minimal.css" rel="stylesheet">
+
+
+<link rel="stylesheet" href="/css/style.css">
+
+
+
+<link href="//cdn.bootcss.com/font-awesome/4.6.3/css/font-awesome.min.css" rel="stylesheet">
+
+
+<title>内核OverlayFS—注册与挂载 | Hexo</title>
+
+<script src="//cdn.bootcss.com/jquery/2.2.4/jquery.min.js"></script>
+<script src="//cdn.bootcss.com/clipboard.js/1.5.10/clipboard.min.js"></script>
+
+<script>
+    var yiliaConfig = {
+        fancybox: true,
+        animate: true,
+        isHome: false,
+        isPost: true,
+        isArchive: false,
+        isTag: false,
+        isCategory: false,
+        fancybox_js: "//cdn.bootcss.com/fancybox/2.1.5/jquery.fancybox.min.js",
+        scrollreveal: "//cdn.bootcss.com/scrollReveal.js/3.1.4/scrollreveal.min.js",
+        search: false
+    }
+</script>
+
+
+    <script> yiliaConfig.jquery_ui = [false]; </script>
+
+
+
+    <script> yiliaConfig.rootUrl = "\/";</script>
+
+
+
+
+
+
+</head></html>
+<body>
+  <div id="container">
+    <div class="left-col">
+    <div class="overlay"></div>
+<div class="intrude-less">
+    <header id="header" class="inner">
+        <a href="/" class="profilepic">
+            <img src="/img/avatar.png" class="animated zoomIn">
+        </a>
+        <hgroup>
+          <h1 class="header-author"><a href="/">Arking</a></h1>
+        </hgroup>
+
+        
+
+        
+
+
+        
+            <div id="switch-btn" class="switch-btn">
+                <div class="icon">
+                    <div class="icon-ctn">
+                        <div class="icon-wrap icon-house" data-idx="0">
+                            <div class="birdhouse"></div>
+                            <div class="birdhouse_holes"></div>
+                        </div>
+                        <div class="icon-wrap icon-ribbon hide" data-idx="1">
+                            <div class="ribbon"></div>
+                        </div>
+                        
+                        <div class="icon-wrap icon-link hide" data-idx="2">
+                            <div class="loopback_l"></div>
+                            <div class="loopback_r"></div>
+                        </div>
+                        
+                        
+                        <div class="icon-wrap icon-me hide" data-idx="3">
+                            <div class="user"></div>
+                            <div class="shoulder"></div>
+                        </div>
+                        
+                    </div>
+                    
+                </div>
+                <div class="tips-box hide">
+                    <div class="tips-arrow"></div>
+                    <ul class="tips-inner">
+                        <li>菜单</li>
+                        <li>标签</li>
+                        
+                        <li>友情链接</li>
+                        
+                        
+                        <li>关于我</li>
+                        
+                    </ul>
+                </div>
+            </div>
+        
+
+        <div id="switch-area" class="switch-area">
+            <div class="switch-wrap">
+                <section class="switch-part switch-part1">
+                    <nav class="header-menu">
+                        <ul>
+                        
+                            <li><a href="/">主页</a></li>
+                        
+                            <li><a href="/archives/">归档</a></li>
+                        
+                            <li><a href="/tags/">标签</a></li>
+                        
+                            <li><a href="/about/">关于我</a></li>
+                        
+                        </ul>
+                    </nav>
+                    <nav class="header-nav">
+                        <ul class="social">
+                            
+                                <a class="fa Email" href="/ximingchenhust@foxmail.com" title="Email"></a>
+                            
+                                <a class="fa GitHub" href="#" title="GitHub"></a>
+                            
+                        </ul>
+                    </nav>
+                </section>
+                
+                
+                <section class="switch-part switch-part2">
+                    <div class="widget tagcloud" id="js-tagcloud">
+                        <ul class="tag-list"><li class="tag-list-item"><a class="tag-list-link" href="/tags/c/">c</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/docker/">docker</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/filesystem/">filesystem</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/linux/">linux</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/overlayfs/">overlayfs</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/storage/">storage</a></li></ul>
+                    </div>
+                </section>
+                
+                
+                
+                <section class="switch-part switch-part3">
+                    <div id="js-friends">
+                    
+                      <a class="main-nav-link switch-friends-link" href="https://hexo.io">Hexo</a>
+                    
+                      <a class="main-nav-link switch-friends-link" href="https://pages.github.com/">GitHub</a>
+                    
+                      <a class="main-nav-link switch-friends-link" href="http://moxfive.xyz/">MOxFIVE</a>
+                    
+                    </div>
+                </section>
+                
+
+                
+                
+                <section class="switch-part switch-part4">
+                
+                    <div id="js-aboutme">专注于前端</div>
+                </section>
+                
+            </div>
+        </div>
+    </header>                
+</div>
+    </div>
+    <div class="mid-col">
+      <nav id="mobile-nav">
+      <div class="overlay">
+          <div class="slider-trigger"></div>
+          <h1 class="header-author js-mobile-header hide"><a href="/" title="回到主页">Arking</a></h1>
+      </div>
+    <div class="intrude-less">
+        <header id="header" class="inner">
+            <a href="/" class="profilepic">
+                <img src="/img/avatar.png" class="animated zoomIn">
+            </a>
+            <hgroup>
+              <h1 class="header-author"><a href="/" title="回到主页">Arking</a></h1>
+            </hgroup>
+            
+            <nav class="header-menu">
+                <ul>
+                
+                    <li><a href="/">主页</a></li>
+                
+                    <li><a href="/archives/">归档</a></li>
+                
+                    <li><a href="/tags/">标签</a></li>
+                
+                    <li><a href="/about/">关于我</a></li>
+                
+                <div class="clearfix"></div>
+                </ul>
+            </nav>
+            <nav class="header-nav">
+                        <ul class="social">
+                            
+                                <a class="fa Email" target="_blank" href="/ximingchenhust@foxmail.com" title="Email"></a>
+                            
+                                <a class="fa GitHub" target="_blank" href="#" title="GitHub"></a>
+                            
+                        </ul>
+            </nav>
+        </header>                
+    </div>
+    <link class="menu-list" tags="标签" friends="友情链接" about="关于我">
+</nav>
+      <div class="body-wrap"><article id="post-2017-10-12-linux-code-overlayfs-mnt" class="article article-type-post" itemscope="" itemprop="blogPost">
+  
+    <div class="article-meta">
+      <a href="/2017/10/12/2017-10-12-linux-code-overlayfs-mnt/" class="article-date">
+      <time datetime="2017-10-11T18:51:00.000Z" itemprop="datePublished">2017-10-12</time>
+</a>
+
+
+    </div>
+  
+  <div class="article-inner">
+    
+      <input type="hidden" class="isFancy">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="article-title" itemprop="name">
+      内核OverlayFS—注册与挂载
+    </h1>
+  
+
+      </header>
+      
+      <div class="article-info article-info-post">
+        
+    <div class="article-category tagcloud">
+    <a class="article-category-link" href="/categories/Linux内核/">Linux内核</a>
+    </div>
+
+
+        
+    <div class="article-tag tagcloud">
+        <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/filesystem/">filesystem</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/overlayfs/">overlayfs</a></li></ul>
+    </div>
+
+        <div class="clearfix"></div>
+      </div>
+      
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+          
+        <blockquote>
+<p><strong>内核版本为4.4.68</strong></p>
+</blockquote>
+<p>这篇文章通过内核源码分析OverlayFS的注册与挂载过程</p>
+<p>假设你对OverlayFS的层次关系已经有一个基本的了解。如果对OverlayFS的层以及联合挂载没有概念，建议先补充下相关知识，因为挂载OverlayFS时会使用到层</p>
+<p>分析会尽可能避开公有部分(每种文件系统注册和挂载过程中都会涉及的内容)，而更多的关注OverlayFS独有部分</p>
+<a id="more"></a>
+<p><br></p>
+<h2 id="注册"><a href="#注册" class="headerlink" title="注册"></a>注册</h2><p>OverlayFS在内核中以内核模块的形式存在，假设你已经知道在内核模块加载时，会涉及到两个关键函数——入口和出口函数。他们通过如下代码指明：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">module_init(ovl_init);<span class="comment">//入口函数——ovl_init</span></span><br><span class="line">module_exit(ovl_exit);<span class="comment">//出口函数——ovl_exit</span></span><br></pre></td></tr></table></figure>
+<p>当使用命令<figure class="highlight plain"><figcaption><span>overlay```加载overlayfs时，会调用入口函数ovl_init：</span></figcaption><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"></span><br><span class="line">```c</span><br><span class="line">static int __init ovl_init(void)</span><br><span class="line">&#123;</span><br><span class="line">	return register_filesystem(&amp;ovl_fs_type);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></p>
+<p>因此，当加载overlay模块时，模块入口函数调用register_filesystem函数注册overlayfs：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">register_filesystem</span><span class="params">(struct file_system_type * fs)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">	<span class="keyword">int</span> res = <span class="number">0</span>;</span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">file_system_type</span> ** <span class="title">p</span>;</span></span><br><span class="line"></span><br><span class="line">	BUG_ON(<span class="built_in">strchr</span>(fs-&gt;name, <span class="string">'.'</span>));</span><br><span class="line">	<span class="keyword">if</span> (fs-&gt;next)<span class="comment">//说明已在文件系统类型链表</span></span><br><span class="line">		<span class="keyword">return</span> -EBUSY;</span><br><span class="line">	write_lock(&amp;file_systems_lock);</span><br><span class="line">	<span class="comment">//根据文件系统名查找文件系统类型链表</span></span><br><span class="line">	p = find_filesystem(fs-&gt;name, <span class="built_in">strlen</span>(fs-&gt;name));</span><br><span class="line">	<span class="keyword">if</span> (*p)</span><br><span class="line">		res = -EBUSY;</span><br><span class="line">	<span class="keyword">else</span></span><br><span class="line">		*p = fs;</span><br><span class="line">	write_unlock(&amp;file_systems_lock);</span><br><span class="line">	<span class="keyword">return</span> res;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">EXPORT_SYMBOL(register_filesystem);</span><br></pre></td></tr></table></figure>
+<p>注册一个文件系统需要用到这个文件系统的类型结构——file_system_type。这个结构中定义了<strong>文件系统的名称，挂载函数等信息</strong></p>
+<p>注册函数主要完成以下工作：</p>
+<ul>
+<li>首先通过next字段检查文件系统是否已经在文件系统类型链表中，如果存在，则直接返回。</li>
+<li>否则调用find_filesystem()遍历由<strong>变量file_systems指向的全局文件系统类型链表</strong>，查看是否存在已经注册过名为overlay的文件系统，有则返回，否则返回链表结尾的地址。</li>
+<li>最后，如果没找到，则将这个文件系统链接到链表结尾</li>
+</ul>
+<p>下图展示了文件系统类型链表：</p>
+<div align="left"> <img src="/img/in-post/post-linux-vfs/filesystem_list.png" width="50%" height="50%"> </div>
+
+<p>这里提一下，上图中fs_supers字段的类型在内核4.4.68中换成了struct hlist_head，super_block的s_instance字段的类型换成了hlist_node</p>
+<p>每种文件系统的fs_supers字段指向对应的已挂载文件系统实例。假设系统还未注册OverlayFS，因此会将OverlayFS的file_system_type添加到文件系统类型链表结尾</p>
+<p>不直接遍历全局链表查找，而是先查看fs的next指针是否为NULL的原因在于遍历链表十分耗时</p>
+<p>总结起来，<strong>OverlayFS的注册是在overlay模块的插入中完成，而注册即是将代表OverlayFS的file_system_type添加到全局文件系统类型链表中，因此实际上是一个通用文件系统注册的步骤，和其它文件系统的注册没有什么区别</strong></p>
+<p><br></p>
+<h2 id="挂载"><a href="#挂载" class="headerlink" title="挂载"></a>挂载</h2><p>每当挂载一个OverlayFS时，比如下面的命令将lower和upper目录，使用overlayfs挂载到merged目录：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">sudo mount -t overlay overlay -o lowerdir=lower,upperdir=upper,workdir=work merged</span><br></pre></td></tr></table></figure>
+<p>我的磁盘划了3个分区，3个分区的文件系统都是ext4，分别挂载在/、/home、/boot目录下：</p>
+<p><img src="/img/in-post/post-kernel-overlayfs/df.png" alt=""></p>
+<p>整个dentry树大概是这个样子：</p>
+<div align="left"> <img src="/img/in-post/post-kernel-overlayfs/dir-op1-dir_tree.png" width="50%" height="50%"> </div>
+
+<p>OverlayFS的<strong>文件系统类型变量ovl_fs_type</strong>中指明了挂载函数：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">static</span> <span class="class"><span class="keyword">struct</span> <span class="title">file_system_type</span> <span class="title">ovl_fs_type</span> = &#123;</span></span><br><span class="line">	.owner		= THIS_MODULE,</span><br><span class="line">	.name		= <span class="string">"overlay"</span>,</span><br><span class="line">	.mount		= ovl_mount,<span class="comment">//挂载函数</span></span><br><span class="line">	.kill_sb	= kill_anon_super,</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+<p>mount字段指明了挂载函数为ovl_mount，它是函数mount_nodev的封装，在“注册”一节文件系统类型链表的图中可以看到，每个文件系统的fs_supers字段指向已挂载文件系统实例的链表。因此，挂载一个OverlayFS实例，就是要分配并初始化一个超级块，链接到这个链表中，也就是注册函数所要完成的工作：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">static</span> struct dentry *<span class="title">ovl_mount</span><span class="params">(struct file_system_type *fs_type, <span class="keyword">int</span> flags,</span></span></span><br><span class="line"><span class="function"><span class="params">				<span class="keyword">const</span> <span class="keyword">char</span> *dev_name, <span class="keyword">void</span> *raw_data)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">	<span class="keyword">return</span> mount_nodev(fs_type, flags, raw_data, ovl_fill_super);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">/* fs/super.c */</span></span><br><span class="line"><span class="function">struct dentry *<span class="title">mount_nodev</span><span class="params">(struct file_system_type *fs_type,</span></span></span><br><span class="line"><span class="function"><span class="params">	<span class="keyword">int</span> flags, <span class="keyword">void</span> *data,</span></span></span><br><span class="line"><span class="function"><span class="params">	<span class="keyword">int</span> (*fill_super)(struct super_block *, <span class="keyword">void</span> *, <span class="keyword">int</span>))</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">	<span class="keyword">int</span> error;</span><br><span class="line">	<span class="comment">//1.创建一个superblock，新创建的这个superblock已经链接到全局superblock链表中</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">super_block</span> *<span class="title">s</span> = <span class="title">sget</span>(<span class="title">fs_type</span>, <span class="title">NULL</span>, <span class="title">set_anon_super</span>, <span class="title">flags</span>, <span class="title">NULL</span>);</span></span><br><span class="line">	...</span><br><span class="line">	<span class="comment">//2.填充superblock</span></span><br><span class="line">	error = fill_super(s, data, flags &amp; MS_SILENT ? <span class="number">1</span> : <span class="number">0</span>);</span><br><span class="line">	...</span><br><span class="line">&#125;</span><br><span class="line">EXPORT_SYMBOL(mount_nodev);</span><br></pre></td></tr></table></figure>
+<p>主要分为2步：</p>
+<ul>
+<li>调用sget()函数，该函数搜索fs_supers字段指向的由超级块组成的已挂载文件系统实例链表，如果找到一个与块设备相关的超级块，则返回它的地址，否则分配并初始化一个新的超级块，并插入到OverlayFS已挂载文件系统实例链表和全局已挂载文件系统实例链表中</li>
+<li>调用函数fill_super()填充这个super_block，使其包含OverlayFS的特有信息</li>
+</ul>
+<p>sget()函数完成了super_block的分配和插入链表，这是一个文件系统挂载的通用步骤。已分配的super_block还需要填充更多OverlayFS独有的信息，这也是本文主要关注的部分</p>
+<h3 id="OverlayFS挂载信息"><a href="#OverlayFS挂载信息" class="headerlink" title="OverlayFS挂载信息"></a>OverlayFS挂载信息</h3><p>在进一步介绍如何填充新分配的super_block之前，要介绍一个<strong>结构体ovl_fs。这个结构体是OverlayFS的特有信息，它记录了OverlayFS upper层和lower层的文件系统、文件名以及work目录的dentry这些挂载信息</strong>：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">ovl_fs</span> &#123;</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">vfsmount</span> *<span class="title">upper_mnt</span>;</span></span><br><span class="line">	<span class="keyword">unsigned</span> numlower;</span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">vfsmount</span> **<span class="title">lower_mnt</span>;</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">dentry</span> *<span class="title">workdir</span>;</span></span><br><span class="line">	<span class="keyword">long</span> lower_namelen;</span><br><span class="line">	<span class="comment">/* pathnames of lower and upper dirs, for show_options */</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">ovl_config</span> <span class="title">config</span>;</span></span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">ovl_config</span> &#123;</span></span><br><span class="line">	<span class="keyword">char</span> *lowerdir;</span><br><span class="line">	<span class="keyword">char</span> *upperdir;</span><br><span class="line">	<span class="keyword">char</span> *workdir;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+<p>upper_mnt字段描述了upper层文件系统，lower_mnt字段描述了lower层文件系统，workdir为work目录的dentry，结构体ovl_config记录了upper、lower、以及work目录的字符串信息</p>
+<h3 id="填充super-block"><a href="#填充super-block" class="headerlink" title="填充super_block"></a>填充super_block</h3><p>在填充super_block时，会分配一个ovl_fs类型的变量，并设置super_block的s_fs_info字段指向这个变量，从而可以访问到挂载信息。填充super_block由函数ovl_fill_super完成，主要包括下列工作：</p>
+<ol>
+<li><p>分配一个ovl_fs结构ufs，调用函数ovl_parse_opt()对挂载命令进行解析，得到upper、lower、work目录的字符串，存入ufs的config字段</p>
+ <figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">...</span><br><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">ovl_fs</span> *<span class="title">ufs</span>;</span><span class="comment">//存储overlayfs挂载信息</span></span><br><span class="line">...</span><br><span class="line">ufs = kzalloc(<span class="keyword">sizeof</span>(struct ovl_fs), GFP_KERNEL);</span><br><span class="line">...</span><br><span class="line">err = ovl_parse_opt((<span class="keyword">char</span> *) data, &amp;ufs-&gt;config);</span><br><span class="line">...</span><br></pre></td></tr></table></figure>
+</li>
+<li><p>调用ovl_mount_dir()函数根据upper目录和work目录的字符串对upper层和work目录进行解析。该函数最终会调用kern_path()<strong>执行路径解析，得到upper层和work目录的路径</strong>，保存在传入ovl_mount_dir()函数的参数upperpath以及workpath中</p>
+ <figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">path</span> <span class="title">upperpath</span> = &#123;</span> <span class="literal">NULL</span>, <span class="literal">NULL</span> &#125;;</span><br><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">path</span> <span class="title">workpath</span> = &#123;</span> <span class="literal">NULL</span>, <span class="literal">NULL</span> &#125;;</span><br><span class="line">...</span><br><span class="line"><span class="keyword">if</span> (ufs-&gt;config.upperdir) &#123;</span><br><span class="line">	...</span><br><span class="line">	<span class="comment">//对upper层进行路径解析，得到路径upperpath</span></span><br><span class="line">	err = ovl_mount_dir(ufs-&gt;config.upperdir, &amp;upperpath);</span><br><span class="line">	...</span><br><span class="line">	<span class="comment">//对work目录进行路径解析，得到路径workpath</span></span><br><span class="line">	err = ovl_mount_dir(ufs-&gt;config.workdir, &amp;workpath);</span><br><span class="line">	<span class="comment">//有效性检查</span></span><br><span class="line">	...</span><br><span class="line">&#125;</span><br><span class="line">...</span><br></pre></td></tr></table></figure>
+<p> 这个if条件中，在解析完两个路径后，会进行有效性检查，要求upper目录与work目录必须位于相同文件系统下，同时要求两个目录不能再同一子树中。</p>
+</li>
+<li><p>对记录lower层信息的字符串进行解析，分析出lower层数，循环调用函数ovl_lower_dir()对lower层进行解析，该函数最终也会调用kern_path()执行<strong>路径解析，得到每个lower目录的路径</strong>，保存在lower路径栈stack中：</p>
+ <figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br></pre></td><td class="code"><pre><span class="line">...</span><br><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">path</span> *<span class="title">stack</span> = <span class="title">NULL</span>;</span></span><br><span class="line"><span class="keyword">char</span> *lowertmp;</span><br><span class="line"><span class="keyword">char</span> *lower;</span><br><span class="line"><span class="keyword">unsigned</span> <span class="keyword">int</span> numlower;</span><br><span class="line"><span class="keyword">unsigned</span> <span class="keyword">int</span> stacklen = <span class="number">0</span>;</span><br><span class="line">...</span><br><span class="line"><span class="comment">//复制lower层信息字符串</span></span><br><span class="line">lowertmp = kstrdup(ufs-&gt;config.lowerdir, GFP_KERNEL);</span><br><span class="line">...</span><br><span class="line"><span class="comment">//解析字符串，得到lower层数目</span></span><br><span class="line">stacklen = ovl_split_lowerdirs(lowertmp);</span><br><span class="line">...</span><br><span class="line"><span class="comment">//为lower路径栈分配空间</span></span><br><span class="line"><span class="built_in">stack</span> = kcalloc(stacklen, <span class="keyword">sizeof</span>(struct path), GFP_KERNEL);</span><br><span class="line">...</span><br><span class="line">lower = lowertmp;<span class="comment">//此时的lowertmp的形式为：lowerdir1\0lowerdir2\0lowerdir3\0...</span></span><br><span class="line"><span class="comment">//循环获取每个lower层的路径</span></span><br><span class="line"><span class="keyword">for</span> (numlower = <span class="number">0</span>; numlower &lt; stacklen; numlower++) &#123;</span><br><span class="line">	err = ovl_lower_dir(lower, &amp;<span class="built_in">stack</span>[numlower],</span><br><span class="line">			    &amp;ufs-&gt;lower_namelen, &amp;sb-&gt;s_stack_depth,</span><br><span class="line">			    &amp;remote);</span><br><span class="line">	<span class="keyword">if</span> (err)</span><br><span class="line">		<span class="keyword">goto</span> out_put_lowerpath;</span><br><span class="line"></span><br><span class="line">	lower = <span class="built_in">strchr</span>(lower, <span class="string">'\0'</span>) + <span class="number">1</span>;<span class="comment">//接着处理下一个lowerdir</span></span><br><span class="line">&#125;</span><br><span class="line"><span class="comment">//循环结束后，numlower等于stacklen，记录了lower层数</span></span><br></pre></td></tr></table></figure>
+</li>
+</ol>
+<ol start="4">
+<li><p>调用函数clone_private_mount()根据到的upper层路径，lower层路径克隆得到一个私有的挂载点，调用函数ovl_workdir_create()在work目录下创建一个名为“work”的目录，<strong>填充ufs的upper_mnt、workdir、lower_mnt和numlower字段</strong></p>
+ <figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line">...</span><br><span class="line"><span class="comment">//处理upper层和work目录</span></span><br><span class="line"><span class="keyword">if</span> (ufs-&gt;config.upperdir) &#123;</span><br><span class="line">	ufs-&gt;upper_mnt = clone_private_mount(&amp;upperpath);</span><br><span class="line">	...</span><br><span class="line">	ufs-&gt;workdir = ovl_workdir_create(ufs-&gt;upper_mnt, workpath.dentry);</span><br><span class="line">	...</span><br><span class="line">&#125;</span><br><span class="line">...</span><br><span class="line"><span class="comment">//处理lower层</span></span><br><span class="line">ufs-&gt;lower_mnt = kcalloc(numlower, <span class="keyword">sizeof</span>(struct vfsmount *), GFP_KERNEL);</span><br><span class="line">...</span><br><span class="line"><span class="keyword">for</span> (i = <span class="number">0</span>; i &lt; numlower; i++) &#123;</span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">vfsmount</span> *<span class="title">mnt</span> = <span class="title">clone_private_mount</span>(&amp;<span class="title">stack</span>[<span class="title">i</span>]);</span></span><br><span class="line">	...</span><br><span class="line">	mnt-&gt;mnt_flags |= MNT_READONLY;<span class="comment">//设置lower层为只读</span></span><br><span class="line">	ufs-&gt;lower_mnt[ufs-&gt;numlower] = mnt;</span><br><span class="line">	ufs-&gt;numlower++;<span class="comment">//lower层数</span></span><br><span class="line">&#125;</span><br><span class="line">...</span><br></pre></td></tr></table></figure>
+<p> 私有挂载点不会附着到命名空间中的任何位置，对原挂载点的改变不会传播到私有挂载点</p>
+</li>
+<li><p>填充super_block的s_d_op字段，这个字段是一个struct dentry_operations类型的指针，它描述了OverlayFS的dentry操作，每当在OverlayFS中分配一个dentry时，会使用s_d_op字段赋值dentry的d_op字段</p>
+ <figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">...</span><br><span class="line"><span class="keyword">if</span> (remote)</span><br><span class="line">	sb-&gt;s_d_op = &amp;ovl_reval_dentry_operations;</span><br><span class="line"><span class="keyword">else</span></span><br><span class="line">	sb-&gt;s_d_op = &amp;ovl_dentry_operations;</span><br><span class="line">...</span><br></pre></td></tr></table></figure>
+</li>
+</ol>
+<ol start="6">
+<li><p>为struct ovl_entry类型的变量oe分配空间<strong>（这个变量记录OverlayFS根目录的层次信息，由根目录dentry的d_fsdata字段指向）</strong>。为OverlayFS根目录分配inode，创建根目录的dentry。通过前面得到的upper层和lower层的路径填充oe，然后设置根目录dentry的d_fsdata字段指向oe。最后调用函数ovl_copyattr()将upper目录inode的i_uid、i_gid、i_mode字段的值拷贝到OverlayFS根目录inode相应字段中</p>
+ <figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line">...</span><br><span class="line">oe = ovl_alloc_entry(numlower);</span><br><span class="line">...</span><br><span class="line"><span class="comment">//为根目录分配inode，创建dentry</span></span><br><span class="line">root_dentry = d_make_root(ovl_new_inode(sb, S_IFDIR, oe));</span><br><span class="line">...</span><br><span class="line"><span class="comment">//通过前面得到的upper层和lower层的路径填充oe</span></span><br><span class="line">oe-&gt;__upperdentry = upperpath.dentry;</span><br><span class="line"><span class="keyword">for</span> (i = <span class="number">0</span>; i &lt; numlower; i++) &#123;</span><br><span class="line">	oe-&gt;lowerstack[i].dentry = <span class="built_in">stack</span>[i].dentry;</span><br><span class="line">	oe-&gt;lowerstack[i].mnt = ufs-&gt;lower_mnt[i];</span><br><span class="line">&#125;</span><br><span class="line">...</span><br><span class="line"><span class="comment">//设置根目录dentry的d_fsdata字段指向oe</span></span><br><span class="line">root_dentry-&gt;d_fsdata = oe;</span><br><span class="line"></span><br><span class="line"><span class="comment">//inode属性拷贝</span></span><br><span class="line">ovl_copyattr(ovl_dentry_real(root_dentry)-&gt;d_inode,</span><br><span class="line">	     root_dentry-&gt;d_inode);</span><br></pre></td></tr></table></figure>
+</li>
+</ol>
+<ol start="7">
+<li><p>填充super_block其余字段，设置super_block的根dentry、设置OverlayFS的字段s_fs_info指向代表挂载信息的变量ufs</p>
+ <figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">...</span><br><span class="line">sb-&gt;s_magic = OVERLAYFS_SUPER_MAGIC;</span><br><span class="line">sb-&gt;s_op = &amp;ovl_super_operations;<span class="comment">//设置superblock操作对象</span></span><br><span class="line">sb-&gt;s_root = root_dentry;<span class="comment">//设置superblock的根目录项</span></span><br><span class="line">sb-&gt;s_fs_info = ufs;<span class="comment">//设置superblock的文件系统私有信息</span></span><br><span class="line">...</span><br></pre></td></tr></table></figure>
+</li>
+</ol>
+<p>总结一下，可以归纳为两个部分：</p>
+<ul>
+<li><strong>1-4步</strong>：主要是在<strong>填充ufs</strong>，也就是<strong>设置OverlayFS挂载信息</strong>，最终第8步会设置super_block的s_fs_info字段指向ufs</li>
+<li><strong>第6步</strong>：主要是<strong>创建根目录</strong>，然后<strong>设置根目录的层次信息oe</strong>（关于OverlayFS文件的层次信息在我的另一篇博文中有介绍）</li>
+</ul>
+<p>最后设置super_block相应的字段保存这些信息</p>
+<h3 id="图示分析"><a href="#图示分析" class="headerlink" title="图示分析"></a>图示分析</h3><p>这里给出图示，帮助对填充部分代码的理解</p>
+<p>1-4步如下图：</p>
+<div align="left"> <img src="/img/in-post/post-kernel-overlayfs/fill_1.png" width="50%" height="50%"> </div>
+
+<p>第6步如下图：</p>
+<div align="left"> <img src="/img/in-post/post-kernel-overlayfs/fill_2.png" width="50%" height="50%"> </div>
+      
+    </div>
+    
+  </div>
+  
+    
+    <div class="copyright">
+        <p><span>本文标题:</span><a href="/2017/10/12/2017-10-12-linux-code-overlayfs-mnt/">内核OverlayFS—注册与挂载</a></p>
+        <p><span>文章作者:</span><a href="/" title="回到主页">Arking</a></p>
+        <p><span>发布时间:</span>2017-10-12, 02:51:00</p>
+        <p><span>最后更新:</span>2018-12-04, 17:50:11</p>
+        <p>
+            <span>原始链接:</span><a class="post-url" href="/2017/10/12/2017-10-12-linux-code-overlayfs-mnt/" title="内核OverlayFS—注册与挂载">http://yoursite.com/2017/10/12/2017-10-12-linux-code-overlayfs-mnt/</a>
+            <span class="copy-path" data-clipboard-text="原文: http://yoursite.com/2017/10/12/2017-10-12-linux-code-overlayfs-mnt/　　作者: Arking" title="点击复制文章链接"><i class="fa fa-clipboard"></i></span>
+            <script> var clipboard = new Clipboard('.copy-path'); </script>
+        </p>
+        <p>
+            <span>许可协议:</span><i class="fa fa-creative-commons"></i> <a rel="license" href="http://creativecommons.org/licenses/by-nc-sa/4.0/" title="CC BY-NC-SA 4.0 International" target="_blank">"署名-非商用-相同方式共享 4.0"</a> 转载请保留原文链接及作者。
+        </p>
+    </div>
+
+
+
+    <nav id="article-nav">
+        
+            <div id="article-nav-newer" class="article-nav-title">
+                <a href="/2017/11/10/2017-11-10-linux-code-overlayfs-dir-op1/">
+                    内核OverlayFS—目录搜索
+                </a>
+            </div>
+        
+        
+            <div id="article-nav-older" class="article-nav-title">
+                <a href="/2017/09/20/2017-09-20-linux-code-overlayfs-layerinfo/">
+                    内核OverlayFS—文件层次信息
+                </a>
+            </div>
+        
+    </nav>
+
+  
+</article>
+
+    <div id="toc" class="toc-article">
+        <strong class="toc-title">文章目录</strong>
+        
+            <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#注册"><span class="toc-number">1.</span> <span class="toc-text">注册</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#挂载"><span class="toc-number">2.</span> <span class="toc-text">挂载</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#OverlayFS挂载信息"><span class="toc-number">2.1.</span> <span class="toc-text">OverlayFS挂载信息</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#填充super-block"><span class="toc-number">2.2.</span> <span class="toc-text">填充super_block</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#图示分析"><span class="toc-number">2.3.</span> <span class="toc-text">图示分析</span></a></li></ol></li></ol>
+        
+    </div>
+    <style>
+        .left-col .switch-btn,
+        .left-col .switch-area {
+            display: none;
+        }
+        .toc-level-3 i,
+        .toc-level-3 ol {
+            display: none !important;
+        }
+    </style>
+
+    <input type="button" id="tocButton" value="隐藏目录" title="点击按钮隐藏或者显示文章目录">
+
+    <script>
+        yiliaConfig.toc = ["隐藏目录", "显示目录", !!"false"];
+    </script>
+
+
+
+    
+<div class="share">
+    
+        <div class="bdsharebuttonbox">
+            <a href="#" class="fa fa-twitter bds_twi" data-cmd="twi" title="分享到推特"></a>
+            <a href="#" class="fa fa-weibo bds_tsina" data-cmd="tsina" title="分享到新浪微博"></a>
+            <a href="#" class="fa fa-qq bds_sqq" data-cmd="sqq" title="分享给 QQ 好友"></a>
+            <a href="#" class="fa fa-files-o bds_copy" data-cmd="copy" title="复制网址"></a>
+            <a href="#" class="fa fa fa-envelope-o bds_mail" data-cmd="mail" title="通过邮件分享"></a>
+            <a href="#" class="fa fa-weixin bds_weixin" data-cmd="weixin" title="生成文章二维码"></a>
+            <a href="#" class="fa fa-share-alt bds_more" data-cmd="more"></a>
+        </div>
+        <script>
+            window._bd_share_config={
+                "common":{"bdSnsKey":{},"bdText":"内核OverlayFS—注册与挂载　| Hexo　","bdMini":"2","bdMiniList":false,"bdPic":"","bdStyle":"0","bdSize":"24"},"share":{}};with(document)0[(getElementsByTagName('head')[0]||body).appendChild(createElement('script')).src='http://bdimg.share.baidu.com/static/api/js/share.js?v=89860593.js?cdnversion='+~(-new Date()/36e5)];
+        </script>
+    
+
+    
+</div>
+
+
+
+
+
+
+
+    
+
+
+
+
+    <div class="scroll" id="post-nav-button">
+        
+            <a href="/2017/11/10/2017-11-10-linux-code-overlayfs-dir-op1/" title="上一篇: 内核OverlayFS—目录搜索">
+                <i class="fa fa-angle-left"></i>
+            </a>
+        
+
+        <a title="文章列表"><i class="fa fa-bars"></i><i class="fa fa-times"></i></a>
+
+        
+            <a href="/2017/09/20/2017-09-20-linux-code-overlayfs-layerinfo/" title="下一篇: 内核OverlayFS—文件层次信息">
+                <i class="fa fa-angle-right"></i>
+            </a>
+        
+    </div>
+
+    <ul class="post-list"><li class="post-list-item"><a class="post-list-link" href="/2018/09/05/2018-09-05-linux-kernel/">Ubuntu下内核与内核模块的编译过程</a></li><li class="post-list-item"><a class="post-list-link" href="/2018/01/19/2018-01-19-docker-imagestore/"> Docker源码分析—镜像存储 </a></li><li class="post-list-item"><a class="post-list-link" href="/2018/01/15/2018-01-15-docker-storage-overlay2/"> Docker源码分析—存储驱动 </a></li><li class="post-list-item"><a class="post-list-link" href="/2018/01/14/2018-01-14-docker-layerstore/"> Docker源码分析—层存储 </a></li><li class="post-list-item"><a class="post-list-link" href="/2018/01/12/2018-01-10-c-stack_frame/"> C函数栈帧 </a></li><li class="post-list-item"><a class="post-list-link" href="/2017/12/26/2017-12-26-linux-code-overlayfs-read_write/">内核OverlayFS—文件读写</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/12/22/2017-12-22-linux-code-overlayfs-create_delete/">内核OverlayFS—创建与删除文件</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/11/30/2017-11-30-linux-du/"> Linux查看目录大小</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/11/10/2017-11-10-linux-code-overlayfs-dir-op1/">内核OverlayFS—目录搜索</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/10/12/2017-10-12-linux-code-overlayfs-mnt/">内核OverlayFS—注册与挂载</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/09/20/2017-09-20-linux-code-overlayfs-layerinfo/">内核OverlayFS—文件层次信息</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/08/18/2017-08-18-linux-code-vfs/">Linux虚拟文件系统(VFS)</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/05/05/2017-05-05-docker-filesystem-overlay/"> Docker存储驱动—Overlay/Overlay2「译」</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/04/13/2017-04-13-docker-filesystem-aufs/"> Docker存储驱动—Aufs </a></li><li class="post-list-item"><a class="post-list-link" href="/2017/04/09/2017-04-09-linux-uuid/"> Linux存储设备的UUID</a></li></ul>
+
+
+
+
+    <script>
+        
+    </script>
+</div>
+      <footer id="footer">
+    <div class="outer">
+        <div id="footer-info">
+            <div class="footer-left">
+                <i class="fa fa-copyright"></i> 
+                2017-2018 Arking
+            </div>
+            <div class="footer-right">
+                <a href="http://hexo.io/" target="_blank" title="快速、简洁且高效的博客框架">Hexo</a>  Theme <a href="https://github.com/MOxFIVE/hexo-theme-yelee" target="_blank" title="简而不减 Hexo 双栏博客主题  v3.5">Yelee</a> by MOxFIVE <i class="fa fa-heart animated infinite pulse"></i>
+            </div>
+        </div>
+        
+            <div class="visit">
+                
+                    <span id="busuanzi_container_site_pv" style="display:none">
+                        <span id="site-visit" title="本站到访数"><i class="fa fa-user" aria-hidden="true"></i><span id="busuanzi_value_site_uv"></span>
+                        </span>
+                    </span>
+                
+                
+                    <span>| </span>
+                
+                
+                    <span id="busuanzi_container_page_pv" style="display:none">
+                        <span id="page-visit" title="本页阅读量"><i class="fa fa-eye animated infinite pulse" aria-hidden="true"></i><span id="busuanzi_value_page_pv"></span>
+                        </span>
+                    </span>
+                
+            </div>
+        
+    </div>
+</footer>
+    </div>
+    
+<script data-main="/js/main.js" src="//cdn.bootcss.com/require.js/2.2.0/require.min.js"></script>
+
+    <script>
+        $(document).ready(function() {
+            var iPad = window.navigator.userAgent.indexOf('iPad');
+            if (iPad > -1 || $(".left-col").css("display") === "none") {
+                var bgColorList = ["#9db3f4", "#414141", "#e5a859", "#f5dfc6", "#c084a0", "#847e72", "#cd8390", "#996731"];
+                var bgColor = Math.ceil(Math.random() * (bgColorList.length - 1));
+                $("body").css({"background-color": bgColorList[bgColor], "background-size": "cover"});
+            }
+            else {
+                var backgroundnum = 5;
+                var backgroundimg = "url(/background/bg-x.jpg)".replace(/x/gi, Math.ceil(Math.random() * backgroundnum));
+                $("body").css({"background": backgroundimg, "background-attachment": "fixed", "background-size": "cover"});
+            }
+        })
+    </script>
+
+
+
+
+
+<div class="scroll" id="scroll">
+    <a href="#" title="返回顶部"><i class="fa fa-arrow-up"></i></a>
+    <a href="#comments" onclick="load$hide();" title="查看评论"><i class="fa fa-comments-o"></i></a>
+    <a href="#footer" title="转到底部"><i class="fa fa-arrow-down"></i></a>
+</div>
+<script>
+    // Open in New Window
+    
+        var oOpenInNew = {
+            
+            
+            
+            
+            
+            
+             archives: ".archive-article-title", 
+             miniArchives: "a.post-list-link", 
+            
+             friends: "#js-friends a", 
+             socail: ".social a" 
+        }
+        for (var x in oOpenInNew) {
+            $(oOpenInNew[x]).attr("target", "_blank");
+        }
+    
+</script>
+
+<script async src="https://dn-lbstatics.qbox.me/busuanzi/2.3/busuanzi.pure.mini.js">
+</script>
+  </div>
+</body>
+</html>

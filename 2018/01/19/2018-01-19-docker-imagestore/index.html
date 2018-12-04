@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html>
+<head><meta name="generator" content="Hexo 3.8.0">
+
+    <!--[if lt IE 9]>
+        <style>body {display: none; background: none !important} </style>
+        <meta http-equiv="Refresh" Content="0; url=//outdatedbrowser.com/" />
+    <![endif]-->
+
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge, chrome=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="format-detection" content="telephone=no">
+<meta name="author" content="Arking">
+
+
+
+<meta name="description" content="基于Docker 17.05.x  Docker使用层存储来管理容器和镜像的层，那么如何知道哪些层属于某一个镜像？也就说如果现在系统上有很多个镜像，每个镜像又包括很多层，如果使用Overlay2，你可以在存储驱动目录下看到一大堆目录，如何知道哪些层是属于某个镜像？也就是说一个镜像如何和镜像层之间建立起关系？ 这篇文章主要通过分析Docker源码，介绍镜像存储的创建过程">
+<meta name="keywords" content="docker,storage">
+<meta property="og:type" content="article">
+<meta property="og:title" content=" Docker源码分析—镜像存储 ">
+<meta property="og:url" content="http://yoursite.com/2018/01/19/2018-01-19-docker-imagestore/index.html">
+<meta property="og:site_name" content="Hexo">
+<meta property="og:description" content="基于Docker 17.05.x  Docker使用层存储来管理容器和镜像的层，那么如何知道哪些层属于某一个镜像？也就说如果现在系统上有很多个镜像，每个镜像又包括很多层，如果使用Overlay2，你可以在存储驱动目录下看到一大堆目录，如何知道哪些层是属于某个镜像？也就是说一个镜像如何和镜像层之间建立起关系？ 这篇文章主要通过分析Docker源码，介绍镜像存储的创建过程">
+<meta property="og:locale" content="default">
+<meta property="og:image" content="http://yoursite.com/img/in-post/post-docker-imagestore/imagestore.png">
+<meta property="og:updated_time" content="2018-12-04T12:22:10.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content=" Docker源码分析—镜像存储 ">
+<meta name="twitter:description" content="基于Docker 17.05.x  Docker使用层存储来管理容器和镜像的层，那么如何知道哪些层属于某一个镜像？也就说如果现在系统上有很多个镜像，每个镜像又包括很多层，如果使用Overlay2，你可以在存储驱动目录下看到一大堆目录，如何知道哪些层是属于某个镜像？也就是说一个镜像如何和镜像层之间建立起关系？ 这篇文章主要通过分析Docker源码，介绍镜像存储的创建过程">
+<meta name="twitter:image" content="http://yoursite.com/img/in-post/post-docker-imagestore/imagestore.png">
+
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+
+
+    <link rel="alternate" href="/atom.xml" title="Hexo" type="application/atom+xml">
+
+
+
+    <link rel="shortcut icon" href="/favicon.png">
+
+
+
+    <link href="//cdn.bootcss.com/animate.css/3.5.1/animate.min.css" rel="stylesheet">
+
+
+
+    <link href="//cdn.bootcss.com/fancybox/2.1.5/jquery.fancybox.min.css" rel="stylesheet">
+
+
+
+    <script src="//cdn.bootcss.com/pace/1.0.2/pace.min.js"></script>
+    <link href="//cdn.bootcss.com/pace/1.0.2/themes/blue/pace-theme-minimal.css" rel="stylesheet">
+
+
+<link rel="stylesheet" href="/css/style.css">
+
+
+
+<link href="//cdn.bootcss.com/font-awesome/4.6.3/css/font-awesome.min.css" rel="stylesheet">
+
+
+<title> Docker源码分析—镜像存储  | Hexo</title>
+
+<script src="//cdn.bootcss.com/jquery/2.2.4/jquery.min.js"></script>
+<script src="//cdn.bootcss.com/clipboard.js/1.5.10/clipboard.min.js"></script>
+
+<script>
+    var yiliaConfig = {
+        fancybox: true,
+        animate: true,
+        isHome: false,
+        isPost: true,
+        isArchive: false,
+        isTag: false,
+        isCategory: false,
+        fancybox_js: "//cdn.bootcss.com/fancybox/2.1.5/jquery.fancybox.min.js",
+        scrollreveal: "//cdn.bootcss.com/scrollReveal.js/3.1.4/scrollreveal.min.js",
+        search: false
+    }
+</script>
+
+
+    <script> yiliaConfig.jquery_ui = [false]; </script>
+
+
+
+    <script> yiliaConfig.rootUrl = "\/";</script>
+
+
+
+
+
+
+</head></html>
+<body>
+  <div id="container">
+    <div class="left-col">
+    <div class="overlay"></div>
+<div class="intrude-less">
+    <header id="header" class="inner">
+        <a href="/" class="profilepic">
+            <img src="/img/avatar.png" class="animated zoomIn">
+        </a>
+        <hgroup>
+          <h1 class="header-author"><a href="/">Arking</a></h1>
+        </hgroup>
+
+        
+
+        
+
+
+        
+            <div id="switch-btn" class="switch-btn">
+                <div class="icon">
+                    <div class="icon-ctn">
+                        <div class="icon-wrap icon-house" data-idx="0">
+                            <div class="birdhouse"></div>
+                            <div class="birdhouse_holes"></div>
+                        </div>
+                        <div class="icon-wrap icon-ribbon hide" data-idx="1">
+                            <div class="ribbon"></div>
+                        </div>
+                        
+                        <div class="icon-wrap icon-link hide" data-idx="2">
+                            <div class="loopback_l"></div>
+                            <div class="loopback_r"></div>
+                        </div>
+                        
+                        
+                        <div class="icon-wrap icon-me hide" data-idx="3">
+                            <div class="user"></div>
+                            <div class="shoulder"></div>
+                        </div>
+                        
+                    </div>
+                    
+                </div>
+                <div class="tips-box hide">
+                    <div class="tips-arrow"></div>
+                    <ul class="tips-inner">
+                        <li>菜单</li>
+                        <li>标签</li>
+                        
+                        <li>友情链接</li>
+                        
+                        
+                        <li>关于我</li>
+                        
+                    </ul>
+                </div>
+            </div>
+        
+
+        <div id="switch-area" class="switch-area">
+            <div class="switch-wrap">
+                <section class="switch-part switch-part1">
+                    <nav class="header-menu">
+                        <ul>
+                        
+                            <li><a href="/">主页</a></li>
+                        
+                            <li><a href="/archives/">归档</a></li>
+                        
+                            <li><a href="/tags/">标签</a></li>
+                        
+                            <li><a href="/about/">关于我</a></li>
+                        
+                        </ul>
+                    </nav>
+                    <nav class="header-nav">
+                        <ul class="social">
+                            
+                                <a class="fa Email" href="/ximingchenhust@foxmail.com" title="Email"></a>
+                            
+                                <a class="fa GitHub" href="#" title="GitHub"></a>
+                            
+                        </ul>
+                    </nav>
+                </section>
+                
+                
+                <section class="switch-part switch-part2">
+                    <div class="widget tagcloud" id="js-tagcloud">
+                        <ul class="tag-list"><li class="tag-list-item"><a class="tag-list-link" href="/tags/c/">c</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/docker/">docker</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/filesystem/">filesystem</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/linux/">linux</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/overlayfs/">overlayfs</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/storage/">storage</a></li></ul>
+                    </div>
+                </section>
+                
+                
+                
+                <section class="switch-part switch-part3">
+                    <div id="js-friends">
+                    
+                      <a class="main-nav-link switch-friends-link" href="https://hexo.io">Hexo</a>
+                    
+                      <a class="main-nav-link switch-friends-link" href="https://pages.github.com/">GitHub</a>
+                    
+                      <a class="main-nav-link switch-friends-link" href="http://moxfive.xyz/">MOxFIVE</a>
+                    
+                    </div>
+                </section>
+                
+
+                
+                
+                <section class="switch-part switch-part4">
+                
+                    <div id="js-aboutme">专注于前端</div>
+                </section>
+                
+            </div>
+        </div>
+    </header>                
+</div>
+    </div>
+    <div class="mid-col">
+      <nav id="mobile-nav">
+      <div class="overlay">
+          <div class="slider-trigger"></div>
+          <h1 class="header-author js-mobile-header hide"><a href="/" title="回到主页">Arking</a></h1>
+      </div>
+    <div class="intrude-less">
+        <header id="header" class="inner">
+            <a href="/" class="profilepic">
+                <img src="/img/avatar.png" class="animated zoomIn">
+            </a>
+            <hgroup>
+              <h1 class="header-author"><a href="/" title="回到主页">Arking</a></h1>
+            </hgroup>
+            
+            <nav class="header-menu">
+                <ul>
+                
+                    <li><a href="/">主页</a></li>
+                
+                    <li><a href="/archives/">归档</a></li>
+                
+                    <li><a href="/tags/">标签</a></li>
+                
+                    <li><a href="/about/">关于我</a></li>
+                
+                <div class="clearfix"></div>
+                </ul>
+            </nav>
+            <nav class="header-nav">
+                        <ul class="social">
+                            
+                                <a class="fa Email" target="_blank" href="/ximingchenhust@foxmail.com" title="Email"></a>
+                            
+                                <a class="fa GitHub" target="_blank" href="#" title="GitHub"></a>
+                            
+                        </ul>
+            </nav>
+        </header>                
+    </div>
+    <link class="menu-list" tags="标签" friends="友情链接" about="关于我">
+</nav>
+      <div class="body-wrap"><article id="post-2018-01-19-docker-imagestore" class="article article-type-post" itemscope="" itemprop="blogPost">
+  
+    <div class="article-meta">
+      <a href="/2018/01/19/2018-01-19-docker-imagestore/" class="article-date">
+      <time datetime="2018-01-18T18:57:00.000Z" itemprop="datePublished">2018-01-19</time>
+</a>
+
+
+    </div>
+  
+  <div class="article-inner">
+    
+      <input type="hidden" class="isFancy">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="article-title" itemprop="name">
+       Docker源码分析—镜像存储 
+    </h1>
+  
+
+      </header>
+      
+      <div class="article-info article-info-post">
+        
+    <div class="article-category tagcloud">
+    <a class="article-category-link" href="/categories/Docker/">Docker</a>
+    </div>
+
+
+        
+    <div class="article-tag tagcloud">
+        <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/docker/">docker</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/storage/">storage</a></li></ul>
+    </div>
+
+        <div class="clearfix"></div>
+      </div>
+      
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+          
+        <blockquote>
+<p>基于Docker 17.05.x</p>
+</blockquote>
+<p>Docker使用<a href="https://arkingc.github.io/2018/01/14/docker-layerstore/" target="_blank" rel="noopener">层存储</a>来管理容器和镜像的层，那么如何知道哪些层属于某一个镜像？也就说如果现在系统上有很多个镜像，每个镜像又包括很多层，如果使用Overlay2，你可以在存储驱动目录下看到一大堆目录，如何知道哪些层是属于某个镜像？也就是说<strong>一个镜像如何和镜像层之间建立起关系</strong>？</p>
+<p>这篇文章主要通过分析Docker源码，介绍镜像存储的创建过程</p>
+<a id="more"></a>
+<p>Docker使用镜像存储来管理镜像，通过镜像存储可以查找系统当前所有镜像，以及每个镜像的镜像层信息。镜像存储主要通过镜像的元数据(imageMeta类型)来索引镜像的顶层镜像层，然后可以通过层存储来完成所有镜像层的查找等操作，关系结构如下：</p>
+<div align="center"> <img src="/img/in-post/post-docker-imagestore/imagestore.png" width="70%" height="70%"> </div>
+
+<p><br></p>
+<h2 id="创建镜像存储"><a href="#创建镜像存储" class="headerlink" title="创建镜像存储"></a>创建镜像存储</h2><p>在<strong>Docker daemon启动过程中，首先创建层存储，然后创建镜像存储</strong>。创建镜像存储需要用到两个参数：一个是层存储，另外一个是存储后端。存储后端记录了镜像信息的存储根目录</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">//d是docker daemon对象</span></span><br><span class="line"><span class="comment">//1.首先创建层存储</span></span><br><span class="line">d.layerStore = layer.NewStoreFromOptions(...)</span><br><span class="line">...</span><br><span class="line"><span class="comment">//imageRoot：/var/lib/docker/image/graphDriver</span></span><br><span class="line">imageRoot := filepath.Join(config.Root, <span class="string">"image"</span>, graphDriver)</span><br><span class="line">...</span><br><span class="line"><span class="comment">//2.创建存储后端</span></span><br><span class="line"><span class="comment">//镜像存储后端根目录：imageRoot/imagedb</span></span><br><span class="line">ifs, err := image.NewFSStoreBackend(filepath.Join(imageRoot, <span class="string">"imagedb"</span>))</span><br><span class="line">...</span><br><span class="line"><span class="comment">//3.创建镜像存储</span></span><br><span class="line">d.imageStore, err = image.NewImageStore(ifs, d.layerStore)</span><br></pre></td></tr></table></figure>
+<h3 id="创建存储后端"><a href="#创建存储后端" class="headerlink" title="创建存储后端"></a>创建存储后端</h3><p>创建存储后端调用函数NewFSStoreBackend()创建，传入镜像存储的位置。如果使用overlay2作为存储驱动，则参数字符串为“/var/lib/docker/image/overlay2/imagedb”:</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">func</span> <span class="title">NewFSStoreBackend</span><span class="params">(root <span class="keyword">string</span>)</span> <span class="params">(StoreBackend, error)</span></span> &#123;</span><br><span class="line">	<span class="keyword">return</span> newFSStore(root)</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="title">newFSStore</span><span class="params">(root <span class="keyword">string</span>)</span> <span class="params">(*fs, error)</span></span> &#123;</span><br><span class="line">	<span class="comment">//1.构造一个fs结构</span></span><br><span class="line">	s := &amp;fs&#123;</span><br><span class="line">		root: root,<span class="comment">// /var/lib/docker/image/(graphdriver)/imagedb</span></span><br><span class="line">	&#125;</span><br><span class="line">	<span class="comment">/*</span></span><br><span class="line"><span class="comment">		2.创建目录content和目录metadata</span></span><br><span class="line"><span class="comment">		contentDirName和metadataDirName为全局变量：</span></span><br><span class="line"><span class="comment">		contentDirName = "content"</span></span><br><span class="line"><span class="comment">		metadataDirName = "metadata"</span></span><br><span class="line"><span class="comment">	*/</span></span><br><span class="line">	<span class="keyword">if</span> err := os.MkdirAll(filepath.Join(root, contentDirName, <span class="keyword">string</span>(digest.Canonical)), <span class="number">0700</span>); err != <span class="literal">nil</span> &#123;</span><br><span class="line">		<span class="keyword">return</span> <span class="literal">nil</span>, errors.Wrap(err, <span class="string">"failed to create storage backend"</span>)</span><br><span class="line">	&#125;</span><br><span class="line">	<span class="keyword">if</span> err := os.MkdirAll(filepath.Join(root, metadataDirName, <span class="keyword">string</span>(digest.Canonical)), <span class="number">0700</span>); err != <span class="literal">nil</span> &#123;</span><br><span class="line">		<span class="keyword">return</span> <span class="literal">nil</span>, errors.Wrap(err, <span class="string">"failed to create storage backend"</span>)</span><br><span class="line">	&#125;</span><br><span class="line">	<span class="keyword">return</span> s, <span class="literal">nil</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>从上面的代码中可以看出，存储后端的创建主要包括2步：</p>
+<ol>
+<li>构造一个存储后端的fs结构对象</li>
+<li>在镜像存储后端根目录下创建目录content和目录metadata</li>
+</ol>
+<p>content目录用于存放镜像的配置文件。metadata目录会存放镜像的父镜像信息，如果一个镜像使用另一个镜像作为父镜像，则metadata/sha256/目录下会为这个镜像创建一个目录，这个目录中包含一个parent文件，文件内容为“sha256:父镜像ID”</p>
+<h3 id="创建镜像存储-1"><a href="#创建镜像存储-1" class="headerlink" title="创建镜像存储"></a>创建镜像存储</h3><p>在创建镜像的存储后端之后，调用函数NewImageStore()创建镜像存储：</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/*</span></span><br><span class="line"><span class="comment">传入镜像的存储后端对象fs，以及层存储对象layerStore</span></span><br><span class="line"><span class="comment">StoreBackend和LayerGetReleaser是两个接口:</span></span><br><span class="line"><span class="comment">	fs实现了StoreBackend接口</span></span><br><span class="line"><span class="comment">	layerStore实现了LayerGetReleaser接口</span></span><br><span class="line"><span class="comment">*/</span></span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="title">NewImageStore</span><span class="params">(fs StoreBackend, ls LayerGetReleaser)</span> <span class="params">(Store, error)</span></span> &#123;</span><br><span class="line">	<span class="comment">//1.构造镜像存储结构</span></span><br><span class="line">	is := &amp;store&#123;</span><br><span class="line">		ls:        ls,</span><br><span class="line">		images:    <span class="built_in">make</span>(<span class="keyword">map</span>[ID]*imageMeta),</span><br><span class="line">		fs:        fs,</span><br><span class="line">		digestSet: digestset.NewSet(),</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	<span class="comment">//2.调用函数restore装载当前镜像</span></span><br><span class="line">	<span class="keyword">if</span> err := is.restore(); err != <span class="literal">nil</span> &#123;</span><br><span class="line">		<span class="keyword">return</span> <span class="literal">nil</span>, err</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	<span class="keyword">return</span> is, <span class="literal">nil</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>镜像存储的创建逻辑很简单，也是只有2步：</p>
+<ol>
+<li>构造镜像存储结构</li>
+<li>调用restore()函数装载当前镜像</li>
+</ol>
+<p>装载镜像需要用到镜像的配置文件，镜像的配置文件在存储后端根目录下的content目录中：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">#只有1个ubuntu镜像，镜像ID为2a4cca...</span></span><br><span class="line">root@8a7d95c22e2b:/var/lib/docker/image/overlay2/imagedb/content<span class="comment"># docker images</span></span><br><span class="line">REPOSITORY          TAG                 IMAGE ID            CREATED             SIZE</span><br><span class="line">ubuntu              latest              2a4cca5ac898        3 days ago          111MB</span><br><span class="line"></span><br><span class="line"><span class="comment">#查看镜像的配置文件，文件名和镜像ID相同</span></span><br><span class="line">root@8a7d95c22e2b:/var/lib/docker/image/overlay2/imagedb/content<span class="comment"># pwd</span></span><br><span class="line">/var/lib/docker/image/overlay2/imagedb/content</span><br><span class="line">root@8a7d95c22e2b:/var/lib/docker/image/overlay2/imagedb/content<span class="comment"># ls</span></span><br><span class="line">sha256</span><br><span class="line">root@8a7d95c22e2b:/var/lib/docker/image/overlay2/imagedb/content<span class="comment"># ls sha256/</span></span><br><span class="line">2a4cca5ac898476c2c47a8d6a17102e00241d6fa377fbe4d50787fe3d7a8d4d6</span><br></pre></td></tr></table></figure>
+<p>下面看看restore函数如何装载镜像</p>
+<h4 id="装载镜像"><a href="#装载镜像" class="headerlink" title="装载镜像"></a>装载镜像</h4><figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">func</span> <span class="params">(is *store)</span> <span class="title">restore</span><span class="params">()</span> <span class="title">error</span></span> &#123;</span><br><span class="line">	<span class="comment">/*</span></span><br><span class="line"><span class="comment">		读取/../content/sha256目录，</span></span><br><span class="line"><span class="comment">		使用每一个镜像配置文件的文件名以及sha256构造一个digest.Digest对象</span></span><br><span class="line"><span class="comment">		然后根据这个对象构造镜像元数据对象imageMeta</span></span><br><span class="line"><span class="comment">		并将镜像ID和镜像元数据对象存入镜像存储的镜像元数据映射表中</span></span><br><span class="line"><span class="comment">	*/</span></span><br><span class="line">	err := is.fs.Walk(<span class="function"><span class="keyword">func</span><span class="params">(dgst digest.Digest)</span> <span class="title">error</span></span> &#123;</span><br><span class="line">		<span class="comment">//1.读取镜像配置文件构造image对象img</span></span><br><span class="line">		img, err := is.Get(IDFromDigest(dgst))</span><br><span class="line">		<span class="keyword">if</span> err != <span class="literal">nil</span> &#123;</span><br><span class="line">			logrus.Errorf(<span class="string">"invalid image %v, %v"</span>, dgst, err)</span><br><span class="line">			<span class="keyword">return</span> <span class="literal">nil</span></span><br><span class="line">		&#125;</span><br><span class="line">		<span class="keyword">var</span> l layer.Layer</span><br><span class="line">		<span class="comment">//2.获取该镜像顶层镜像层的ChainID,</span></span><br><span class="line">		<span class="comment">//根据ChainID到层存储的镜像层元数据映射表中获取顶层镜像层的元数据对象</span></span><br><span class="line">		<span class="keyword">if</span> chainID := img.RootFS.ChainID(); chainID != <span class="string">""</span> &#123;</span><br><span class="line">			l, err = is.ls.Get(chainID)</span><br><span class="line">			<span class="keyword">if</span> err != <span class="literal">nil</span> &#123;</span><br><span class="line">				<span class="keyword">return</span> err</span><br><span class="line">			&#125;</span><br><span class="line">		&#125;</span><br><span class="line">		<span class="comment">//3.将该镜像的digest.Digest对象dgst添加到digestSet中</span></span><br><span class="line">		<span class="keyword">if</span> err := is.digestSet.Add(dgst); err != <span class="literal">nil</span> &#123;</span><br><span class="line">			<span class="keyword">return</span> err</span><br><span class="line">		&#125;</span><br><span class="line"></span><br><span class="line">		<span class="comment">//4.构造镜像元数据对象</span></span><br><span class="line">		imageMeta := &amp;imageMeta&#123;</span><br><span class="line">			layer:    l,<span class="comment">//镜像顶层元数据</span></span><br><span class="line">			children: <span class="built_in">make</span>(<span class="keyword">map</span>[ID]<span class="keyword">struct</span>&#123;&#125;),</span><br><span class="line">		&#125;</span><br><span class="line">		</span><br><span class="line">		<span class="comment">//5.将元数据信息添加到镜像存储的”镜像元数据映射表“中</span></span><br><span class="line">		is.images[IDFromDigest(dgst)] = imageMeta</span><br><span class="line"></span><br><span class="line">		<span class="keyword">return</span> <span class="literal">nil</span></span><br><span class="line">	&#125;)</span><br><span class="line">	<span class="keyword">if</span> err != <span class="literal">nil</span> &#123;</span><br><span class="line">		<span class="keyword">return</span> err</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	<span class="comment">// Second pass to fill in children maps</span></span><br><span class="line">	<span class="keyword">for</span> id := <span class="keyword">range</span> is.images &#123;</span><br><span class="line">		<span class="keyword">if</span> parent, err := is.GetParent(id); err == <span class="literal">nil</span> &#123;</span><br><span class="line">			<span class="keyword">if</span> parentMeta := is.images[parent]; parentMeta != <span class="literal">nil</span> &#123;</span><br><span class="line">				parentMeta.children[id] = <span class="keyword">struct</span>&#123;&#125;&#123;&#125;</span><br><span class="line">			&#125;</span><br><span class="line">		&#125;</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	<span class="keyword">return</span> <span class="literal">nil</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>装载镜像通过<a href="https://github.com/moby/moby/blob/17.05.x/image/fs.go#L68" target="_blank" rel="noopener">walk()函数</a>来读取镜像的存储后端目录中，镜像配置文件所在的目录/../content/sha256，根据每个镜像名和sha256，构造一个digest.Digest对象dgst，然后根据dgst完成镜像的装载，主要包括5个步骤：</p>
+<ol>
+<li>调用镜像存储实现的Get()函数<strong>读取镜像配置文件</strong>的内容，构造并返回一个image对象img</li>
+<li>调用img对象RootFS成员的ChainID()函数<strong>获取镜像顶层的层ChainID</strong>（<strong>镜像层的元数据目录就是根据层的ChainID来命名</strong>），可以根据这个ChainID调用<strong>层存储</strong>的Get()函数<strong>查找镜像层元数据映射表，获取顶层镜像层roLayer类型的元数据对象</strong></li>
+<li>将这个dgst添加到镜像存储的digestSet中</li>
+<li><strong>构造镜像的元数据对象</strong></li>
+<li>将镜像ID和镜像的元数据对象作为新的表项添加到<strong>镜像元数据映射表</strong>中</li>
+</ol>
+<p><strong>实际上装载镜像就是构造镜像的元数据对象，然后将其添加到镜像存储的镜像元数据映射表中。以后就可以根据这个映射表查找镜像的元数据，然后进一步找到镜像的所有层</strong></p>
+<p>接下来对步骤1和步骤2做进一步分析</p>
+<p>首先是如何根据配置文件构造一个<a href="https://github.com/moby/moby/blob/17.05.x/image/image.go#L59" target="_blank" rel="noopener">Image</a>对象：</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">func</span> <span class="params">(is *store)</span> <span class="title">Get</span><span class="params">(id ID)</span> <span class="params">(*Image, error)</span></span> &#123;</span><br><span class="line">	<span class="comment">// todo: Check if image is in images</span></span><br><span class="line">	<span class="comment">// todo: Detect manual insertions and start using them</span></span><br><span class="line">	<span class="comment">//到imagedb/content/sha256/下读取镜像配置文件</span></span><br><span class="line">	config, err := is.fs.Get(id.Digest())</span><br><span class="line">	<span class="keyword">if</span> err != <span class="literal">nil</span> &#123;</span><br><span class="line">		<span class="keyword">return</span> <span class="literal">nil</span>, err</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	<span class="comment">//根据json配置文件的内容构造镜像的Image对象</span></span><br><span class="line">	img, err := NewFromJSON(config)</span><br><span class="line">	<span class="keyword">if</span> err != <span class="literal">nil</span> &#123;</span><br><span class="line">		<span class="keyword">return</span> <span class="literal">nil</span>, err</span><br><span class="line">	&#125;</span><br><span class="line">	img.computedID = id</span><br><span class="line"></span><br><span class="line">	<span class="comment">//设置父镜像id，实际上就是到metadata目录下的相应目录中读取parent文件</span></span><br><span class="line">	<span class="comment">//parent文件不存在则没有父镜像</span></span><br><span class="line">	img.Parent, err = is.GetParent(id)</span><br><span class="line">	<span class="keyword">if</span> err != <span class="literal">nil</span> &#123;</span><br><span class="line">		img.Parent = <span class="string">""</span></span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	<span class="keyword">return</span> img, <span class="literal">nil</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>函数首先调用存储后端fs的Get()函数读取镜像的配置文件，将读取内容存入config变量中。然后调用NewFromJSON()函数，根据配置文件的内容构造一个Image对象</p>
+<blockquote>
+<p>镜像配置文件为JSON格式，可以使用jq工具查看镜像配置文件的信息。在安装完jq后，可以使用命令<code>jq &#39;.&#39; 配置文件名</code> 查看镜像配置文件的内容</p>
+</blockquote>
+<p>镜像配置文件的内容：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br></pre></td><td class="code"><pre><span class="line">root@8a7d95c22e2b:/var/lib/docker/image/overlay2/imagedb/content/sha256<span class="comment"># pwd</span></span><br><span class="line">/var/lib/docker/image/overlay2/imagedb/content/sha256</span><br><span class="line">oot@8a7d95c22e2b:/var/lib/docker/image/overlay2/imagedb/content/sha256<span class="comment"># ls</span></span><br><span class="line">2a4cca5ac898476c2c47a8d6a17102e00241d6fa377fbe4d50787fe3d7a8d4d6</span><br><span class="line">root@8a7d95c22e2b:/var/lib/docker/image/overlay2/imagedb/content/sha256<span class="comment"># jq '.' 2a4cca5ac898476c2c47a8d6a17102e00241d6fa377fbe4d50787fe3d7a8d4d6</span></span><br><span class="line">&#123;</span><br><span class="line">  <span class="string">"architecture"</span>: <span class="string">"amd64"</span>,</span><br><span class="line">  <span class="string">"config"</span>: &#123;</span><br><span class="line">    <span class="string">"Hostname"</span>: <span class="string">""</span>,</span><br><span class="line">    <span class="string">"Domainname"</span>: <span class="string">""</span>,</span><br><span class="line">    <span class="string">"User"</span>: <span class="string">""</span>,</span><br><span class="line">    <span class="string">"AttachStdin"</span>: <span class="literal">false</span>,</span><br><span class="line">    <span class="string">"AttachStdout"</span>: <span class="literal">false</span>,</span><br><span class="line">    <span class="string">"AttachStderr"</span>: <span class="literal">false</span>,</span><br><span class="line">    <span class="string">"Tty"</span>: <span class="literal">false</span>,</span><br><span class="line">    ...</span><br><span class="line">  &#125;,</span><br><span class="line">  ...</span><br><span class="line">  <span class="string">"rootfs"</span>: &#123;</span><br><span class="line">    <span class="string">"type"</span>: <span class="string">"layers"</span>,</span><br><span class="line">    <span class="string">"diff_ids"</span>: [</span><br><span class="line">      <span class="string">"sha256:833649a3e04c96faf218d8082b3533fa0674664f4b361c93cad91cf97222b733"</span>,</span><br><span class="line">      <span class="string">"sha256:a6a01ad8b53fac9c52a907f40b70a6c61fe305db83a63ae83c970e7be1029d86"</span>,</span><br><span class="line">      <span class="string">"sha256:d2bb1fc88136e1c5d59909e7704a9eb6671ea7aa4a0d4272f3e2689fc31a6bd1"</span>,</span><br><span class="line">      <span class="string">"sha256:2bbb3cec611d9e3c4016eba00c9f87c51c7d03e54ccd9f12f8f04ac369f5243d"</span>,</span><br><span class="line">      <span class="string">"sha256:8600ee70176b569d0776833f106d239d56043cb854a5edbb74aff6c5e8d4782d"</span></span><br><span class="line">    ]</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>所以NewFromJSON()函数实际上就是根据这些信息来构造出一个Image对象。<strong>注意配置文件最后的“diff_ids”</strong>，这部分记录了该镜像所有镜像层的diffID（存于Image对象的RootFS成员中）,也就是镜像层元数据目录下diff文件中的内容。但是要获取镜像层的元数据需要得到镜像层的ChainID（镜像层元数据映射表的key类型为ChainID），<strong>实际上每一层镜像层的ChainID都是根据父层的ChainID和该层的diffID计算来的。可以通过层存储的CreateChainID()函数来得到该层的ChainID</strong>：</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">func</span> <span class="title">CreateChainID</span><span class="params">(dgsts []DiffID)</span> <span class="title">ChainID</span></span> &#123;</span><br><span class="line">	<span class="keyword">return</span> createChainIDFromParent(<span class="string">""</span>, dgsts...)</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="title">createChainIDFromParent</span><span class="params">(parent ChainID, dgsts ...DiffID)</span> <span class="title">ChainID</span></span> &#123;</span><br><span class="line">	<span class="keyword">if</span> <span class="built_in">len</span>(dgsts) == <span class="number">0</span> &#123;</span><br><span class="line">		<span class="keyword">return</span> parent</span><br><span class="line">	&#125;</span><br><span class="line">	<span class="keyword">if</span> parent == <span class="string">""</span> &#123;</span><br><span class="line">		<span class="keyword">return</span> createChainIDFromParent(ChainID(dgsts[<span class="number">0</span>]), dgsts[<span class="number">1</span>:]...)</span><br><span class="line">	&#125;</span><br><span class="line">	<span class="comment">// H = "H(n-1) SHA256(n)"</span></span><br><span class="line">	dgst := digest.FromBytes([]<span class="keyword">byte</span>(<span class="keyword">string</span>(parent) + <span class="string">" "</span> + <span class="keyword">string</span>(dgsts[<span class="number">0</span>])))</span><br><span class="line">	<span class="keyword">return</span> createChainIDFromParent(ChainID(dgst), dgsts[<span class="number">1</span>:]...)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>ubuntu镜像的层次关系以及每层的diffID,chainID如下表：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:center">描述</th>
+<th style="text-align:center">编号</th>
+<th style="text-align:center">diffID</th>
+<th style="text-align:center">chainID</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:center">顶层镜像层</td>
+<td style="text-align:center">5</td>
+<td style="text-align:center">sha256:8600…</td>
+<td style="text-align:center">sha256:01c7…</td>
+</tr>
+<tr>
+<td style="text-align:center"></td>
+<td style="text-align:center">4</td>
+<td style="text-align:center">sha256:2bbb…</td>
+<td style="text-align:center">sha256:8f1d…</td>
+</tr>
+<tr>
+<td style="text-align:center"></td>
+<td style="text-align:center">3</td>
+<td style="text-align:center">sha256:d2bb…</td>
+<td style="text-align:center">sha256:fd96…</td>
+</tr>
+<tr>
+<td style="text-align:center"></td>
+<td style="text-align:center">2</td>
+<td style="text-align:center">sha256:a6a0…</td>
+<td style="text-align:center">sha256:809c…</td>
+</tr>
+<tr>
+<td style="text-align:center">底层镜像层</td>
+<td style="text-align:center">1</td>
+<td style="text-align:center">sha256:8336…</td>
+<td style="text-align:center">sha256:8336…</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>创建底层镜像层的chainID</strong>时，数组dgsts只有一个元素，即底层镜像层的diffID，因此函数createChainIDFromParent()最终返回的chainID实际就是diffID</li>
+<li>在<strong>为后面的镜像层创建chainID</strong>时，数组dgsts包含该层及所有父层的diffID，<strong>下标越小层次越低</strong>。第一次调用createChainIDFromParent()时，parent为“”，所以会以底层镜像的diffID做为父层的ChainID（实际上底层镜像层的diffID也就是底层镜像层的chainID）,根据其余层的diffID组成的数组继续递归处理。第二次调用createChainIDFromParent()时（第一次递归），parent为底层镜像的chainID，dgsts为剩余层diffID组成的数组，函数会根据底层镜像层的chainID（参数parent）以及编号为2的镜像层的diffID，调用digest.FromBytes()计算编号为2的镜像层的chainID。然后以编号为2的镜像层的chainID为parent，根据剩余层的diffID数组接着递归处理，直到得到最后一层的chainID后，再一次调用createChainIDFromParent()，会返回parent，也就是最后一层的chainID</li>
+</ul>
+<p><strong>实际上在装载镜像的过程中，当调用NewFromJSON()读取镜像配置文件并构造出镜像的元数据对象img后，会调用img.RootFS.ChainID()进行上述处理，RootFS结构如下：</strong></p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">type</span> RootFS <span class="keyword">struct</span> &#123;</span><br><span class="line">	Type    <span class="keyword">string</span>         <span class="string">`json:"type"`</span></span><br><span class="line">	DiffIDs []layer.DiffID <span class="string">`json:"diff_ids,omitempty"`</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><strong>RootFS的DiffIDs存有镜像所有层的diffID，RootFS的ChainID()函数会调用CreateChainID()函数，传入diffID数组（RootFS的DiffIDs），最终会获得顶层镜像层的chainID。然后就可以根据这个chainID,查找层存储的镜像层元数据映射表，找到顶层镜像层的元数据，用来设置镜像元数据imageMeta的layer成员</strong></p>
+<p><br></p>
+<h2 id="查找镜像的所有层"><a href="#查找镜像的所有层" class="headerlink" title="查找镜像的所有层"></a>查找镜像的所有层</h2><p>在了解一个镜像元数据对象(imageMeta类型)如何与镜像层进行关联后，就可以找到镜像的所有层了</p>
+<p>imageMeta的layer成员指向镜像顶层镜像层的元数据对象(roLayer)，镜像层元数据对象的cacheID成员记录了镜像层在存储驱动目录下的目录名，parent成员指向父层镜像层的元数据对象，因此，可以用cacheID在存储驱动目录下找到顶层镜像层的内容，然后根据parent获取父层镜像层的元数据对象，根据父层镜像层元数据对象的cacheID在存储驱动目录下找到父层镜像层的内容，重复这个过程，直到在存储驱动目录下找到底层镜像的内容</p>
+<p><strong>总的来说就是，通过镜像元数据对象的layer成员，可以将镜像存储与层存储联系起来，然后层存储可以根据顶层镜像层的元数据—layer，完成该镜像所有内容的查找操作</strong></p>
+
+      
+    </div>
+    
+  </div>
+  
+    
+    <div class="copyright">
+        <p><span>本文标题:</span><a href="/2018/01/19/2018-01-19-docker-imagestore/"> Docker源码分析—镜像存储 </a></p>
+        <p><span>文章作者:</span><a href="/" title="回到主页">Arking</a></p>
+        <p><span>发布时间:</span>2018-01-19, 02:57:00</p>
+        <p><span>最后更新:</span>2018-12-04, 20:22:10</p>
+        <p>
+            <span>原始链接:</span><a class="post-url" href="/2018/01/19/2018-01-19-docker-imagestore/" title=" Docker源码分析—镜像存储 ">http://yoursite.com/2018/01/19/2018-01-19-docker-imagestore/</a>
+            <span class="copy-path" data-clipboard-text="原文: http://yoursite.com/2018/01/19/2018-01-19-docker-imagestore/　　作者: Arking" title="点击复制文章链接"><i class="fa fa-clipboard"></i></span>
+            <script> var clipboard = new Clipboard('.copy-path'); </script>
+        </p>
+        <p>
+            <span>许可协议:</span><i class="fa fa-creative-commons"></i> <a rel="license" href="http://creativecommons.org/licenses/by-nc-sa/4.0/" title="CC BY-NC-SA 4.0 International" target="_blank">"署名-非商用-相同方式共享 4.0"</a> 转载请保留原文链接及作者。
+        </p>
+    </div>
+
+
+
+    <nav id="article-nav">
+        
+            <div id="article-nav-newer" class="article-nav-title">
+                <a href="/2018/09/05/2018-09-05-linux-kernel/">
+                    Ubuntu下内核与内核模块的编译过程
+                </a>
+            </div>
+        
+        
+            <div id="article-nav-older" class="article-nav-title">
+                <a href="/2018/01/15/2018-01-15-docker-storage-overlay2/">
+                     Docker源码分析—存储驱动 
+                </a>
+            </div>
+        
+    </nav>
+
+  
+</article>
+
+    <div id="toc" class="toc-article">
+        <strong class="toc-title">文章目录</strong>
+        
+            <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#创建镜像存储"><span class="toc-number">1.</span> <span class="toc-text">创建镜像存储</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#创建存储后端"><span class="toc-number">1.1.</span> <span class="toc-text">创建存储后端</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#创建镜像存储-1"><span class="toc-number">1.2.</span> <span class="toc-text">创建镜像存储</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#装载镜像"><span class="toc-number">1.2.1.</span> <span class="toc-text">装载镜像</span></a></li></ol></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#查找镜像的所有层"><span class="toc-number">2.</span> <span class="toc-text">查找镜像的所有层</span></a></li></ol>
+        
+    </div>
+    <style>
+        .left-col .switch-btn,
+        .left-col .switch-area {
+            display: none;
+        }
+        .toc-level-3 i,
+        .toc-level-3 ol {
+            display: none !important;
+        }
+    </style>
+
+    <input type="button" id="tocButton" value="隐藏目录" title="点击按钮隐藏或者显示文章目录">
+
+    <script>
+        yiliaConfig.toc = ["隐藏目录", "显示目录", !!"false"];
+    </script>
+
+
+
+    
+<div class="share">
+    
+        <div class="bdsharebuttonbox">
+            <a href="#" class="fa fa-twitter bds_twi" data-cmd="twi" title="分享到推特"></a>
+            <a href="#" class="fa fa-weibo bds_tsina" data-cmd="tsina" title="分享到新浪微博"></a>
+            <a href="#" class="fa fa-qq bds_sqq" data-cmd="sqq" title="分享给 QQ 好友"></a>
+            <a href="#" class="fa fa-files-o bds_copy" data-cmd="copy" title="复制网址"></a>
+            <a href="#" class="fa fa fa-envelope-o bds_mail" data-cmd="mail" title="通过邮件分享"></a>
+            <a href="#" class="fa fa-weixin bds_weixin" data-cmd="weixin" title="生成文章二维码"></a>
+            <a href="#" class="fa fa-share-alt bds_more" data-cmd="more"></a>
+        </div>
+        <script>
+            window._bd_share_config={
+                "common":{"bdSnsKey":{},"bdText":" Docker源码分析—镜像存储 　| Hexo　","bdMini":"2","bdMiniList":false,"bdPic":"","bdStyle":"0","bdSize":"24"},"share":{}};with(document)0[(getElementsByTagName('head')[0]||body).appendChild(createElement('script')).src='http://bdimg.share.baidu.com/static/api/js/share.js?v=89860593.js?cdnversion='+~(-new Date()/36e5)];
+        </script>
+    
+
+    
+</div>
+
+
+
+
+
+
+
+    
+
+
+
+
+    <div class="scroll" id="post-nav-button">
+        
+            <a href="/2018/09/05/2018-09-05-linux-kernel/" title="上一篇: Ubuntu下内核与内核模块的编译过程">
+                <i class="fa fa-angle-left"></i>
+            </a>
+        
+
+        <a title="文章列表"><i class="fa fa-bars"></i><i class="fa fa-times"></i></a>
+
+        
+            <a href="/2018/01/15/2018-01-15-docker-storage-overlay2/" title="下一篇:  Docker源码分析—存储驱动 ">
+                <i class="fa fa-angle-right"></i>
+            </a>
+        
+    </div>
+
+    <ul class="post-list"><li class="post-list-item"><a class="post-list-link" href="/2018/09/05/2018-09-05-linux-kernel/">Ubuntu下内核与内核模块的编译过程</a></li><li class="post-list-item"><a class="post-list-link" href="/2018/01/19/2018-01-19-docker-imagestore/"> Docker源码分析—镜像存储 </a></li><li class="post-list-item"><a class="post-list-link" href="/2018/01/15/2018-01-15-docker-storage-overlay2/"> Docker源码分析—存储驱动 </a></li><li class="post-list-item"><a class="post-list-link" href="/2018/01/14/2018-01-14-docker-layerstore/"> Docker源码分析—层存储 </a></li><li class="post-list-item"><a class="post-list-link" href="/2018/01/12/2018-01-10-c-stack_frame/"> C函数栈帧 </a></li><li class="post-list-item"><a class="post-list-link" href="/2017/12/26/2017-12-26-linux-code-overlayfs-read_write/">内核OverlayFS—文件读写</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/12/22/2017-12-22-linux-code-overlayfs-create_delete/">内核OverlayFS—创建与删除文件</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/11/30/2017-11-30-linux-du/"> Linux查看目录大小</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/11/10/2017-11-10-linux-code-overlayfs-dir-op1/">内核OverlayFS—目录搜索</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/10/12/2017-10-12-linux-code-overlayfs-mnt/">内核OverlayFS—注册与挂载</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/09/20/2017-09-20-linux-code-overlayfs-layerinfo/">内核OverlayFS—文件层次信息</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/08/18/2017-08-18-linux-code-vfs/">Linux虚拟文件系统(VFS)</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/05/05/2017-05-05-docker-filesystem-overlay/"> Docker存储驱动—Overlay/Overlay2「译」</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/04/13/2017-04-13-docker-filesystem-aufs/"> Docker存储驱动—Aufs </a></li><li class="post-list-item"><a class="post-list-link" href="/2017/04/09/2017-04-09-linux-uuid/"> Linux存储设备的UUID</a></li></ul>
+
+
+
+
+    <script>
+        
+    </script>
+</div>
+      <footer id="footer">
+    <div class="outer">
+        <div id="footer-info">
+            <div class="footer-left">
+                <i class="fa fa-copyright"></i> 
+                2017-2018 Arking
+            </div>
+            <div class="footer-right">
+                <a href="http://hexo.io/" target="_blank" title="快速、简洁且高效的博客框架">Hexo</a>  Theme <a href="https://github.com/MOxFIVE/hexo-theme-yelee" target="_blank" title="简而不减 Hexo 双栏博客主题  v3.5">Yelee</a> by MOxFIVE <i class="fa fa-heart animated infinite pulse"></i>
+            </div>
+        </div>
+        
+            <div class="visit">
+                
+                    <span id="busuanzi_container_site_pv" style="display:none">
+                        <span id="site-visit" title="本站到访数"><i class="fa fa-user" aria-hidden="true"></i><span id="busuanzi_value_site_uv"></span>
+                        </span>
+                    </span>
+                
+                
+                    <span>| </span>
+                
+                
+                    <span id="busuanzi_container_page_pv" style="display:none">
+                        <span id="page-visit" title="本页阅读量"><i class="fa fa-eye animated infinite pulse" aria-hidden="true"></i><span id="busuanzi_value_page_pv"></span>
+                        </span>
+                    </span>
+                
+            </div>
+        
+    </div>
+</footer>
+    </div>
+    
+<script data-main="/js/main.js" src="//cdn.bootcss.com/require.js/2.2.0/require.min.js"></script>
+
+    <script>
+        $(document).ready(function() {
+            var iPad = window.navigator.userAgent.indexOf('iPad');
+            if (iPad > -1 || $(".left-col").css("display") === "none") {
+                var bgColorList = ["#9db3f4", "#414141", "#e5a859", "#f5dfc6", "#c084a0", "#847e72", "#cd8390", "#996731"];
+                var bgColor = Math.ceil(Math.random() * (bgColorList.length - 1));
+                $("body").css({"background-color": bgColorList[bgColor], "background-size": "cover"});
+            }
+            else {
+                var backgroundnum = 5;
+                var backgroundimg = "url(/background/bg-x.jpg)".replace(/x/gi, Math.ceil(Math.random() * backgroundnum));
+                $("body").css({"background": backgroundimg, "background-attachment": "fixed", "background-size": "cover"});
+            }
+        })
+    </script>
+
+
+
+
+
+<div class="scroll" id="scroll">
+    <a href="#" title="返回顶部"><i class="fa fa-arrow-up"></i></a>
+    <a href="#comments" onclick="load$hide();" title="查看评论"><i class="fa fa-comments-o"></i></a>
+    <a href="#footer" title="转到底部"><i class="fa fa-arrow-down"></i></a>
+</div>
+<script>
+    // Open in New Window
+    
+        var oOpenInNew = {
+            
+            
+            
+            
+            
+            
+             archives: ".archive-article-title", 
+             miniArchives: "a.post-list-link", 
+            
+             friends: "#js-friends a", 
+             socail: ".social a" 
+        }
+        for (var x in oOpenInNew) {
+            $(oOpenInNew[x]).attr("target", "_blank");
+        }
+    
+</script>
+
+<script async src="https://dn-lbstatics.qbox.me/busuanzi/2.3/busuanzi.pure.mini.js">
+</script>
+  </div>
+</body>
+</html>

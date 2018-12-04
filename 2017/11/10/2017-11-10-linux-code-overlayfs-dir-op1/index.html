@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html>
+<head><meta name="generator" content="Hexo 3.8.0">
+
+    <!--[if lt IE 9]>
+        <style>body {display: none; background: none !important} </style>
+        <meta http-equiv="Refresh" Content="0; url=//outdatedbrowser.com/" />
+    <![endif]-->
+
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge, chrome=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="format-detection" content="telephone=no">
+<meta name="author" content="Arking">
+
+
+
+<meta name="description" content="内核版本4.4.68  在OverlayFS联合挂载目录下，使用命令ls看到的文件实际上来自联合挂载的upper层和lower层。前面的博文中有提到过，OverlayFS的本质在于实现操作转化，因此在对OverlayFS中的一个目录进行搜索时（使用命令ls时），实际上会搜索目录对应upper层和lower层的目录，然后对搜索结果进行处理、展示。最终得到我们在OverlayFS下ls dir看到的">
+<meta name="keywords" content="filesystem,overlayfs">
+<meta property="og:type" content="article">
+<meta property="og:title" content="内核OverlayFS—目录搜索">
+<meta property="og:url" content="http://yoursite.com/2017/11/10/2017-11-10-linux-code-overlayfs-dir-op1/index.html">
+<meta property="og:site_name" content="Hexo">
+<meta property="og:description" content="内核版本4.4.68  在OverlayFS联合挂载目录下，使用命令ls看到的文件实际上来自联合挂载的upper层和lower层。前面的博文中有提到过，OverlayFS的本质在于实现操作转化，因此在对OverlayFS中的一个目录进行搜索时（使用命令ls时），实际上会搜索目录对应upper层和lower层的目录，然后对搜索结果进行处理、展示。最终得到我们在OverlayFS下ls dir看到的">
+<meta property="og:locale" content="default">
+<meta property="og:image" content="http://yoursite.com/img/in-post/post-kernel-overlayfs/mount_tree.png">
+<meta property="og:image" content="http://yoursite.com/img/in-post/post-kernel-overlayfs/dir-op1-strace.png">
+<meta property="og:image" content="http://yoursite.com/img/in-post/post-kernel-overlayfs/dir-op1-open.png">
+<meta property="og:image" content="http://yoursite.com/img/in-post/post-kernel-overlayfs/dir-op1-iterator.png">
+<meta property="og:updated_time" content="2018-12-04T09:46:01.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="内核OverlayFS—目录搜索">
+<meta name="twitter:description" content="内核版本4.4.68  在OverlayFS联合挂载目录下，使用命令ls看到的文件实际上来自联合挂载的upper层和lower层。前面的博文中有提到过，OverlayFS的本质在于实现操作转化，因此在对OverlayFS中的一个目录进行搜索时（使用命令ls时），实际上会搜索目录对应upper层和lower层的目录，然后对搜索结果进行处理、展示。最终得到我们在OverlayFS下ls dir看到的">
+<meta name="twitter:image" content="http://yoursite.com/img/in-post/post-kernel-overlayfs/mount_tree.png">
+
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+
+
+    <link rel="alternate" href="/atom.xml" title="Hexo" type="application/atom+xml">
+
+
+
+    <link rel="shortcut icon" href="/favicon.png">
+
+
+
+    <link href="//cdn.bootcss.com/animate.css/3.5.1/animate.min.css" rel="stylesheet">
+
+
+
+    <link href="//cdn.bootcss.com/fancybox/2.1.5/jquery.fancybox.min.css" rel="stylesheet">
+
+
+
+    <script src="//cdn.bootcss.com/pace/1.0.2/pace.min.js"></script>
+    <link href="//cdn.bootcss.com/pace/1.0.2/themes/blue/pace-theme-minimal.css" rel="stylesheet">
+
+
+<link rel="stylesheet" href="/css/style.css">
+
+
+
+<link href="//cdn.bootcss.com/font-awesome/4.6.3/css/font-awesome.min.css" rel="stylesheet">
+
+
+<title>内核OverlayFS—目录搜索 | Hexo</title>
+
+<script src="//cdn.bootcss.com/jquery/2.2.4/jquery.min.js"></script>
+<script src="//cdn.bootcss.com/clipboard.js/1.5.10/clipboard.min.js"></script>
+
+<script>
+    var yiliaConfig = {
+        fancybox: true,
+        animate: true,
+        isHome: false,
+        isPost: true,
+        isArchive: false,
+        isTag: false,
+        isCategory: false,
+        fancybox_js: "//cdn.bootcss.com/fancybox/2.1.5/jquery.fancybox.min.js",
+        scrollreveal: "//cdn.bootcss.com/scrollReveal.js/3.1.4/scrollreveal.min.js",
+        search: false
+    }
+</script>
+
+
+    <script> yiliaConfig.jquery_ui = [false]; </script>
+
+
+
+    <script> yiliaConfig.rootUrl = "\/";</script>
+
+
+
+
+
+
+</head></html>
+<body>
+  <div id="container">
+    <div class="left-col">
+    <div class="overlay"></div>
+<div class="intrude-less">
+    <header id="header" class="inner">
+        <a href="/" class="profilepic">
+            <img src="/img/avatar.png" class="animated zoomIn">
+        </a>
+        <hgroup>
+          <h1 class="header-author"><a href="/">Arking</a></h1>
+        </hgroup>
+
+        
+
+        
+
+
+        
+            <div id="switch-btn" class="switch-btn">
+                <div class="icon">
+                    <div class="icon-ctn">
+                        <div class="icon-wrap icon-house" data-idx="0">
+                            <div class="birdhouse"></div>
+                            <div class="birdhouse_holes"></div>
+                        </div>
+                        <div class="icon-wrap icon-ribbon hide" data-idx="1">
+                            <div class="ribbon"></div>
+                        </div>
+                        
+                        <div class="icon-wrap icon-link hide" data-idx="2">
+                            <div class="loopback_l"></div>
+                            <div class="loopback_r"></div>
+                        </div>
+                        
+                        
+                        <div class="icon-wrap icon-me hide" data-idx="3">
+                            <div class="user"></div>
+                            <div class="shoulder"></div>
+                        </div>
+                        
+                    </div>
+                    
+                </div>
+                <div class="tips-box hide">
+                    <div class="tips-arrow"></div>
+                    <ul class="tips-inner">
+                        <li>菜单</li>
+                        <li>标签</li>
+                        
+                        <li>友情链接</li>
+                        
+                        
+                        <li>关于我</li>
+                        
+                    </ul>
+                </div>
+            </div>
+        
+
+        <div id="switch-area" class="switch-area">
+            <div class="switch-wrap">
+                <section class="switch-part switch-part1">
+                    <nav class="header-menu">
+                        <ul>
+                        
+                            <li><a href="/">主页</a></li>
+                        
+                            <li><a href="/archives/">归档</a></li>
+                        
+                            <li><a href="/tags/">标签</a></li>
+                        
+                            <li><a href="/about/">关于我</a></li>
+                        
+                        </ul>
+                    </nav>
+                    <nav class="header-nav">
+                        <ul class="social">
+                            
+                                <a class="fa Email" href="/ximingchenhust@foxmail.com" title="Email"></a>
+                            
+                                <a class="fa GitHub" href="#" title="GitHub"></a>
+                            
+                        </ul>
+                    </nav>
+                </section>
+                
+                
+                <section class="switch-part switch-part2">
+                    <div class="widget tagcloud" id="js-tagcloud">
+                        <ul class="tag-list"><li class="tag-list-item"><a class="tag-list-link" href="/tags/c/">c</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/docker/">docker</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/filesystem/">filesystem</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/linux/">linux</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/overlayfs/">overlayfs</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/storage/">storage</a></li></ul>
+                    </div>
+                </section>
+                
+                
+                
+                <section class="switch-part switch-part3">
+                    <div id="js-friends">
+                    
+                      <a class="main-nav-link switch-friends-link" href="https://hexo.io">Hexo</a>
+                    
+                      <a class="main-nav-link switch-friends-link" href="https://pages.github.com/">GitHub</a>
+                    
+                      <a class="main-nav-link switch-friends-link" href="http://moxfive.xyz/">MOxFIVE</a>
+                    
+                    </div>
+                </section>
+                
+
+                
+                
+                <section class="switch-part switch-part4">
+                
+                    <div id="js-aboutme">专注于前端</div>
+                </section>
+                
+            </div>
+        </div>
+    </header>                
+</div>
+    </div>
+    <div class="mid-col">
+      <nav id="mobile-nav">
+      <div class="overlay">
+          <div class="slider-trigger"></div>
+          <h1 class="header-author js-mobile-header hide"><a href="/" title="回到主页">Arking</a></h1>
+      </div>
+    <div class="intrude-less">
+        <header id="header" class="inner">
+            <a href="/" class="profilepic">
+                <img src="/img/avatar.png" class="animated zoomIn">
+            </a>
+            <hgroup>
+              <h1 class="header-author"><a href="/" title="回到主页">Arking</a></h1>
+            </hgroup>
+            
+            <nav class="header-menu">
+                <ul>
+                
+                    <li><a href="/">主页</a></li>
+                
+                    <li><a href="/archives/">归档</a></li>
+                
+                    <li><a href="/tags/">标签</a></li>
+                
+                    <li><a href="/about/">关于我</a></li>
+                
+                <div class="clearfix"></div>
+                </ul>
+            </nav>
+            <nav class="header-nav">
+                        <ul class="social">
+                            
+                                <a class="fa Email" target="_blank" href="/ximingchenhust@foxmail.com" title="Email"></a>
+                            
+                                <a class="fa GitHub" target="_blank" href="#" title="GitHub"></a>
+                            
+                        </ul>
+            </nav>
+        </header>                
+    </div>
+    <link class="menu-list" tags="标签" friends="友情链接" about="关于我">
+</nav>
+      <div class="body-wrap"><article id="post-2017-11-10-linux-code-overlayfs-dir-op1" class="article article-type-post" itemscope="" itemprop="blogPost">
+  
+    <div class="article-meta">
+      <a href="/2017/11/10/2017-11-10-linux-code-overlayfs-dir-op1/" class="article-date">
+      <time datetime="2017-11-09T18:51:00.000Z" itemprop="datePublished">2017-11-10</time>
+</a>
+
+
+    </div>
+  
+  <div class="article-inner">
+    
+      <input type="hidden" class="isFancy">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="article-title" itemprop="name">
+      内核OverlayFS—目录搜索
+    </h1>
+  
+
+      </header>
+      
+      <div class="article-info article-info-post">
+        
+    <div class="article-category tagcloud">
+    <a class="article-category-link" href="/categories/Linux内核/">Linux内核</a>
+    </div>
+
+
+        
+    <div class="article-tag tagcloud">
+        <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/filesystem/">filesystem</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/overlayfs/">overlayfs</a></li></ul>
+    </div>
+
+        <div class="clearfix"></div>
+      </div>
+      
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+          
+        <blockquote>
+<p><strong>内核版本4.4.68</strong></p>
+</blockquote>
+<p>在OverlayFS联合挂载目录下，使用命令<code>ls</code>看到的文件实际上来自联合挂载的upper层和lower层。前面的博文中有提到过，OverlayFS的本质在于实现操作转化，因此在对OverlayFS中的一个目录进行搜索时（使用命令<code>ls</code>时），实际上会搜索目录对应upper层和lower层的目录，然后对搜索结果进行处理、展示。最终得到我们在OverlayFS下<code>ls dir</code>看到的内容</p>
+<p>这篇文章就是以OverlayFS根目录为例，分析<code>ls merged</code>时，OverlayFS根目录搜索，处理的过程</p>
+<a id="more"></a>
+<div align="left"> <img src="/img/in-post/post-kernel-overlayfs/mount_tree.png" width="40%" height="40%"> </div>
+
+<p><br></p>
+<h2 id="从系统调用开始"><a href="#从系统调用开始" class="headerlink" title="从系统调用开始"></a>从系统调用开始</h2><p>strace命令可以查看一个命令调用到了哪些系统调用，执行<code>strace ls merged</code>,结果如下：</p>
+<div align="left"> <img src="/img/in-post/post-kernel-overlayfs/dir-op1-strace.png" width="50%" height="50%"> </div>
+
+<p>这里只截取了关键的几个系统调用，openat()打开目录merged，返回相应的描述符。getdents()根据openat()返回的描述符对目录进行搜索。因此，overlayfs中的目录搜索主要完成两件事：</p>
+<ul>
+<li><strong>打开目录</strong></li>
+<li><strong>搜索目录</strong></li>
+</ul>
+<p><br></p>
+<h2 id="打开目录"><a href="#打开目录" class="headerlink" title="打开目录"></a>打开目录</h2><p>通过openat()系统调用进入内核后，会执行下列代码：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">SYSCALL_DEFINE4(openat, <span class="keyword">int</span>, dfd, <span class="keyword">const</span> <span class="keyword">char</span> __user *, filename, <span class="keyword">int</span>, flags,</span><br><span class="line">		<span class="keyword">umode_t</span>, mode)</span><br><span class="line">&#123;</span><br><span class="line">	<span class="keyword">if</span> (force_o_largefile())</span><br><span class="line">		flags |= O_LARGEFILE;</span><br><span class="line"></span><br><span class="line">	<span class="keyword">return</span> do_sys_open(dfd, filename, flags, mode);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>进一步调用do_sys_open():</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">long</span> <span class="title">do_sys_open</span><span class="params">(<span class="keyword">int</span> dfd, <span class="keyword">const</span> <span class="keyword">char</span> __user *filename, <span class="keyword">int</span> flags, <span class="keyword">umode_t</span> mode)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">open_flags</span> <span class="title">op</span>;</span></span><br><span class="line">	<span class="keyword">int</span> fd = build_open_flags(flags, mode, &amp;op);</span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">filename</span> *<span class="title">tmp</span>;</span></span><br><span class="line"></span><br><span class="line">	<span class="keyword">if</span> (fd)</span><br><span class="line">		<span class="keyword">return</span> fd;</span><br><span class="line"></span><br><span class="line">	tmp = getname(filename);<span class="comment">//1.根据filename得到一个对应的struct filename变量</span></span><br><span class="line">	<span class="keyword">if</span> (IS_ERR(tmp))</span><br><span class="line">		<span class="keyword">return</span> PTR_ERR(tmp);</span><br><span class="line"></span><br><span class="line">	fd = get_unused_fd_flags(flags);<span class="comment">//2.获取一个未使用的文件描述符</span></span><br><span class="line">	<span class="keyword">if</span> (fd &gt;= <span class="number">0</span>) &#123;</span><br><span class="line">		<span class="class"><span class="keyword">struct</span> <span class="title">file</span> *<span class="title">f</span> = <span class="title">do_filp_open</span>(<span class="title">dfd</span>, <span class="title">tmp</span>, &amp;<span class="title">op</span>);</span><span class="comment">//3.打开文件</span></span><br><span class="line">		<span class="keyword">if</span> (IS_ERR(f)) &#123;</span><br><span class="line">			put_unused_fd(fd);</span><br><span class="line">			fd = PTR_ERR(f);</span><br><span class="line">		&#125; <span class="keyword">else</span> &#123;</span><br><span class="line">			fsnotify_open(f);</span><br><span class="line">			fd_install(fd, f);</span><br><span class="line">		&#125;</span><br><span class="line">	&#125;</span><br><span class="line">	putname(tmp);</span><br><span class="line">	<span class="keyword">return</span> fd;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>这个函数主要完成3个工作，已经注释在代码块中，重点在第三步，通过调用do_flip_open函数，打开目录merged，并返回一个表示merged的file，后续对merged目录的读取和修改都将使用到这个file：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">struct file *<span class="title">do_filp_open</span><span class="params">(<span class="keyword">int</span> dfd, struct filename *pathname,</span></span></span><br><span class="line"><span class="function"><span class="params">		<span class="keyword">const</span> struct open_flags *op)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">nameidata</span> <span class="title">nd</span>;</span><span class="comment">//1.初始化一个nameidata变量</span></span><br><span class="line">	<span class="keyword">int</span> flags = op-&gt;lookup_flags;</span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">file</span> *<span class="title">filp</span>;</span></span><br><span class="line"></span><br><span class="line">	set_nameidata(&amp;nd, dfd, pathname);<span class="comment">//2.保存查找信息，更新current相应字段</span></span><br><span class="line">	filp = path_openat(&amp;nd, op, flags | LOOKUP_RCU);<span class="comment">//3.路径查找，打开文件</span></span><br><span class="line">	<span class="keyword">if</span> (unlikely(filp == ERR_PTR(-ECHILD)))</span><br><span class="line">		filp = path_openat(&amp;nd, op, flags);</span><br><span class="line">	<span class="keyword">if</span> (unlikely(filp == ERR_PTR(-ESTALE)))</span><br><span class="line">		filp = path_openat(&amp;nd, op, flags | LOOKUP_REVAL);</span><br><span class="line">	restore_nameidata();</span><br><span class="line">	<span class="keyword">return</span> filp;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>为了更多的关注在overlayfs部分，这里不再继续深入函数调用栈。忽略一些错误检查以及复杂路径查询的处理细节，概括性的描述一下该函数完成的操作：</p>
+<ul>
+<li><strong>初始化一个nameidata变量nd</strong><ul>
+<li>这个变量在路径查找中很重要，它记录了查找信息、保存了查找起始路径。在路径的每一个分量的查找中，它会保存当前的结果。对于一般路径名查找，在查找结束时，它会包含查询结果的信息，对于父路径名查找，在查找结束时，它会包含最后一个分量所在目录的信息</li>
+</ul>
+</li>
+<li><strong>调用函数set_nameidata()将查找信息(查找字符串等)保存到nd中，并更新current进程的nameidata字段</strong>；</li>
+<li><strong>调用函数get_empty_filp()得到一个空文件file</strong></li>
+<li><strong>调用函数path_init()初始化nd变量中的路径字段（设置查找起始路径），根据路径设置inode字段</strong>：<ul>
+<li>如果查找字符串以‘/’开头，说明是一个绝对路径，因此根据current进程的fs字段获取root路径并设置nd中的root字段和path字段。如果不是以’/‘开头，说明是一个相对路径，则根据current进程获取当前工作路径并设置nd中的path字段。根据路径中的dentry获取inode并设置nd的inode字段</li>
+</ul>
+</li>
+<li><strong>调用函数link_path_walk()执行路径查找，找到最后一个分量所在的目录，此时最后一个分量还未解析</strong>:<ul>
+<li>通过nd的inode字段检查当前目录的是否具有可执行权限(不然无法遍历)，不具有则返回一个错误。跳过路径字符串开头的’/‘，获取查找字符串下一个’/‘前的字符串，也就是得到当前查找分量字符串。对这个分量字符串执行hash操作，然后存入nd中的last字段。以path字段的dentry为父目录项，根据last字段进行目录项查找(先会查找目录项高速缓存，没有则会通过real_lookup()调用inode的lookup方法从磁盘读取目录)，得到一个和分量字符串对应的目录项。根据这个目录项和父目录下的挂载点更新nd的path路径及inode。重复上述步骤，直到nd的last字段中保存了最后一个分量的信息(此时，最后一个分量还未解析)</li>
+</ul>
+</li>
+<li><strong>调用函数do_last()完成最后路径分量的解析，结果会保存在nd中，使用解析结果填充第3步得到的file中的字段，打开文件</strong>：<ul>
+<li>根据nd的path字段(此时，已经记录了最后一个分量的路径)中的dentry获取文件对应的inode，然后根据inode设置file的字段，其中包括f_op字段，得到文件操作接口。调用file-&gt;f_op-&gt;open()打开文件</li>
+</ul>
+</li>
+</ul>
+<p>到这里，已经得到了表示merged目录（<strong>实际上说是OverlayFS中的/目录更准确</strong>，因为merged是OverlayFS的挂载点，也可以说是安装点，所以路径查找时会做一个转换）的文件file，并且对file执行了open操作。但是open操作到底具体做了什么？回到上面，我们知道open函数是f_op中的一个函数接口，而f_op又由inode的i_fop字段得到，因此i_fop应该在创建内存inode结构时指定，也就是open操作在为OverlayFS根目录创建内存inode结构时确定，在OverlayFS中，内存inode创建由函数ovl_new_inode()完成：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">struct inode *<span class="title">ovl_new_inode</span><span class="params">(struct super_block *sb, <span class="keyword">umode_t</span> mode,</span></span></span><br><span class="line"><span class="function"><span class="params">			    struct ovl_entry *oe)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">inode</span> *<span class="title">inode</span>;</span></span><br><span class="line"></span><br><span class="line">	inode = new_inode(sb);<span class="comment">//在sb下分配一个inode</span></span><br><span class="line">	<span class="keyword">if</span> (!inode)</span><br><span class="line">		<span class="keyword">return</span> <span class="literal">NULL</span>;</span><br><span class="line"></span><br><span class="line">	inode-&gt;i_ino = get_next_ino();<span class="comment">//设置inode号</span></span><br><span class="line">	inode-&gt;i_mode = mode;<span class="comment">//设置mode</span></span><br><span class="line">	inode-&gt;i_flags |= S_NOATIME | S_NOCMTIME;<span class="comment">//设置flag</span></span><br><span class="line"></span><br><span class="line">	mode &amp;= S_IFMT;</span><br><span class="line">	<span class="comment">//根据inode类型设置inode操作</span></span><br><span class="line">	<span class="keyword">switch</span> (mode) &#123;</span><br><span class="line">	<span class="keyword">case</span> S_IFDIR:</span><br><span class="line">		inode-&gt;i_private = oe;</span><br><span class="line">		inode-&gt;i_op = &amp;ovl_dir_inode_operations;</span><br><span class="line">		inode-&gt;i_fop = &amp;ovl_dir_operations;<span class="comment">//设置inode file操作</span></span><br><span class="line">		<span class="keyword">break</span>;</span><br><span class="line"></span><br><span class="line">	<span class="keyword">case</span> S_IFLNK:</span><br><span class="line">		inode-&gt;i_op = &amp;ovl_symlink_inode_operations;</span><br><span class="line">		<span class="keyword">break</span>;</span><br><span class="line"></span><br><span class="line">	<span class="keyword">case</span> S_IFREG:</span><br><span class="line">	<span class="keyword">case</span> S_IFSOCK:</span><br><span class="line">	<span class="keyword">case</span> S_IFBLK:</span><br><span class="line">	<span class="keyword">case</span> S_IFCHR:</span><br><span class="line">	<span class="keyword">case</span> S_IFIFO:</span><br><span class="line">		inode-&gt;i_op = &amp;ovl_file_inode_operations;</span><br><span class="line">		<span class="keyword">break</span>;</span><br><span class="line"></span><br><span class="line">	<span class="keyword">default</span>:</span><br><span class="line">		WARN(<span class="number">1</span>, <span class="string">"illegal file type: %i\n"</span>, mode);</span><br><span class="line">		iput(inode);</span><br><span class="line">		inode = <span class="literal">NULL</span>;</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	<span class="keyword">return</span> inode;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>当创建的inode是一个目录的inode时，指定了i_fop字段，从这里可以知道，OverlayFS中，目录的读写操作，定义在ovl_dir_operations中：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">const</span> <span class="class"><span class="keyword">struct</span> <span class="title">file_operations</span> <span class="title">ovl_dir_operations</span> = &#123;</span></span><br><span class="line">	.read		= generic_read_dir,</span><br><span class="line">	.open		= ovl_dir_open,</span><br><span class="line">	.iterate	= ovl_iterate,</span><br><span class="line">	.llseek		= ovl_dir_llseek,</span><br><span class="line">	.fsync		= ovl_dir_fsync,</span><br><span class="line">	.release	= ovl_dir_release,</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+<p>所以open接口对应的函数为ovl_dir_open():</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">static</span> <span class="keyword">int</span> <span class="title">ovl_dir_open</span><span class="params">(struct inode *inode, struct file *file)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">path</span> <span class="title">realpath</span>;</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">file</span> *<span class="title">realfile</span>;</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">ovl_dir_file</span> *<span class="title">od</span>;</span></span><br><span class="line">	<span class="keyword">enum</span> ovl_path_type type;</span><br><span class="line"></span><br><span class="line">	od = kzalloc(<span class="keyword">sizeof</span>(struct ovl_dir_file), GFP_KERNEL);<span class="comment">//1.分配一个ovl_dir_file变量od</span></span><br><span class="line">	<span class="keyword">if</span> (!od)</span><br><span class="line">		<span class="keyword">return</span> -ENOMEM;</span><br><span class="line"></span><br><span class="line">	type = ovl_path_real(file-&gt;f_path.dentry, &amp;realpath);<span class="comment">//2.获取file路径类型以及真实路径</span></span><br><span class="line">	realfile = ovl_path_open(&amp;realpath, file-&gt;f_flags);<span class="comment">//3.根据路径类型打开真实文件</span></span><br><span class="line">	<span class="keyword">if</span> (IS_ERR(realfile)) &#123;</span><br><span class="line">		kfree(od);</span><br><span class="line">		<span class="keyword">return</span> PTR_ERR(realfile);</span><br><span class="line">	&#125;</span><br><span class="line">	<span class="comment">//4.设置变量od的字段</span></span><br><span class="line">	od-&gt;realfile = realfile;</span><br><span class="line">	od-&gt;is_real = !OVL_TYPE_MERGE(type);</span><br><span class="line">	od-&gt;is_upper = OVL_TYPE_UPPER(type);</span><br><span class="line">	file-&gt;private_data = od;</span><br><span class="line"></span><br><span class="line">	<span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>函数完成的主要操作已经注释在代码中，这里提一下第2步和3步</p>
+<p>所谓真实路径和真实文件，如果一个文件存在upper层，由于OverlayFS的特性，上层会覆盖下层，所以在联合挂载目录merged中，这个文件的真实路径就是对应upper层中文件的路径，真实文件就是upper层中文件的file结构。如果一个文件只存在lower层，则真实路径和真实文件就是lower层中对应文件的路径和file结构。这里file代表的是merged目录，也就是OverlayFS中的根(/)目录，所以实际上对应的upper层的文件是upper目录，因此第3步实际上是获取upper目录对应的file结构并调用file的f_op字段中的open函数(这个函数自然是ext4在为upper目录分配inode时指定)打开upper目录</p>
+<p><strong>总结起来就是，ls命令第一步通过路径查找，获取merged目录(OverlayFS中的/目录)的file内存表示，接着获取根目录的真实文件(upper目录)，打开upper目录。然后在打开操作中分配了一个ovl_dir_file类型的变量，这个变量记录了OverlayFS中一个文件特有的信息，最后设置file的private_data指向这个变量，以便后面利用</strong>：</p>
+<div align="center"> <img src="/img/in-post/post-kernel-overlayfs/dir-op1-open.png" width="50%" height="50%"> </div>
+
+<p><br></p>
+<h2 id="目录搜索"><a href="#目录搜索" class="headerlink" title="目录搜索"></a>目录搜索</h2><p>第一步已经得到了OverlayFS根目录对应的file结构，并且执行打开操作设置了文件系统特有信息，但是并没有描述怎么在该目录下显示出upper和lower层联合挂载的文件，所以这部分应该是由getdents()系统调用实现</p>
+<p>通过系统调用getdents()进入内核后会执行如下代码：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br></pre></td><td class="code"><pre><span class="line">SYSCALL_DEFINE3(getdents, <span class="keyword">unsigned</span> <span class="keyword">int</span>, fd,</span><br><span class="line">		struct linux_dirent __user *, dirent, <span class="keyword">unsigned</span> <span class="keyword">int</span>, count)</span><br><span class="line">&#123;</span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">fd</span> <span class="title">f</span>;</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">linux_dirent</span> __<span class="title">user</span> * <span class="title">lastdirent</span>;</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">getdents_callback</span> <span class="title">buf</span> = &#123;</span></span><br><span class="line">		.ctx.actor = filldir,</span><br><span class="line">		.count = count,</span><br><span class="line">		.current_dir = dirent</span><br><span class="line">	&#125;;</span><br><span class="line">	<span class="keyword">int</span> error;</span><br><span class="line"></span><br><span class="line">	<span class="keyword">if</span> (!access_ok(VERIFY_WRITE, dirent, count))</span><br><span class="line">		<span class="keyword">return</span> -EFAULT;</span><br><span class="line"></span><br><span class="line">	f = fdget(fd);<span class="comment">//1.根据文件描述符号获取fd，里面包含了对应的文件file</span></span><br><span class="line">	<span class="keyword">if</span> (!f.file)</span><br><span class="line">		<span class="keyword">return</span> -EBADF;</span><br><span class="line"></span><br><span class="line">	error = iterate_dir(f.file, &amp;buf.ctx);<span class="comment">//2.目录搜索</span></span><br><span class="line">	<span class="keyword">if</span> (error &gt;= <span class="number">0</span>)</span><br><span class="line">		error = buf.error;</span><br><span class="line">	lastdirent = buf.previous;</span><br><span class="line">	<span class="keyword">if</span> (lastdirent) &#123;</span><br><span class="line">		<span class="keyword">if</span> (put_user(buf.ctx.pos, &amp;lastdirent-&gt;d_off))</span><br><span class="line">			error = -EFAULT;</span><br><span class="line">		<span class="keyword">else</span></span><br><span class="line">			error = count - buf.count;</span><br><span class="line">	&#125;</span><br><span class="line">	fdput(f);</span><br><span class="line">	<span class="keyword">return</span> error;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">fd</span> &#123;</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">file</span> *<span class="title">file</span>;</span></span><br><span class="line">	<span class="keyword">unsigned</span> <span class="keyword">int</span> flags;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+<p>根据传入OverlayFS根(/)目录（后面都用“根目录”表示）的文件描述符参数获取对应的文件file，然后调用iterate_dir()函数执行搜索：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">iterate_dir</span><span class="params">(struct file *file, struct dir_context *ctx)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">inode</span> *<span class="title">inode</span> = <span class="title">file_inode</span>(<span class="title">file</span>);</span><span class="comment">//file-&gt;f_inode，获取file对应的inode号</span></span><br><span class="line">	<span class="keyword">int</span> res = -ENOTDIR;</span><br><span class="line">	<span class="keyword">if</span> (!file-&gt;f_op-&gt;iterate)</span><br><span class="line">		<span class="keyword">goto</span> out;</span><br><span class="line"></span><br><span class="line">	res = security_file_permission(file, MAY_READ);</span><br><span class="line">	<span class="keyword">if</span> (res)</span><br><span class="line">		<span class="keyword">goto</span> out;</span><br><span class="line"></span><br><span class="line">	res = mutex_lock_killable(&amp;inode-&gt;i_mutex);</span><br><span class="line">	<span class="keyword">if</span> (res)</span><br><span class="line">		<span class="keyword">goto</span> out;</span><br><span class="line"></span><br><span class="line">	res = -ENOENT;</span><br><span class="line">	<span class="keyword">if</span> (!IS_DEADDIR(inode)) &#123;</span><br><span class="line">		ctx-&gt;pos = file-&gt;f_pos;<span class="comment">//根据文件读写位置更新上下文的pos字段</span></span><br><span class="line">		res = file-&gt;f_op-&gt;iterate(file, ctx);<span class="comment">//调用f_op中的iterate接口</span></span><br><span class="line">		file-&gt;f_pos = ctx-&gt;pos;<span class="comment">//iterate会更新ctx的pos字段，使用其更新文件的读写位置</span></span><br><span class="line">		fsnotify_access(file);</span><br><span class="line">		file_accessed(file);</span><br><span class="line">	&#125;</span><br><span class="line">	mutex_unlock(&amp;inode-&gt;i_mutex);</span><br><span class="line">out:</span><br><span class="line">	<span class="keyword">return</span> res;</span><br><span class="line">&#125;</span><br><span class="line">EXPORT_SYMBOL(iterate_dir);</span><br></pre></td></tr></table></figure>
+<p>该函数进一步调用file-&gt;f_op中的接口iterate,在前面已经知道，目录文件的f_op操作为ovl_dir_operations，接口iterate对应的函数为ovl_iterate:</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">static</span> <span class="keyword">int</span> <span class="title">ovl_iterate</span><span class="params">(struct file *file, struct dir_context *ctx)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">ovl_dir_file</span> *<span class="title">od</span> = <span class="title">file</span>-&gt;<span class="title">private_data</span>;</span><span class="comment">//获取OverlayFS特有信息</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">dentry</span> *<span class="title">dentry</span> = <span class="title">file</span>-&gt;<span class="title">f_path</span>.<span class="title">dentry</span>;</span><span class="comment">//文件对应的dentry</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">ovl_cache_entry</span> *<span class="title">p</span>;</span></span><br><span class="line"></span><br><span class="line">	<span class="keyword">if</span> (!ctx-&gt;pos)</span><br><span class="line">		ovl_dir_reset(file);</span><br><span class="line"></span><br><span class="line">	<span class="keyword">if</span> (od-&gt;is_real)<span class="comment">//说明不是一个合并目录，当目录只存在upper层或者lower层时条件会成立</span></span><br><span class="line">		<span class="keyword">return</span> iterate_dir(od-&gt;realfile, ctx);</span><br><span class="line"></span><br><span class="line">	<span class="keyword">if</span> (!od-&gt;cache) &#123;<span class="comment">//在前一节我们知道这个字段为NULL,条件成立</span></span><br><span class="line">		<span class="class"><span class="keyword">struct</span> <span class="title">ovl_dir_cache</span> *<span class="title">cache</span>;</span></span><br><span class="line"></span><br><span class="line">		cache = ovl_cache_get(dentry);<span class="comment">//获取得到一个ovl_dir_cache</span></span><br><span class="line">		<span class="keyword">if</span> (IS_ERR(cache))</span><br><span class="line">			<span class="keyword">return</span> PTR_ERR(cache);</span><br><span class="line"></span><br><span class="line">		od-&gt;cache = cache;<span class="comment">//设置od的cache字段为前面得到的cache</span></span><br><span class="line">		ovl_seek_cursor(od, ctx-&gt;pos);<span class="comment">//根据上下文的位置设置od的cursor字段，指向链表对应的位置</span></span><br><span class="line">	&#125;</span><br><span class="line">	</span><br><span class="line">	<span class="comment">//遍历，处理链表的每一项</span></span><br><span class="line">	<span class="keyword">while</span> (od-&gt;cursor != &amp;od-&gt;cache-&gt;entries) &#123;</span><br><span class="line">		p = list_entry(od-&gt;cursor, struct ovl_cache_entry, l_node);</span><br><span class="line">		<span class="keyword">if</span> (!p-&gt;is_whiteout)</span><br><span class="line">			<span class="keyword">if</span> (!dir_emit(ctx, p-&gt;name, p-&gt;len, p-&gt;ino, p-&gt;type))</span><br><span class="line">				<span class="keyword">break</span>;</span><br><span class="line">		od-&gt;cursor = p-&gt;l_node.next;</span><br><span class="line">		ctx-&gt;pos++;</span><br><span class="line">	&#125;</span><br><span class="line">	<span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><strong>因此总的来说，当对OverlayFS中的一个目录进行搜索时，首先通过文件描述符得到file，进一步获得文件的OverlayFS特有信息。然后根据特有信息获取cache，如果cache为NULL，则调用函数ovl_cache_get先获得cache。这个cache中包含一个链表，通过对链表中的每一项进行处理，完成对目录的检索</strong></p>
+<p>所以当对根目录(联合挂载目录)进行检索时，这个链表应该记录了联合挂载目录下每一个文件的信息。分析函数ovl_cache_get()如何获得一个cache:</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">static</span> struct ovl_dir_cache *<span class="title">ovl_cache_get</span><span class="params">(struct dentry *dentry)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">	<span class="keyword">int</span> res;</span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">ovl_dir_cache</span> *<span class="title">cache</span>;</span></span><br><span class="line"></span><br><span class="line">	<span class="comment">//获取dentry目录项特有信息(dentry-&gt;d_fsdata,它指向一个ovl_entry类型的变量)中的cache</span></span><br><span class="line">	cache = ovl_dir_cache(dentry);</span><br><span class="line">	<span class="keyword">if</span> (cache &amp;&amp; ovl_dentry_version_get(dentry) == cache-&gt;version) &#123;<span class="comment">//cache存在并且有效</span></span><br><span class="line">		cache-&gt;refcount++;</span><br><span class="line">		<span class="keyword">return</span> cache;</span><br><span class="line">	&#125;</span><br><span class="line">	ovl_set_dir_cache(dentry, <span class="literal">NULL</span>);<span class="comment">//设置dentry目录项特有信息中的cache为NULL</span></span><br><span class="line"></span><br><span class="line">	cache = kzalloc(<span class="keyword">sizeof</span>(struct ovl_dir_cache), GFP_KERNEL);<span class="comment">//分配一个cache</span></span><br><span class="line">	<span class="keyword">if</span> (!cache)</span><br><span class="line">		<span class="keyword">return</span> ERR_PTR(-ENOMEM);</span><br><span class="line"></span><br><span class="line">	cache-&gt;refcount = <span class="number">1</span>;</span><br><span class="line">	INIT_LIST_HEAD(&amp;cache-&gt;entries);<span class="comment">//初始化链表头</span></span><br><span class="line"></span><br><span class="line">	res = ovl_dir_read_merged(dentry, &amp;cache-&gt;entries);</span><br><span class="line">	<span class="keyword">if</span> (res) &#123;</span><br><span class="line">		ovl_cache_free(&amp;cache-&gt;entries);</span><br><span class="line">		kfree(cache);</span><br><span class="line">		<span class="keyword">return</span> ERR_PTR(res);</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	cache-&gt;version = ovl_dentry_version_get(dentry);</span><br><span class="line">	ovl_set_dir_cache(dentry, cache);<span class="comment">//设置dentry目录项特有信息中的cache</span></span><br><span class="line"></span><br><span class="line">	<span class="keyword">return</span> cache;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>这个函数的参数为OverlayFS根目录的目录项，函数首先通过判断是否能根据这个根目录项检索到cache，如果能并且cache有效则直接返回。如果不能则分配一个，初始化cache中的链表，并且调用函数ovl_dir_read_merged向链表添加节点：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">static</span> <span class="keyword">int</span> <span class="title">ovl_dir_read_merged</span><span class="params">(struct dentry *dentry, struct list_head *<span class="built_in">list</span>)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">	<span class="keyword">int</span> err;</span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">path</span> <span class="title">realpath</span>;</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">ovl_readdir_data</span> <span class="title">rdd</span> = &#123;</span></span><br><span class="line">		.ctx.actor = ovl_fill_merge,</span><br><span class="line">		.<span class="built_in">list</span> = <span class="built_in">list</span>,</span><br><span class="line">		.root = RB_ROOT,</span><br><span class="line">		.is_merge = <span class="literal">false</span>,</span><br><span class="line">	&#125;;</span><br><span class="line">	<span class="keyword">int</span> idx, next;</span><br><span class="line"></span><br><span class="line">	<span class="keyword">for</span> (idx = <span class="number">0</span>; idx != <span class="number">-1</span>; idx = next) &#123;</span><br><span class="line">		next = ovl_path_next(idx, dentry, &amp;realpath);</span><br><span class="line"></span><br><span class="line">		<span class="keyword">if</span> (next != <span class="number">-1</span>) &#123;</span><br><span class="line">			err = ovl_dir_read(&amp;realpath, &amp;rdd);</span><br><span class="line">			<span class="keyword">if</span> (err)</span><br><span class="line">				<span class="keyword">break</span>;</span><br><span class="line">		&#125; <span class="keyword">else</span> &#123;</span><br><span class="line">			<span class="comment">/*</span></span><br><span class="line"><span class="comment">			 * Insert lowest layer entries before upper ones, this</span></span><br><span class="line"><span class="comment">			 * allows offsets to be reasonably constant</span></span><br><span class="line"><span class="comment">			 */</span></span><br><span class="line">			list_add(&amp;rdd.middle, rdd.<span class="built_in">list</span>);</span><br><span class="line">			rdd.is_merge = <span class="literal">true</span>;</span><br><span class="line">			err = ovl_dir_read(&amp;realpath, &amp;rdd);</span><br><span class="line">			list_del(&amp;rdd.middle);</span><br><span class="line">		&#125;</span><br><span class="line">	&#125;</span><br><span class="line">	<span class="keyword">return</span> err;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>这个函数创建一个ovl_readdir_data类型的变量rdd，然后通过一个for循环遍历，获取根目录每一层的路径（在这里实际上就是获取upper目录的路径和lower目录的路径），然后对每一层调用一个ovl_dir_read函数，传入rdd作为参数。由于rdd的list字段指向链表，所以函数ovl_dir_read()实现了每一层向链表中添加节点：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">static</span> <span class="keyword">inline</span> <span class="keyword">int</span> <span class="title">ovl_dir_read</span><span class="params">(struct path *realpath,</span></span></span><br><span class="line"><span class="function"><span class="params">			       struct ovl_readdir_data *rdd)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">file</span> *<span class="title">realfile</span>;</span></span><br><span class="line">	<span class="keyword">int</span> err;</span><br><span class="line"></span><br><span class="line">	realfile = ovl_path_open(realpath, O_RDONLY | O_DIRECTORY);<span class="comment">//通过该层路径获得该层的文件</span></span><br><span class="line">	<span class="keyword">if</span> (IS_ERR(realfile))</span><br><span class="line">		<span class="keyword">return</span> PTR_ERR(realfile);</span><br><span class="line"></span><br><span class="line">	rdd-&gt;first_maybe_whiteout = <span class="literal">NULL</span>;</span><br><span class="line">	rdd-&gt;ctx.pos = <span class="number">0</span>;</span><br><span class="line">	<span class="keyword">do</span> &#123;</span><br><span class="line">		rdd-&gt;count = <span class="number">0</span>;</span><br><span class="line">		rdd-&gt;err = <span class="number">0</span>;</span><br><span class="line">		err = iterate_dir(realfile, &amp;rdd-&gt;ctx);<span class="comment">//转为对该层进行检索</span></span><br><span class="line">		<span class="keyword">if</span> (err &gt;= <span class="number">0</span>)</span><br><span class="line">			err = rdd-&gt;err;</span><br><span class="line">	&#125; <span class="keyword">while</span> (!err &amp;&amp; rdd-&gt;count);</span><br><span class="line"></span><br><span class="line">	<span class="keyword">if</span> (!err &amp;&amp; rdd-&gt;first_maybe_whiteout)</span><br><span class="line">		err = ovl_check_whiteouts(realpath-&gt;dentry, rdd);</span><br><span class="line"></span><br><span class="line">	fput(realfile);</span><br><span class="line"></span><br><span class="line">	<span class="keyword">return</span> err;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>如果你还能大概回忆起这一节开始到这的大概步骤，应该会记得在对OverlayFS根目录(merged目录)检索时，就调用了iterate_dir函数。刚刚我们又提到，函数ovl_dir_read()实现每一层向链表中添加节点。因此这个函数先是得到该层的文件(即upper目录的file，lower目录的file)，然后转为对该层文件进行检索。但是观察本文开头的目录树，实际上upper和lower都是ext4下的目录，调用ext4的目录检索接口为何能修改一个OverlayFS结构中的链表？这就是rdd的用途了，在上一个函数中，设置了rdd-&gt;ctx-&gt;actor为ovl_fill_merge。所以在ext4目录检索的过程中，通过ctx-&gt;actor实现了对OverlayFS中函数的调用，进一步实现向链表中添加节点：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">static</span> <span class="keyword">int</span> <span class="title">ovl_fill_merge</span><span class="params">(struct dir_context *ctx, <span class="keyword">const</span> <span class="keyword">char</span> *name,</span></span></span><br><span class="line"><span class="function"><span class="params">			  <span class="keyword">int</span> namelen, <span class="keyword">loff_t</span> offset, u64 ino,</span></span></span><br><span class="line"><span class="function"><span class="params">			  <span class="keyword">unsigned</span> <span class="keyword">int</span> d_type)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">ovl_readdir_data</span> *<span class="title">rdd</span> =</span></span><br><span class="line"><span class="class">		<span class="title">container_of</span>(<span class="title">ctx</span>, <span class="title">struct</span> <span class="title">ovl_readdir_data</span>, <span class="title">ctx</span>);</span></span><br><span class="line"></span><br><span class="line">	rdd-&gt;count++;</span><br><span class="line">	<span class="keyword">if</span> (!rdd-&gt;is_merge)</span><br><span class="line">		<span class="keyword">return</span> ovl_cache_entry_add_rb(rdd, name, namelen, ino, d_type);</span><br><span class="line">	<span class="keyword">else</span></span><br><span class="line">		<span class="keyword">return</span> ovl_fill_lower(rdd, name, namelen, offset, ino, d_type);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>这个函数的逻辑还是很清晰的，首先根据ctx还原得到rdd，由于能够还原rdd，因此能通过rdd的list字段访问链表。如果不是最后一层，则调用ovl_cache_entry_add_rb()向链表中添加节点，否则调用ovl_fill_lower()添加。需要提一点的是，rdd的root字段指向一颗红黑树的根节点，函数ovl_cache_entry_add_rb()在想链表中添加节点的同时会向红黑树中添加节点，而函数ovl_fill_lower()只会向链表中添加节点。感兴趣可以具体去看看源码，这里就不再细致分析这个添加过程了，直接看图吧：</p>
+<div align="center"> <img src="/img/in-post/post-kernel-overlayfs/dir-op1-iterator.png" width="50%" height="50%"> </div>
+
+<p>联合挂载到merged目录下的每一个文件都有一个对应的ovl_cache_entry。通过l_node字段添加到链表中。通过访问链表，可以还原这个ovl_cache_entry结构，访问文件的大小，inode号，名称等信息</p>
+<p><strong>总的来说，整个搜索过程看似很复杂，其实也很简单。就是围绕着cache和cache中的链表进行。如果没有cache，则分配，然后将检索转化为对每一层的检索。检索过程中借助rdd完成向链表中添加节点</strong></p>
+
+      
+    </div>
+    
+  </div>
+  
+    
+    <div class="copyright">
+        <p><span>本文标题:</span><a href="/2017/11/10/2017-11-10-linux-code-overlayfs-dir-op1/">内核OverlayFS—目录搜索</a></p>
+        <p><span>文章作者:</span><a href="/" title="回到主页">Arking</a></p>
+        <p><span>发布时间:</span>2017-11-10, 02:51:00</p>
+        <p><span>最后更新:</span>2018-12-04, 17:46:01</p>
+        <p>
+            <span>原始链接:</span><a class="post-url" href="/2017/11/10/2017-11-10-linux-code-overlayfs-dir-op1/" title="内核OverlayFS—目录搜索">http://yoursite.com/2017/11/10/2017-11-10-linux-code-overlayfs-dir-op1/</a>
+            <span class="copy-path" data-clipboard-text="原文: http://yoursite.com/2017/11/10/2017-11-10-linux-code-overlayfs-dir-op1/　　作者: Arking" title="点击复制文章链接"><i class="fa fa-clipboard"></i></span>
+            <script> var clipboard = new Clipboard('.copy-path'); </script>
+        </p>
+        <p>
+            <span>许可协议:</span><i class="fa fa-creative-commons"></i> <a rel="license" href="http://creativecommons.org/licenses/by-nc-sa/4.0/" title="CC BY-NC-SA 4.0 International" target="_blank">"署名-非商用-相同方式共享 4.0"</a> 转载请保留原文链接及作者。
+        </p>
+    </div>
+
+
+
+    <nav id="article-nav">
+        
+            <div id="article-nav-newer" class="article-nav-title">
+                <a href="/2017/11/30/2017-11-30-linux-du/">
+                     Linux查看目录大小
+                </a>
+            </div>
+        
+        
+            <div id="article-nav-older" class="article-nav-title">
+                <a href="/2017/10/12/2017-10-12-linux-code-overlayfs-mnt/">
+                    内核OverlayFS—注册与挂载
+                </a>
+            </div>
+        
+    </nav>
+
+  
+</article>
+
+    <div id="toc" class="toc-article">
+        <strong class="toc-title">文章目录</strong>
+        
+            <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#从系统调用开始"><span class="toc-number">1.</span> <span class="toc-text">从系统调用开始</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#打开目录"><span class="toc-number">2.</span> <span class="toc-text">打开目录</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#目录搜索"><span class="toc-number">3.</span> <span class="toc-text">目录搜索</span></a></li></ol>
+        
+    </div>
+    <style>
+        .left-col .switch-btn,
+        .left-col .switch-area {
+            display: none;
+        }
+        .toc-level-3 i,
+        .toc-level-3 ol {
+            display: none !important;
+        }
+    </style>
+
+    <input type="button" id="tocButton" value="隐藏目录" title="点击按钮隐藏或者显示文章目录">
+
+    <script>
+        yiliaConfig.toc = ["隐藏目录", "显示目录", !!"false"];
+    </script>
+
+
+
+    
+<div class="share">
+    
+        <div class="bdsharebuttonbox">
+            <a href="#" class="fa fa-twitter bds_twi" data-cmd="twi" title="分享到推特"></a>
+            <a href="#" class="fa fa-weibo bds_tsina" data-cmd="tsina" title="分享到新浪微博"></a>
+            <a href="#" class="fa fa-qq bds_sqq" data-cmd="sqq" title="分享给 QQ 好友"></a>
+            <a href="#" class="fa fa-files-o bds_copy" data-cmd="copy" title="复制网址"></a>
+            <a href="#" class="fa fa fa-envelope-o bds_mail" data-cmd="mail" title="通过邮件分享"></a>
+            <a href="#" class="fa fa-weixin bds_weixin" data-cmd="weixin" title="生成文章二维码"></a>
+            <a href="#" class="fa fa-share-alt bds_more" data-cmd="more"></a>
+        </div>
+        <script>
+            window._bd_share_config={
+                "common":{"bdSnsKey":{},"bdText":"内核OverlayFS—目录搜索　| Hexo　","bdMini":"2","bdMiniList":false,"bdPic":"","bdStyle":"0","bdSize":"24"},"share":{}};with(document)0[(getElementsByTagName('head')[0]||body).appendChild(createElement('script')).src='http://bdimg.share.baidu.com/static/api/js/share.js?v=89860593.js?cdnversion='+~(-new Date()/36e5)];
+        </script>
+    
+
+    
+</div>
+
+
+
+
+
+
+
+    
+
+
+
+
+    <div class="scroll" id="post-nav-button">
+        
+            <a href="/2017/11/30/2017-11-30-linux-du/" title="上一篇:  Linux查看目录大小">
+                <i class="fa fa-angle-left"></i>
+            </a>
+        
+
+        <a title="文章列表"><i class="fa fa-bars"></i><i class="fa fa-times"></i></a>
+
+        
+            <a href="/2017/10/12/2017-10-12-linux-code-overlayfs-mnt/" title="下一篇: 内核OverlayFS—注册与挂载">
+                <i class="fa fa-angle-right"></i>
+            </a>
+        
+    </div>
+
+    <ul class="post-list"><li class="post-list-item"><a class="post-list-link" href="/2018/09/05/2018-09-05-linux-kernel/">Ubuntu下内核与内核模块的编译过程</a></li><li class="post-list-item"><a class="post-list-link" href="/2018/01/19/2018-01-19-docker-imagestore/"> Docker源码分析—镜像存储 </a></li><li class="post-list-item"><a class="post-list-link" href="/2018/01/15/2018-01-15-docker-storage-overlay2/"> Docker源码分析—存储驱动 </a></li><li class="post-list-item"><a class="post-list-link" href="/2018/01/14/2018-01-14-docker-layerstore/"> Docker源码分析—层存储 </a></li><li class="post-list-item"><a class="post-list-link" href="/2018/01/12/2018-01-10-c-stack_frame/"> C函数栈帧 </a></li><li class="post-list-item"><a class="post-list-link" href="/2017/12/26/2017-12-26-linux-code-overlayfs-read_write/">内核OverlayFS—文件读写</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/12/22/2017-12-22-linux-code-overlayfs-create_delete/">内核OverlayFS—创建与删除文件</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/11/30/2017-11-30-linux-du/"> Linux查看目录大小</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/11/10/2017-11-10-linux-code-overlayfs-dir-op1/">内核OverlayFS—目录搜索</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/10/12/2017-10-12-linux-code-overlayfs-mnt/">内核OverlayFS—注册与挂载</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/09/20/2017-09-20-linux-code-overlayfs-layerinfo/">内核OverlayFS—文件层次信息</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/08/18/2017-08-18-linux-code-vfs/">Linux虚拟文件系统(VFS)</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/05/05/2017-05-05-docker-filesystem-overlay/"> Docker存储驱动—Overlay/Overlay2「译」</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/04/13/2017-04-13-docker-filesystem-aufs/"> Docker存储驱动—Aufs </a></li><li class="post-list-item"><a class="post-list-link" href="/2017/04/09/2017-04-09-linux-uuid/"> Linux存储设备的UUID</a></li></ul>
+
+
+
+
+    <script>
+        
+    </script>
+</div>
+      <footer id="footer">
+    <div class="outer">
+        <div id="footer-info">
+            <div class="footer-left">
+                <i class="fa fa-copyright"></i> 
+                2017-2018 Arking
+            </div>
+            <div class="footer-right">
+                <a href="http://hexo.io/" target="_blank" title="快速、简洁且高效的博客框架">Hexo</a>  Theme <a href="https://github.com/MOxFIVE/hexo-theme-yelee" target="_blank" title="简而不减 Hexo 双栏博客主题  v3.5">Yelee</a> by MOxFIVE <i class="fa fa-heart animated infinite pulse"></i>
+            </div>
+        </div>
+        
+            <div class="visit">
+                
+                    <span id="busuanzi_container_site_pv" style="display:none">
+                        <span id="site-visit" title="本站到访数"><i class="fa fa-user" aria-hidden="true"></i><span id="busuanzi_value_site_uv"></span>
+                        </span>
+                    </span>
+                
+                
+                    <span>| </span>
+                
+                
+                    <span id="busuanzi_container_page_pv" style="display:none">
+                        <span id="page-visit" title="本页阅读量"><i class="fa fa-eye animated infinite pulse" aria-hidden="true"></i><span id="busuanzi_value_page_pv"></span>
+                        </span>
+                    </span>
+                
+            </div>
+        
+    </div>
+</footer>
+    </div>
+    
+<script data-main="/js/main.js" src="//cdn.bootcss.com/require.js/2.2.0/require.min.js"></script>
+
+    <script>
+        $(document).ready(function() {
+            var iPad = window.navigator.userAgent.indexOf('iPad');
+            if (iPad > -1 || $(".left-col").css("display") === "none") {
+                var bgColorList = ["#9db3f4", "#414141", "#e5a859", "#f5dfc6", "#c084a0", "#847e72", "#cd8390", "#996731"];
+                var bgColor = Math.ceil(Math.random() * (bgColorList.length - 1));
+                $("body").css({"background-color": bgColorList[bgColor], "background-size": "cover"});
+            }
+            else {
+                var backgroundnum = 5;
+                var backgroundimg = "url(/background/bg-x.jpg)".replace(/x/gi, Math.ceil(Math.random() * backgroundnum));
+                $("body").css({"background": backgroundimg, "background-attachment": "fixed", "background-size": "cover"});
+            }
+        })
+    </script>
+
+
+
+
+
+<div class="scroll" id="scroll">
+    <a href="#" title="返回顶部"><i class="fa fa-arrow-up"></i></a>
+    <a href="#comments" onclick="load$hide();" title="查看评论"><i class="fa fa-comments-o"></i></a>
+    <a href="#footer" title="转到底部"><i class="fa fa-arrow-down"></i></a>
+</div>
+<script>
+    // Open in New Window
+    
+        var oOpenInNew = {
+            
+            
+            
+            
+            
+            
+             archives: ".archive-article-title", 
+             miniArchives: "a.post-list-link", 
+            
+             friends: "#js-friends a", 
+             socail: ".social a" 
+        }
+        for (var x in oOpenInNew) {
+            $(oOpenInNew[x]).attr("target", "_blank");
+        }
+    
+</script>
+
+<script async src="https://dn-lbstatics.qbox.me/busuanzi/2.3/busuanzi.pure.mini.js">
+</script>
+  </div>
+</body>
+</html>

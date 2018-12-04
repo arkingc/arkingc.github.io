@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html>
+<head><meta name="generator" content="Hexo 3.8.0">
+
+    <!--[if lt IE 9]>
+        <style>body {display: none; background: none !important} </style>
+        <meta http-equiv="Refresh" Content="0; url=//outdatedbrowser.com/" />
+    <![endif]-->
+
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge, chrome=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="format-detection" content="telephone=no">
+<meta name="author" content="Arking">
+
+
+
+<meta name="description" content="一个可执行C程序由一系列二进制码组成，程序代码会被翻译成由二进制组成的机器指令。程序执行时，CPU取出程序指令执行，寄存器用于程序中变量数据的交换以及算术运算。由于寄存器数量等因素，程序执行过程中产生的数据（如变量）不会一直保存在寄存器中，变量和寄存器状态等会被保存在为函数分配的一个栈空间中，这个为函数分配的内存空间，就称为栈帧 栈帧可以加深对C中函数调用与返回的理解，了解函数的栈帧也有利于对C中">
+<meta name="keywords" content="c">
+<meta property="og:type" content="article">
+<meta property="og:title" content=" C函数栈帧 ">
+<meta property="og:url" content="http://yoursite.com/2018/01/12/2018-01-10-c-stack_frame/index.html">
+<meta property="og:site_name" content="Hexo">
+<meta property="og:description" content="一个可执行C程序由一系列二进制码组成，程序代码会被翻译成由二进制组成的机器指令。程序执行时，CPU取出程序指令执行，寄存器用于程序中变量数据的交换以及算术运算。由于寄存器数量等因素，程序执行过程中产生的数据（如变量）不会一直保存在寄存器中，变量和寄存器状态等会被保存在为函数分配的一个栈空间中，这个为函数分配的内存空间，就称为栈帧 栈帧可以加深对C中函数调用与返回的理解，了解函数的栈帧也有利于对C中">
+<meta property="og:locale" content="default">
+<meta property="og:image" content="http://yoursite.com/img/in-post/post-c-stackframe/stack_frame.png">
+<meta property="og:image" content="http://yoursite.com/img/in-post/post-c-stackframe/step_1.png">
+<meta property="og:image" content="http://yoursite.com/img/in-post/post-c-stackframe/step_2.png">
+<meta property="og:image" content="http://yoursite.com/img/in-post/post-c-stackframe/step_3.png">
+<meta property="og:image" content="http://yoursite.com/img/in-post/post-c-stackframe/step_4.png">
+<meta property="og:image" content="http://yoursite.com/img/in-post/post-c-stackframe/step_5.png">
+<meta property="og:image" content="http://yoursite.com/img/in-post/post-c-stackframe/step_6.png">
+<meta property="og:image" content="http://yoursite.com/img/in-post/post-c-stackframe/step_7.png">
+<meta property="og:image" content="http://yoursite.com/img/in-post/post-c-stackframe/step_8.png">
+<meta property="og:image" content="http://yoursite.com/img/in-post/post-c-stackframe/step_9.png">
+<meta property="og:updated_time" content="2018-12-04T12:21:52.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content=" C函数栈帧 ">
+<meta name="twitter:description" content="一个可执行C程序由一系列二进制码组成，程序代码会被翻译成由二进制组成的机器指令。程序执行时，CPU取出程序指令执行，寄存器用于程序中变量数据的交换以及算术运算。由于寄存器数量等因素，程序执行过程中产生的数据（如变量）不会一直保存在寄存器中，变量和寄存器状态等会被保存在为函数分配的一个栈空间中，这个为函数分配的内存空间，就称为栈帧 栈帧可以加深对C中函数调用与返回的理解，了解函数的栈帧也有利于对C中">
+<meta name="twitter:image" content="http://yoursite.com/img/in-post/post-c-stackframe/stack_frame.png">
+
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+
+
+    <link rel="alternate" href="/atom.xml" title="Hexo" type="application/atom+xml">
+
+
+
+    <link rel="shortcut icon" href="/favicon.png">
+
+
+
+    <link href="//cdn.bootcss.com/animate.css/3.5.1/animate.min.css" rel="stylesheet">
+
+
+
+    <link href="//cdn.bootcss.com/fancybox/2.1.5/jquery.fancybox.min.css" rel="stylesheet">
+
+
+
+    <script src="//cdn.bootcss.com/pace/1.0.2/pace.min.js"></script>
+    <link href="//cdn.bootcss.com/pace/1.0.2/themes/blue/pace-theme-minimal.css" rel="stylesheet">
+
+
+<link rel="stylesheet" href="/css/style.css">
+
+
+
+<link href="//cdn.bootcss.com/font-awesome/4.6.3/css/font-awesome.min.css" rel="stylesheet">
+
+
+<title> C函数栈帧  | Hexo</title>
+
+<script src="//cdn.bootcss.com/jquery/2.2.4/jquery.min.js"></script>
+<script src="//cdn.bootcss.com/clipboard.js/1.5.10/clipboard.min.js"></script>
+
+<script>
+    var yiliaConfig = {
+        fancybox: true,
+        animate: true,
+        isHome: false,
+        isPost: true,
+        isArchive: false,
+        isTag: false,
+        isCategory: false,
+        fancybox_js: "//cdn.bootcss.com/fancybox/2.1.5/jquery.fancybox.min.js",
+        scrollreveal: "//cdn.bootcss.com/scrollReveal.js/3.1.4/scrollreveal.min.js",
+        search: false
+    }
+</script>
+
+
+    <script> yiliaConfig.jquery_ui = [false]; </script>
+
+
+
+    <script> yiliaConfig.rootUrl = "\/";</script>
+
+
+
+
+
+
+</head></html>
+<body>
+  <div id="container">
+    <div class="left-col">
+    <div class="overlay"></div>
+<div class="intrude-less">
+    <header id="header" class="inner">
+        <a href="/" class="profilepic">
+            <img src="/img/avatar.png" class="animated zoomIn">
+        </a>
+        <hgroup>
+          <h1 class="header-author"><a href="/">Arking</a></h1>
+        </hgroup>
+
+        
+
+        
+
+
+        
+            <div id="switch-btn" class="switch-btn">
+                <div class="icon">
+                    <div class="icon-ctn">
+                        <div class="icon-wrap icon-house" data-idx="0">
+                            <div class="birdhouse"></div>
+                            <div class="birdhouse_holes"></div>
+                        </div>
+                        <div class="icon-wrap icon-ribbon hide" data-idx="1">
+                            <div class="ribbon"></div>
+                        </div>
+                        
+                        <div class="icon-wrap icon-link hide" data-idx="2">
+                            <div class="loopback_l"></div>
+                            <div class="loopback_r"></div>
+                        </div>
+                        
+                        
+                        <div class="icon-wrap icon-me hide" data-idx="3">
+                            <div class="user"></div>
+                            <div class="shoulder"></div>
+                        </div>
+                        
+                    </div>
+                    
+                </div>
+                <div class="tips-box hide">
+                    <div class="tips-arrow"></div>
+                    <ul class="tips-inner">
+                        <li>菜单</li>
+                        <li>标签</li>
+                        
+                        <li>友情链接</li>
+                        
+                        
+                        <li>关于我</li>
+                        
+                    </ul>
+                </div>
+            </div>
+        
+
+        <div id="switch-area" class="switch-area">
+            <div class="switch-wrap">
+                <section class="switch-part switch-part1">
+                    <nav class="header-menu">
+                        <ul>
+                        
+                            <li><a href="/">主页</a></li>
+                        
+                            <li><a href="/archives/">归档</a></li>
+                        
+                            <li><a href="/tags/">标签</a></li>
+                        
+                            <li><a href="/about/">关于我</a></li>
+                        
+                        </ul>
+                    </nav>
+                    <nav class="header-nav">
+                        <ul class="social">
+                            
+                                <a class="fa Email" href="/ximingchenhust@foxmail.com" title="Email"></a>
+                            
+                                <a class="fa GitHub" href="#" title="GitHub"></a>
+                            
+                        </ul>
+                    </nav>
+                </section>
+                
+                
+                <section class="switch-part switch-part2">
+                    <div class="widget tagcloud" id="js-tagcloud">
+                        <ul class="tag-list"><li class="tag-list-item"><a class="tag-list-link" href="/tags/c/">c</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/docker/">docker</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/filesystem/">filesystem</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/linux/">linux</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/overlayfs/">overlayfs</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/storage/">storage</a></li></ul>
+                    </div>
+                </section>
+                
+                
+                
+                <section class="switch-part switch-part3">
+                    <div id="js-friends">
+                    
+                      <a class="main-nav-link switch-friends-link" href="https://hexo.io">Hexo</a>
+                    
+                      <a class="main-nav-link switch-friends-link" href="https://pages.github.com/">GitHub</a>
+                    
+                      <a class="main-nav-link switch-friends-link" href="http://moxfive.xyz/">MOxFIVE</a>
+                    
+                    </div>
+                </section>
+                
+
+                
+                
+                <section class="switch-part switch-part4">
+                
+                    <div id="js-aboutme">专注于前端</div>
+                </section>
+                
+            </div>
+        </div>
+    </header>                
+</div>
+    </div>
+    <div class="mid-col">
+      <nav id="mobile-nav">
+      <div class="overlay">
+          <div class="slider-trigger"></div>
+          <h1 class="header-author js-mobile-header hide"><a href="/" title="回到主页">Arking</a></h1>
+      </div>
+    <div class="intrude-less">
+        <header id="header" class="inner">
+            <a href="/" class="profilepic">
+                <img src="/img/avatar.png" class="animated zoomIn">
+            </a>
+            <hgroup>
+              <h1 class="header-author"><a href="/" title="回到主页">Arking</a></h1>
+            </hgroup>
+            
+            <nav class="header-menu">
+                <ul>
+                
+                    <li><a href="/">主页</a></li>
+                
+                    <li><a href="/archives/">归档</a></li>
+                
+                    <li><a href="/tags/">标签</a></li>
+                
+                    <li><a href="/about/">关于我</a></li>
+                
+                <div class="clearfix"></div>
+                </ul>
+            </nav>
+            <nav class="header-nav">
+                        <ul class="social">
+                            
+                                <a class="fa Email" target="_blank" href="/ximingchenhust@foxmail.com" title="Email"></a>
+                            
+                                <a class="fa GitHub" target="_blank" href="#" title="GitHub"></a>
+                            
+                        </ul>
+            </nav>
+        </header>                
+    </div>
+    <link class="menu-list" tags="标签" friends="友情链接" about="关于我">
+</nav>
+      <div class="body-wrap"><article id="post-2018-01-10-c-stack_frame" class="article article-type-post" itemscope="" itemprop="blogPost">
+  
+    <div class="article-meta">
+      <a href="/2018/01/12/2018-01-10-c-stack_frame/" class="article-date">
+      <time datetime="2018-01-11T18:57:00.000Z" itemprop="datePublished">2018-01-12</time>
+</a>
+
+
+    </div>
+  
+  <div class="article-inner">
+    
+      <input type="hidden" class="isFancy">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="article-title" itemprop="name">
+       C函数栈帧 
+    </h1>
+  
+
+      </header>
+      
+      <div class="article-info article-info-post">
+        
+    <div class="article-category tagcloud">
+    <a class="article-category-link" href="/categories/编程语言/">编程语言</a>
+    </div>
+
+
+        
+    <div class="article-tag tagcloud">
+        <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/c/">c</a></li></ul>
+    </div>
+
+        <div class="clearfix"></div>
+      </div>
+      
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+          
+        <p>一个可执行C程序由一系列二进制码组成，程序代码会被翻译成由二进制组成的机器指令。程序执行时，CPU取出程序指令执行，寄存器用于程序中变量数据的交换以及算术运算。由于寄存器数量等因素，程序执行过程中产生的数据（如变量）不会一直保存在寄存器中，变量和寄存器状态等会被保存在为函数分配的一个栈空间中，这个为函数分配的内存空间，就称为栈帧</p>
+<p>栈帧可以加深对C中函数调用与返回的理解，了解函数的栈帧也有利于对C中一些问题进行更深入的思考：</p>
+<ul>
+<li>函数参数的传递过程</li>
+<li>局部变量的生命周期</li>
+<li>为什么应该将一些经常调用到的简短的函数定义为内敛函数</li>
+<li>…</li>
+</ul>
+<p>这篇文章使用VC++ 6.0对一个错误的swap函数进行调试，分析其栈帧结构，并解释错误的原因</p>
+<a id="more"></a>
+<p>程序代码如下：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="meta-keyword">include</span> <span class="meta-string">&lt;stdio.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">swap</span><span class="params">(<span class="keyword">int</span> x,<span class="keyword">int</span> y)</span></span>;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span><span class="params">()</span></span>&#123;</span><br><span class="line">	<span class="keyword">int</span> a = <span class="number">100</span>;</span><br><span class="line">	<span class="keyword">int</span> b = <span class="number">200</span>;</span><br><span class="line">	swap(a,b);</span><br><span class="line">	<span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">void</span>  <span class="title">swap</span><span class="params">(<span class="keyword">int</span> x,<span class="keyword">int</span> y)</span></span>&#123;</span><br><span class="line">	<span class="keyword">int</span> tmp = x;</span><br><span class="line">	x = y;</span><br><span class="line">	y = tmp;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><br></p>
+<h2 id="函数的栈帧结构"><a href="#函数的栈帧结构" class="headerlink" title="函数的栈帧结构"></a>函数的栈帧结构</h2><p>两个重要的寄存器：</p>
+<ul>
+<li>ebp：保存当前栈帧的栈底地址</li>
+<li>esp：保存当前栈帧的栈顶地址</li>
+</ul>
+<p>下图是一个典型的函数栈帧结构：</p>
+<div align="left"> <img src="/img/in-post/post-c-stackframe/stack_frame.png" width="40%" height="40%"> </div>
+
+<p>用swap程序来进行说明：</p>
+<ul>
+<li>函数main作为主调函数，定义了a，b两个变量，保存在主调函数的局部变量区</li>
+<li>在调用swap函数前，会进行值传递，将形参x，y和返回地址压入栈顶</li>
+<li>然后保存旧ebp，修改ebp和esp，为函数swap分配栈帧空间</li>
+<li>为swap函数中的局部变量tmp赋值，并存入函数swap栈帧的局部变量区</li>
+<li>交换形参的值</li>
+<li>函数返回时进行一系列操作，恢复主调函数栈帧，从返回地址处取指，继续执行</li>
+</ul>
+<p>因此从上述操作步骤中可以知道，由于函数swap交换的是形参x，y的值，因此并没有修改main函数栈帧空间中局部变量a，b的值，所以a，b还是原来的值</p>
+<p>对于内联函数，由于缺少函数调用过程中的栈帧初始化等操作，加上函数的指令地址空间相邻，更有利于局部性，因此通常效率更高</p>
+<p>下面在VC++ 6.0中调试，验证swap程序的栈帧操作</p>
+<p><br></p>
+<h2 id="函数调用"><a href="#函数调用" class="headerlink" title="函数调用"></a>函数调用</h2><p>函数被调用时，执行如下步骤：</p>
+<ul>
+<li>将参数压栈</li>
+<li>将返回地址压栈</li>
+<li>将ebp压栈</li>
+<li>将ebp设置为与esp相等</li>
+<li>减小esp的地址为函数分配栈帧，并清理局部变量区</li>
+</ul>
+<p>执行main中第一行代码之前，通过观察寄存器发现当前main函数的栈底地址是0x0018FF48，栈顶地址为0x0018FEF4</p>
+<p><img src="/img/in-post/post-c-stackframe/step_1.png" alt=""></p>
+<p>局部变量的定义由两条指令完成：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">mov dword ptr [ebp-4],64h</span><br><span class="line">mov dword ptr [ebp-8],0c8h</span><br></pre></td></tr></table></figure>
+<p>所以在执行完a,b的定义后，可以看到地址0x0018FF44和地址0x0018FF40中数据的变化：</p>
+<p><img src="/img/in-post/post-c-stackframe/step_2.png" alt=""></p>
+<p>接下来即将调用swap函数，在调用swap函数之前，首先会将实参a，b的值传给形参x，y。然后将形参x，y压栈，数据传输过程用到了eax和ecx两个寄存器：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">mov eax,dword ptr [ebp-8]</span><br><span class="line">push eax</span><br><span class="line">mov ecx,dword ptr [ebp-4]</span><br><span class="line">push ecx</span><br></pre></td></tr></table></figure>
+<p>注意，由于压栈操作，esp的值也会变化：</p>
+<p><img src="/img/in-post/post-c-stackframe/step_3.png" alt=""></p>
+<p>下一条指令会调用swap函数，执行指令后，会将返回地址0x0040B7B3（即main函数中swap函数返回后下一条指令的地址）压入栈中：</p>
+<p><img src="/img/in-post/post-c-stackframe/step_4.png" alt=""></p>
+<p>在swap函数的第一行代码执行之前，会执行一系列指令为函数swap分配栈帧空间：</p>
+<p>首先是保存旧ebp的值（以便函数返回后恢复），然后更新ebp的值为当前栈顶esp的值，也就是将当前栈顶变为新的栈底。减小esp的值使当前栈顶指向更低的地址，从而为函数swap分配出了一个栈帧空间：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">push ebp </span><br><span class="line">mov ebp,esp</span><br><span class="line">sub esp,44h</span><br></pre></td></tr></table></figure>
+<p>接着，保存三个寄存器的值：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">push ebx</span><br><span class="line">push esi</span><br><span class="line">push edi</span><br></pre></td></tr></table></figure>
+<p>得到了函数swap的栈帧：</p>
+<p><img src="/img/in-post/post-c-stackframe/step_5.png" alt=""></p>
+<p>最后，通过4条指令清理函数swap栈帧的局部变量区：</p>
+<p><img src="/img/in-post/post-c-stackframe/step_6.png" alt=""></p>
+<p>函数swap首先将形参x的值传入eax，然后将eax的值保存到swap栈帧的局部变量区，完成局部变量tmp的定义：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">mov eax,dword ptr [ebp+8]</span><br><span class="line">mov dword ptr [ebp-4],eax</span><br></pre></td></tr></table></figure>
+<p>然后，通过下面4条指令交换形参x，y的值：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">mov ecx,dword ptr [ebp+0Ch]</span><br><span class="line">mov dword ptr [ebp+8],ecx</span><br><span class="line">mov edx,dword ptr [ebp-4]</span><br><span class="line">mov dword ptr [ebp+0ch],edx</span><br></pre></td></tr></table></figure>
+<p>最后结果如下：</p>
+<p><img src="/img/in-post/post-c-stackframe/step_7.png" alt=""></p>
+<p>所以，swap函数实际上交换的是形参x，y的值，对main函数中a，b的值并没有改动</p>
+<p><br></p>
+<h2 id="函数返回"><a href="#函数返回" class="headerlink" title="函数返回"></a>函数返回</h2><p>函数返回时，会执行如下操作：</p>
+<ul>
+<li>弹出为寄存器保存的值</li>
+<li>设置esp等于ebp</li>
+<li>从栈中弹出旧ebp的值，并将ebp设置为弹出的旧值</li>
+<li>弹出返回地址</li>
+</ul>
+<p>函数swap执行完后，在ret前，需要恢复main函数的栈帧：</p>
+<p>首先会弹出保存在栈中的3个寄存器的值：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">pop edi</span><br><span class="line">pop esi</span><br><span class="line">pop ebx</span><br></pre></td></tr></table></figure>
+<p>然后将栈顶更新为栈底，弹出保存的旧ebp的值到ebp中，使栈底变为原来main函数的栈底：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">mov esp,ebp</span><br><span class="line">pop ebp</span><br></pre></td></tr></table></figure>
+<p>现在栈帧恢复成了原来main函数的栈帧：</p>
+<p><img src="/img/in-post/post-c-stackframe/step_8.png" alt=""></p>
+<p>最后一步，将原来main函数中，调用swap函数的下一条指令的地址从栈顶取出，使程序接着swap函数返回后执行：</p>
+<p><img src="/img/in-post/post-c-stackframe/step_9.png" alt=""></p>
+
+      
+    </div>
+    
+  </div>
+  
+    
+    <div class="copyright">
+        <p><span>本文标题:</span><a href="/2018/01/12/2018-01-10-c-stack_frame/"> C函数栈帧 </a></p>
+        <p><span>文章作者:</span><a href="/" title="回到主页">Arking</a></p>
+        <p><span>发布时间:</span>2018-01-12, 02:57:00</p>
+        <p><span>最后更新:</span>2018-12-04, 20:21:52</p>
+        <p>
+            <span>原始链接:</span><a class="post-url" href="/2018/01/12/2018-01-10-c-stack_frame/" title=" C函数栈帧 ">http://yoursite.com/2018/01/12/2018-01-10-c-stack_frame/</a>
+            <span class="copy-path" data-clipboard-text="原文: http://yoursite.com/2018/01/12/2018-01-10-c-stack_frame/　　作者: Arking" title="点击复制文章链接"><i class="fa fa-clipboard"></i></span>
+            <script> var clipboard = new Clipboard('.copy-path'); </script>
+        </p>
+        <p>
+            <span>许可协议:</span><i class="fa fa-creative-commons"></i> <a rel="license" href="http://creativecommons.org/licenses/by-nc-sa/4.0/" title="CC BY-NC-SA 4.0 International" target="_blank">"署名-非商用-相同方式共享 4.0"</a> 转载请保留原文链接及作者。
+        </p>
+    </div>
+
+
+
+    <nav id="article-nav">
+        
+            <div id="article-nav-newer" class="article-nav-title">
+                <a href="/2018/01/14/2018-01-14-docker-layerstore/">
+                     Docker源码分析—层存储 
+                </a>
+            </div>
+        
+        
+            <div id="article-nav-older" class="article-nav-title">
+                <a href="/2017/12/26/2017-12-26-linux-code-overlayfs-read_write/">
+                    内核OverlayFS—文件读写
+                </a>
+            </div>
+        
+    </nav>
+
+  
+</article>
+
+    <div id="toc" class="toc-article">
+        <strong class="toc-title">文章目录</strong>
+        
+            <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#函数的栈帧结构"><span class="toc-number">1.</span> <span class="toc-text">函数的栈帧结构</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#函数调用"><span class="toc-number">2.</span> <span class="toc-text">函数调用</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#函数返回"><span class="toc-number">3.</span> <span class="toc-text">函数返回</span></a></li></ol>
+        
+    </div>
+    <style>
+        .left-col .switch-btn,
+        .left-col .switch-area {
+            display: none;
+        }
+        .toc-level-3 i,
+        .toc-level-3 ol {
+            display: none !important;
+        }
+    </style>
+
+    <input type="button" id="tocButton" value="隐藏目录" title="点击按钮隐藏或者显示文章目录">
+
+    <script>
+        yiliaConfig.toc = ["隐藏目录", "显示目录", !!"false"];
+    </script>
+
+
+
+    
+<div class="share">
+    
+        <div class="bdsharebuttonbox">
+            <a href="#" class="fa fa-twitter bds_twi" data-cmd="twi" title="分享到推特"></a>
+            <a href="#" class="fa fa-weibo bds_tsina" data-cmd="tsina" title="分享到新浪微博"></a>
+            <a href="#" class="fa fa-qq bds_sqq" data-cmd="sqq" title="分享给 QQ 好友"></a>
+            <a href="#" class="fa fa-files-o bds_copy" data-cmd="copy" title="复制网址"></a>
+            <a href="#" class="fa fa fa-envelope-o bds_mail" data-cmd="mail" title="通过邮件分享"></a>
+            <a href="#" class="fa fa-weixin bds_weixin" data-cmd="weixin" title="生成文章二维码"></a>
+            <a href="#" class="fa fa-share-alt bds_more" data-cmd="more"></a>
+        </div>
+        <script>
+            window._bd_share_config={
+                "common":{"bdSnsKey":{},"bdText":" C函数栈帧 　| Hexo　","bdMini":"2","bdMiniList":false,"bdPic":"","bdStyle":"0","bdSize":"24"},"share":{}};with(document)0[(getElementsByTagName('head')[0]||body).appendChild(createElement('script')).src='http://bdimg.share.baidu.com/static/api/js/share.js?v=89860593.js?cdnversion='+~(-new Date()/36e5)];
+        </script>
+    
+
+    
+</div>
+
+
+
+
+
+
+
+    
+
+
+
+
+    <div class="scroll" id="post-nav-button">
+        
+            <a href="/2018/01/14/2018-01-14-docker-layerstore/" title="上一篇:  Docker源码分析—层存储 ">
+                <i class="fa fa-angle-left"></i>
+            </a>
+        
+
+        <a title="文章列表"><i class="fa fa-bars"></i><i class="fa fa-times"></i></a>
+
+        
+            <a href="/2017/12/26/2017-12-26-linux-code-overlayfs-read_write/" title="下一篇: 内核OverlayFS—文件读写">
+                <i class="fa fa-angle-right"></i>
+            </a>
+        
+    </div>
+
+    <ul class="post-list"><li class="post-list-item"><a class="post-list-link" href="/2018/09/05/2018-09-05-linux-kernel/">Ubuntu下内核与内核模块的编译过程</a></li><li class="post-list-item"><a class="post-list-link" href="/2018/01/19/2018-01-19-docker-imagestore/"> Docker源码分析—镜像存储 </a></li><li class="post-list-item"><a class="post-list-link" href="/2018/01/15/2018-01-15-docker-storage-overlay2/"> Docker源码分析—存储驱动 </a></li><li class="post-list-item"><a class="post-list-link" href="/2018/01/14/2018-01-14-docker-layerstore/"> Docker源码分析—层存储 </a></li><li class="post-list-item"><a class="post-list-link" href="/2018/01/12/2018-01-10-c-stack_frame/"> C函数栈帧 </a></li><li class="post-list-item"><a class="post-list-link" href="/2017/12/26/2017-12-26-linux-code-overlayfs-read_write/">内核OverlayFS—文件读写</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/12/22/2017-12-22-linux-code-overlayfs-create_delete/">内核OverlayFS—创建与删除文件</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/11/30/2017-11-30-linux-du/"> Linux查看目录大小</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/11/10/2017-11-10-linux-code-overlayfs-dir-op1/">内核OverlayFS—目录搜索</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/10/12/2017-10-12-linux-code-overlayfs-mnt/">内核OverlayFS—注册与挂载</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/09/20/2017-09-20-linux-code-overlayfs-layerinfo/">内核OverlayFS—文件层次信息</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/08/18/2017-08-18-linux-code-vfs/">Linux虚拟文件系统(VFS)</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/05/05/2017-05-05-docker-filesystem-overlay/"> Docker存储驱动—Overlay/Overlay2「译」</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/04/13/2017-04-13-docker-filesystem-aufs/"> Docker存储驱动—Aufs </a></li><li class="post-list-item"><a class="post-list-link" href="/2017/04/09/2017-04-09-linux-uuid/"> Linux存储设备的UUID</a></li></ul>
+
+
+
+
+    <script>
+        
+    </script>
+</div>
+      <footer id="footer">
+    <div class="outer">
+        <div id="footer-info">
+            <div class="footer-left">
+                <i class="fa fa-copyright"></i> 
+                2017-2018 Arking
+            </div>
+            <div class="footer-right">
+                <a href="http://hexo.io/" target="_blank" title="快速、简洁且高效的博客框架">Hexo</a>  Theme <a href="https://github.com/MOxFIVE/hexo-theme-yelee" target="_blank" title="简而不减 Hexo 双栏博客主题  v3.5">Yelee</a> by MOxFIVE <i class="fa fa-heart animated infinite pulse"></i>
+            </div>
+        </div>
+        
+            <div class="visit">
+                
+                    <span id="busuanzi_container_site_pv" style="display:none">
+                        <span id="site-visit" title="本站到访数"><i class="fa fa-user" aria-hidden="true"></i><span id="busuanzi_value_site_uv"></span>
+                        </span>
+                    </span>
+                
+                
+                    <span>| </span>
+                
+                
+                    <span id="busuanzi_container_page_pv" style="display:none">
+                        <span id="page-visit" title="本页阅读量"><i class="fa fa-eye animated infinite pulse" aria-hidden="true"></i><span id="busuanzi_value_page_pv"></span>
+                        </span>
+                    </span>
+                
+            </div>
+        
+    </div>
+</footer>
+    </div>
+    
+<script data-main="/js/main.js" src="//cdn.bootcss.com/require.js/2.2.0/require.min.js"></script>
+
+    <script>
+        $(document).ready(function() {
+            var iPad = window.navigator.userAgent.indexOf('iPad');
+            if (iPad > -1 || $(".left-col").css("display") === "none") {
+                var bgColorList = ["#9db3f4", "#414141", "#e5a859", "#f5dfc6", "#c084a0", "#847e72", "#cd8390", "#996731"];
+                var bgColor = Math.ceil(Math.random() * (bgColorList.length - 1));
+                $("body").css({"background-color": bgColorList[bgColor], "background-size": "cover"});
+            }
+            else {
+                var backgroundnum = 5;
+                var backgroundimg = "url(/background/bg-x.jpg)".replace(/x/gi, Math.ceil(Math.random() * backgroundnum));
+                $("body").css({"background": backgroundimg, "background-attachment": "fixed", "background-size": "cover"});
+            }
+        })
+    </script>
+
+
+
+
+
+<div class="scroll" id="scroll">
+    <a href="#" title="返回顶部"><i class="fa fa-arrow-up"></i></a>
+    <a href="#comments" onclick="load$hide();" title="查看评论"><i class="fa fa-comments-o"></i></a>
+    <a href="#footer" title="转到底部"><i class="fa fa-arrow-down"></i></a>
+</div>
+<script>
+    // Open in New Window
+    
+        var oOpenInNew = {
+            
+            
+            
+            
+            
+            
+             archives: ".archive-article-title", 
+             miniArchives: "a.post-list-link", 
+            
+             friends: "#js-friends a", 
+             socail: ".social a" 
+        }
+        for (var x in oOpenInNew) {
+            $(oOpenInNew[x]).attr("target", "_blank");
+        }
+    
+</script>
+
+<script async src="https://dn-lbstatics.qbox.me/busuanzi/2.3/busuanzi.pure.mini.js">
+</script>
+  </div>
+</body>
+</html>

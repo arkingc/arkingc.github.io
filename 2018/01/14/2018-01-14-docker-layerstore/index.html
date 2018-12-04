@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html>
+<head><meta name="generator" content="Hexo 3.8.0">
+
+    <!--[if lt IE 9]>
+        <style>body {display: none; background: none !important} </style>
+        <meta http-equiv="Refresh" Content="0; url=//outdatedbrowser.com/" />
+    <![endif]-->
+
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge, chrome=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="format-detection" content="telephone=no">
+<meta name="author" content="Arking">
+
+
+
+<meta name="description" content="基于Docker 17.05.x  Docker镜像由多层只读镜像层组成，Docker容器实际上就是创建了一层读写层，然后将这层读写层与使用的镜像关联起来。所以实际上镜像和容器在Docker中都是通过“层”来进行存储，每一层对应一个目录，Docker层存储就是用来管理这些“层”以及这些层的元数据 这篇文章根据Docker源码介绍Docker层存储的创建过程">
+<meta name="keywords" content="docker,storage">
+<meta property="og:type" content="article">
+<meta property="og:title" content=" Docker源码分析—层存储 ">
+<meta property="og:url" content="http://yoursite.com/2018/01/14/2018-01-14-docker-layerstore/index.html">
+<meta property="og:site_name" content="Hexo">
+<meta property="og:description" content="基于Docker 17.05.x  Docker镜像由多层只读镜像层组成，Docker容器实际上就是创建了一层读写层，然后将这层读写层与使用的镜像关联起来。所以实际上镜像和容器在Docker中都是通过“层”来进行存储，每一层对应一个目录，Docker层存储就是用来管理这些“层”以及这些层的元数据 这篇文章根据Docker源码介绍Docker层存储的创建过程">
+<meta property="og:locale" content="default">
+<meta property="og:image" content="http://yoursite.com/img/in-post/post-docker-layerstore/layerstore.png">
+<meta property="og:updated_time" content="2018-12-04T12:22:46.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content=" Docker源码分析—层存储 ">
+<meta name="twitter:description" content="基于Docker 17.05.x  Docker镜像由多层只读镜像层组成，Docker容器实际上就是创建了一层读写层，然后将这层读写层与使用的镜像关联起来。所以实际上镜像和容器在Docker中都是通过“层”来进行存储，每一层对应一个目录，Docker层存储就是用来管理这些“层”以及这些层的元数据 这篇文章根据Docker源码介绍Docker层存储的创建过程">
+<meta name="twitter:image" content="http://yoursite.com/img/in-post/post-docker-layerstore/layerstore.png">
+
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+
+
+    <link rel="alternate" href="/atom.xml" title="Hexo" type="application/atom+xml">
+
+
+
+    <link rel="shortcut icon" href="/favicon.png">
+
+
+
+    <link href="//cdn.bootcss.com/animate.css/3.5.1/animate.min.css" rel="stylesheet">
+
+
+
+    <link href="//cdn.bootcss.com/fancybox/2.1.5/jquery.fancybox.min.css" rel="stylesheet">
+
+
+
+    <script src="//cdn.bootcss.com/pace/1.0.2/pace.min.js"></script>
+    <link href="//cdn.bootcss.com/pace/1.0.2/themes/blue/pace-theme-minimal.css" rel="stylesheet">
+
+
+<link rel="stylesheet" href="/css/style.css">
+
+
+
+<link href="//cdn.bootcss.com/font-awesome/4.6.3/css/font-awesome.min.css" rel="stylesheet">
+
+
+<title> Docker源码分析—层存储  | Hexo</title>
+
+<script src="//cdn.bootcss.com/jquery/2.2.4/jquery.min.js"></script>
+<script src="//cdn.bootcss.com/clipboard.js/1.5.10/clipboard.min.js"></script>
+
+<script>
+    var yiliaConfig = {
+        fancybox: true,
+        animate: true,
+        isHome: false,
+        isPost: true,
+        isArchive: false,
+        isTag: false,
+        isCategory: false,
+        fancybox_js: "//cdn.bootcss.com/fancybox/2.1.5/jquery.fancybox.min.js",
+        scrollreveal: "//cdn.bootcss.com/scrollReveal.js/3.1.4/scrollreveal.min.js",
+        search: false
+    }
+</script>
+
+
+    <script> yiliaConfig.jquery_ui = [false]; </script>
+
+
+
+    <script> yiliaConfig.rootUrl = "\/";</script>
+
+
+
+
+
+
+</head></html>
+<body>
+  <div id="container">
+    <div class="left-col">
+    <div class="overlay"></div>
+<div class="intrude-less">
+    <header id="header" class="inner">
+        <a href="/" class="profilepic">
+            <img src="/img/avatar.png" class="animated zoomIn">
+        </a>
+        <hgroup>
+          <h1 class="header-author"><a href="/">Arking</a></h1>
+        </hgroup>
+
+        
+
+        
+
+
+        
+            <div id="switch-btn" class="switch-btn">
+                <div class="icon">
+                    <div class="icon-ctn">
+                        <div class="icon-wrap icon-house" data-idx="0">
+                            <div class="birdhouse"></div>
+                            <div class="birdhouse_holes"></div>
+                        </div>
+                        <div class="icon-wrap icon-ribbon hide" data-idx="1">
+                            <div class="ribbon"></div>
+                        </div>
+                        
+                        <div class="icon-wrap icon-link hide" data-idx="2">
+                            <div class="loopback_l"></div>
+                            <div class="loopback_r"></div>
+                        </div>
+                        
+                        
+                        <div class="icon-wrap icon-me hide" data-idx="3">
+                            <div class="user"></div>
+                            <div class="shoulder"></div>
+                        </div>
+                        
+                    </div>
+                    
+                </div>
+                <div class="tips-box hide">
+                    <div class="tips-arrow"></div>
+                    <ul class="tips-inner">
+                        <li>菜单</li>
+                        <li>标签</li>
+                        
+                        <li>友情链接</li>
+                        
+                        
+                        <li>关于我</li>
+                        
+                    </ul>
+                </div>
+            </div>
+        
+
+        <div id="switch-area" class="switch-area">
+            <div class="switch-wrap">
+                <section class="switch-part switch-part1">
+                    <nav class="header-menu">
+                        <ul>
+                        
+                            <li><a href="/">主页</a></li>
+                        
+                            <li><a href="/archives/">归档</a></li>
+                        
+                            <li><a href="/tags/">标签</a></li>
+                        
+                            <li><a href="/about/">关于我</a></li>
+                        
+                        </ul>
+                    </nav>
+                    <nav class="header-nav">
+                        <ul class="social">
+                            
+                                <a class="fa Email" href="/ximingchenhust@foxmail.com" title="Email"></a>
+                            
+                                <a class="fa GitHub" href="#" title="GitHub"></a>
+                            
+                        </ul>
+                    </nav>
+                </section>
+                
+                
+                <section class="switch-part switch-part2">
+                    <div class="widget tagcloud" id="js-tagcloud">
+                        <ul class="tag-list"><li class="tag-list-item"><a class="tag-list-link" href="/tags/c/">c</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/docker/">docker</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/filesystem/">filesystem</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/linux/">linux</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/overlayfs/">overlayfs</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/storage/">storage</a></li></ul>
+                    </div>
+                </section>
+                
+                
+                
+                <section class="switch-part switch-part3">
+                    <div id="js-friends">
+                    
+                      <a class="main-nav-link switch-friends-link" href="https://hexo.io">Hexo</a>
+                    
+                      <a class="main-nav-link switch-friends-link" href="https://pages.github.com/">GitHub</a>
+                    
+                      <a class="main-nav-link switch-friends-link" href="http://moxfive.xyz/">MOxFIVE</a>
+                    
+                    </div>
+                </section>
+                
+
+                
+                
+                <section class="switch-part switch-part4">
+                
+                    <div id="js-aboutme">专注于前端</div>
+                </section>
+                
+            </div>
+        </div>
+    </header>                
+</div>
+    </div>
+    <div class="mid-col">
+      <nav id="mobile-nav">
+      <div class="overlay">
+          <div class="slider-trigger"></div>
+          <h1 class="header-author js-mobile-header hide"><a href="/" title="回到主页">Arking</a></h1>
+      </div>
+    <div class="intrude-less">
+        <header id="header" class="inner">
+            <a href="/" class="profilepic">
+                <img src="/img/avatar.png" class="animated zoomIn">
+            </a>
+            <hgroup>
+              <h1 class="header-author"><a href="/" title="回到主页">Arking</a></h1>
+            </hgroup>
+            
+            <nav class="header-menu">
+                <ul>
+                
+                    <li><a href="/">主页</a></li>
+                
+                    <li><a href="/archives/">归档</a></li>
+                
+                    <li><a href="/tags/">标签</a></li>
+                
+                    <li><a href="/about/">关于我</a></li>
+                
+                <div class="clearfix"></div>
+                </ul>
+            </nav>
+            <nav class="header-nav">
+                        <ul class="social">
+                            
+                                <a class="fa Email" target="_blank" href="/ximingchenhust@foxmail.com" title="Email"></a>
+                            
+                                <a class="fa GitHub" target="_blank" href="#" title="GitHub"></a>
+                            
+                        </ul>
+            </nav>
+        </header>                
+    </div>
+    <link class="menu-list" tags="标签" friends="友情链接" about="关于我">
+</nav>
+      <div class="body-wrap"><article id="post-2018-01-14-docker-layerstore" class="article article-type-post" itemscope="" itemprop="blogPost">
+  
+    <div class="article-meta">
+      <a href="/2018/01/14/2018-01-14-docker-layerstore/" class="article-date">
+      <time datetime="2018-01-13T18:57:00.000Z" itemprop="datePublished">2018-01-14</time>
+</a>
+
+
+    </div>
+  
+  <div class="article-inner">
+    
+      <input type="hidden" class="isFancy">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="article-title" itemprop="name">
+       Docker源码分析—层存储 
+    </h1>
+  
+
+      </header>
+      
+      <div class="article-info article-info-post">
+        
+    <div class="article-category tagcloud">
+    <a class="article-category-link" href="/categories/Docker/">Docker</a>
+    </div>
+
+
+        
+    <div class="article-tag tagcloud">
+        <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/docker/">docker</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/storage/">storage</a></li></ul>
+    </div>
+
+        <div class="clearfix"></div>
+      </div>
+      
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+          
+        <blockquote>
+<p>基于Docker 17.05.x</p>
+</blockquote>
+<p>Docker镜像由多层只读镜像层组成，Docker容器实际上就是创建了一层读写层，然后将这层读写层与使用的镜像关联起来。所以实际上镜像和容器在Docker中都是通过“层”来进行存储，每一层对应一个目录，<strong>Docker层存储</strong>就是用来管理这些“层”以及这些层的元数据</p>
+<p>这篇文章根据Docker源码介绍Docker层存储的创建过程</p>
+<a id="more"></a>
+<p>Docker层存储主要包括<strong>存储驱动</strong>、<strong>层的元数据存储</strong>以及<strong>层的元数据映射表</strong>3个部分。在Docker源码中，关系如下如：</p>
+<div align="center"> <img src="/img/in-post/post-docker-layerstore/layerstore.png" width="60%" height="60%"> </div>
+
+<p>层的内容存储于/var/lib/docker/driver_name目录中，由存储驱动管理</p>
+<p>层的元素据存储于/var/lib/docker/image/driver_name/layerdb目录中，由层的元数据存储管理</p>
+<p><br></p>
+<h2 id="层存储结构说明"><a href="#层存储结构说明" class="headerlink" title="层存储结构说明"></a>层存储结构说明</h2><p>Docker层存储在源码中使用一个<a href="https://github.com/moby/moby/blob/17.05.x/layer/layer_store.go#L28" target="_blank" rel="noopener">layerStore</a>结构来表示。store字段表示层的元数据存储，driver字段表示具体的存储驱动</p>
+<p>存储驱动用一个Driver结构来表示，它实现了<a href="https://github.com/moby/moby/blob/17.05.x/daemon/graphdriver/driver.go#L110" target="_blank" rel="noopener">graphdriver.Driver</a>接口。Docker支持overlay2，overlay，aufs等多种驱动，我们这里使用overlay2作为存储驱动，因此这个Driver就是<a href="https://github.com/moby/moby/blob/17.05.x/daemon/graphdriver/overlay2/overlay.go#L93" target="_blank" rel="noopener">overlay2定义的Driver</a>结构。<strong>存储驱动管理层的具体内容</strong></p>
+<p>层的元数据存储则使用了名为<a href="https://github.com/moby/moby/blob/17.05.x/layer/filestore.go#L31" target="_blank" rel="noopener">fileMetadataStore</a>的结构来表示，它实现了<a href="https://github.com/moby/moby/blob/17.05.x/layer/layer.go#L221" target="_blank" rel="noopener">MetadataStore</a>接口<strong>层的元数据存储则管理层的元数据</strong></p>
+<p>容器层的元数据通过一个mountedLayer结构来记录，镜像层的元数据则是通过一个roLayer结构来记录。后面会进行介绍</p>
+<h3 id="几个目录说明"><a href="#几个目录说明" class="headerlink" title="几个目录说明"></a>几个目录说明</h3><p>这里给出几个路径名的简称，下文如有出现可以在这查询：</p>
+<ul>
+<li>Docker目录：/var/lib/docker</li>
+<li>存储驱动目录：/var/lib/docker/overlay2</li>
+<li>层的元数据存储目录：/var/lib/docker/image/overlay2/layerdb</li>
+</ul>
+<p>由于使用的存储驱动是overlay2，所以后两个目录中将存储驱动名换成了overlay2</p>
+<p><br></p>
+<h2 id="创建层存储"><a href="#创建层存储" class="headerlink" title="创建层存储"></a>创建层存储</h2><p>层存储记录在Docker daemon的layerStore字段中，因此，在创建daemon时会<a href="https://github.com/moby/moby/blob/17.05.x/daemon/daemon.go#L607" target="_blank" rel="noopener">调用函数NewStoreFromOptions</a>来创建Docker层存储:</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">func</span> <span class="title">NewStoreFromOptions</span><span class="params">(options StoreOptions)</span> <span class="params">(Store, error)</span></span> &#123;</span><br><span class="line">	<span class="comment">//1.创建存储驱动</span></span><br><span class="line">	driver, err := graphdriver.New(options.GraphDriver, options.PluginGetter, graphdriver.Options&#123;</span><br><span class="line">		Root:                options.StorePath,<span class="comment">// /var/lib/docker</span></span><br><span class="line">		DriverOptions:       options.GraphDriverOptions,<span class="comment">//驱动参数选项</span></span><br><span class="line">		UIDMaps:             options.UIDMaps,</span><br><span class="line">		GIDMaps:             options.GIDMaps,</span><br><span class="line">		ExperimentalEnabled: options.ExperimentalEnabled,</span><br><span class="line">	&#125;)</span><br><span class="line">	...</span><br><span class="line">	</span><br><span class="line">	<span class="comment">//2.根据元数据存储路径模板字符串和1创建的存储驱动来创建层的元数据存储</span></span><br><span class="line">	<span class="comment">// options.MetadataStorePathTemplate:/var/lib/docker/image/overlay2/layerdb</span></span><br><span class="line">	fms, err := NewFSMetadataStore(fmt.Sprintf(options.MetadataStorePathTemplate, driver))</span><br><span class="line">	<span class="keyword">if</span> err != <span class="literal">nil</span> &#123;</span><br><span class="line">		<span class="keyword">return</span> <span class="literal">nil</span>, err</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	<span class="comment">//3.根据1，2调用NewStoreFromGrapDriver创建层存储</span></span><br><span class="line">	<span class="keyword">return</span> NewStoreFromGraphDriver(fms, driver)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>这个函数根据StoreOptions结构的参数创建层存储：</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">type</span> StoreOptions <span class="keyword">struct</span> &#123;</span><br><span class="line">	StorePath                 <span class="keyword">string</span>	<span class="comment">//存储路径：/var/lib/docker</span></span><br><span class="line">	MetadataStorePathTemplate <span class="keyword">string</span>	<span class="comment">//元数据存储路径模板：/var/lib/docker/image/%s/layerdb</span></span><br><span class="line">	GraphDriver               <span class="keyword">string</span>	<span class="comment">//存储驱动：overlay2、overlay、aufs、devicemmapper...</span></span><br><span class="line">	GraphDriverOptions        []<span class="keyword">string</span>	<span class="comment">//存储驱动选项</span></span><br><span class="line">	UIDMaps                   []idtools.IDMap <span class="comment">//</span></span><br><span class="line">	GIDMaps                   []idtools.IDMap <span class="comment">//</span></span><br><span class="line">	PluginGetter              plugingetter.PluginGetter</span><br><span class="line">	ExperimentalEnabled       <span class="keyword">bool</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>层存储的创建主要分3步：</p>
+<ol>
+<li>调用graphdriver.New()函数创建存储驱动driver</li>
+<li>调用NewFSMetadataStore()函数创建层的元数据存储fms</li>
+<li>根据driver和fms调用函数NewStoreFromGraphDriver函数创建层存储</li>
+</ol>
+<blockquote>
+<p>这里提一下，在2.创建层的元数据存储时，传入了存储驱动对象作为fmt.Sprintf()的第2个参数，在go语言中，如果一个类定义了String()函数，则这个类作为输出时，会调用这个String()函数。对于overlay2，其String()函数返回驱动名</p>
+</blockquote>
+<h3 id="创建存储驱动"><a href="#创建存储驱动" class="headerlink" title="创建存储驱动"></a>创建存储驱动</h3><p>在分析graphdriver.New()函数之前，首先需要介绍一个映射表—<strong>已注册存储驱动映射表</strong>：</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">var</span> (</span><br><span class="line">	drivers <span class="keyword">map</span>[<span class="keyword">string</span>]InitFunc</span><br><span class="line">	...</span><br><span class="line">)</span><br></pre></td></tr></table></figure>
+<p>这个映射表的key是存储驱动的名称，value是存储驱动的初始化函数。这个映射表是一个全局变量，定义在<a href="https://github.com/moby/moby/blob/17.05.x/daemon/graphdriver/driver.go#L29" target="_blank" rel="noopener">driver.go</a>中</p>
+<p>这个表记录了已经注册的存储驱动。存储驱动的注册通过函数Register来完成，就是向这个映射表中添加表项：</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">func</span> <span class="title">Register</span><span class="params">(name <span class="keyword">string</span>, initFunc InitFunc)</span> <span class="title">error</span></span> &#123;</span><br><span class="line">	<span class="keyword">if</span> _, exists := drivers[name]; exists &#123;</span><br><span class="line">		<span class="keyword">return</span> fmt.Errorf(<span class="string">"Name already registered %s"</span>, name)</span><br><span class="line">	&#125;</span><br><span class="line">	drivers[name] = initFunc</span><br><span class="line"></span><br><span class="line">	<span class="keyword">return</span> <span class="literal">nil</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>在Docker daemon启动之前，所有Docker内置驱动就已经完成了注册。每个存储驱动定义了自己的init()函数，在go语言中，init()函数会在main函数之前执行：</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">func</span> <span class="title">init</span><span class="params">()</span></span> &#123;</span><br><span class="line">	graphdriver.Register(driverName, Init)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>因此，在daemon启动前，存储驱动通过init函数调用Register()，将自己的名字和驱动初始化函数创建为表项添加到已注册驱动映射表drivers中</p>
+<p>在了解了这之后，我们再来看看存储驱动的创建函数graphdriver.New():</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">func</span> <span class="title">New</span><span class="params">(name <span class="keyword">string</span>, pg plugingetter.PluginGetter, config Options)</span> <span class="params">(Driver, error)</span></span> &#123;</span><br><span class="line">	...</span><br><span class="line">	</span><br><span class="line">	<span class="comment">// 1.将所有在/var/lib/docker下存在目录的已注册驱动添加到映射表driversMap</span></span><br><span class="line">	driversMap := scanPriorDrivers(config.Root)</span><br><span class="line">	<span class="comment">/*</span></span><br><span class="line"><span class="comment">	 * 2.按优先级遍历驱动，找到第一个在/var/lib/docker目录下存在目录的驱动</span></span><br><span class="line"><span class="comment">	 */</span></span><br><span class="line">	<span class="keyword">for</span> _, name := <span class="keyword">range</span> priority &#123;</span><br><span class="line">		<span class="keyword">if</span> name == <span class="string">"vfs"</span> &#123;</span><br><span class="line">			<span class="comment">// don't use vfs even if there is state present.</span></span><br><span class="line">			<span class="keyword">continue</span></span><br><span class="line">		&#125;</span><br><span class="line">		<span class="comment">//如果这个驱动在/var/lib/docker下有对应目录，即存在存储驱动目录</span></span><br><span class="line">		<span class="keyword">if</span> _, prior := driversMap[name]; prior &#123;</span><br><span class="line">			driver, err := getBuiltinDriver(name, config.Root, config.DriverOptions, config.UIDMaps, config.GIDMaps)</span><br><span class="line">			<span class="keyword">if</span> err != <span class="literal">nil</span> &#123;</span><br><span class="line">				logrus.Errorf(<span class="string">"[graphdriver] prior storage driver %s failed: %s"</span>, name, err)</span><br><span class="line">				<span class="keyword">return</span> <span class="literal">nil</span>, err</span><br><span class="line">			&#125;</span><br><span class="line">			<span class="comment">/*</span></span><br><span class="line"><span class="comment">			 如果不止一个驱动存在存储驱动目录，则返回错误，</span></span><br><span class="line"><span class="comment">			 输出可以使用的驱动，提示用户指定某一存储驱动</span></span><br><span class="line"><span class="comment">			*/</span></span><br><span class="line">			<span class="keyword">if</span> <span class="built_in">len</span>(driversMap)<span class="number">-1</span> &gt; <span class="number">0</span> &#123;</span><br><span class="line">				<span class="keyword">var</span> driversSlice []<span class="keyword">string</span></span><br><span class="line">				<span class="keyword">for</span> name := <span class="keyword">range</span> driversMap &#123;</span><br><span class="line">					driversSlice = <span class="built_in">append</span>(driversSlice, name)</span><br><span class="line">				&#125;</span><br><span class="line"></span><br><span class="line">				<span class="keyword">return</span> <span class="literal">nil</span>, fmt.Errorf(<span class="string">"%s contains several valid graphdrivers: %s; Please cleanup or explicitly choose storage driver (-s &lt;DRIVER&gt;)"</span>, config.Root, strings.Join(driversSlice, <span class="string">", "</span>))</span><br><span class="line">			&#125;</span><br><span class="line"></span><br><span class="line">			logrus.Infof(<span class="string">"[graphdriver] using prior storage driver: %s"</span>, name)</span><br><span class="line">			<span class="keyword">return</span> driver, <span class="literal">nil</span></span><br><span class="line">		&#125;</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	<span class="comment">/*</span></span><br><span class="line"><span class="comment">	 * 2.如果所有已注册驱动都没有存储驱动目录，一般第一次启动daemon时会如此。</span></span><br><span class="line"><span class="comment">	 *   则按优先级遍历驱动，找到第一个支持的存储驱动</span></span><br><span class="line"><span class="comment">	 */</span></span><br><span class="line">	<span class="keyword">for</span> _, name := <span class="keyword">range</span> priority &#123;</span><br><span class="line">		driver, err := getBuiltinDriver(name, config.Root, config.DriverOptions, config.UIDMaps, config.GIDMaps)</span><br><span class="line">		<span class="keyword">if</span> err != <span class="literal">nil</span> &#123;</span><br><span class="line">			<span class="keyword">if</span> isDriverNotSupported(err) &#123;</span><br><span class="line">				<span class="keyword">continue</span></span><br><span class="line">			&#125;</span><br><span class="line">			<span class="keyword">return</span> <span class="literal">nil</span>, err</span><br><span class="line">		&#125;</span><br><span class="line">		<span class="keyword">return</span> driver, <span class="literal">nil</span></span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	<span class="comment">/*</span></span><br><span class="line"><span class="comment">	 * 3.如果驱动优先级数组中没有支持的驱动，则遍历整个驱动注册表，查找支持的驱动</span></span><br><span class="line"><span class="comment">	 *   意思应该是除了内置的驱动，还可能会有其它驱动注册</span></span><br><span class="line"><span class="comment">	 */</span></span><br><span class="line">	<span class="keyword">for</span> name, initFunc := <span class="keyword">range</span> drivers &#123;</span><br><span class="line">		driver, err := initFunc(filepath.Join(config.Root, name), config.DriverOptions, config.UIDMaps, config.GIDMaps)</span><br><span class="line">		<span class="keyword">if</span> err != <span class="literal">nil</span> &#123;</span><br><span class="line">			<span class="keyword">if</span> isDriverNotSupported(err) &#123;</span><br><span class="line">				<span class="keyword">continue</span></span><br><span class="line">			&#125;</span><br><span class="line">			<span class="keyword">return</span> <span class="literal">nil</span>, err</span><br><span class="line">		&#125;</span><br><span class="line">		<span class="keyword">return</span> driver, <span class="literal">nil</span></span><br><span class="line">	&#125;</span><br><span class="line">	<span class="keyword">return</span> <span class="literal">nil</span>, fmt.Errorf(<span class="string">"No supported storage backend found"</span>)</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>这个函数主要是根据注册驱动表、驱动优先级字符串数组<a href="https://github.com/moby/moby/blob/17.05.x/daemon/graphdriver/driver_linux.go#L55" target="_blank" rel="noopener">priority</a>以及存在驱动目录的映射表driversMap来做驱动选择。相应的选择逻辑已经注释在代码中。代码涉及到3个遍历，每个遍历逻辑都会返回最终我们要创建的存储驱动。而<strong>最终负责驱动创建的函数则是由驱动注册时注册的初始化函数initFunc来完成的</strong>，overlay2注册的initFunc函数定义如下(省略了错误处理)：</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">func</span> <span class="title">Init</span><span class="params">(home <span class="keyword">string</span>, options []<span class="keyword">string</span>, uidMaps, gidMaps []idtools.IDMap)</span> <span class="params">(graphdriver.Driver, error)</span></span> &#123;</span><br><span class="line">	<span class="comment">//1.参数解析</span></span><br><span class="line">	opts, err := parseOptions(options)</span><br><span class="line">	<span class="comment">//2.调用modprobe overlay试加载内核overlay模块，判断内核是否支持OverlayFS</span></span><br><span class="line">	err := supportsOverlay();</span><br><span class="line">	<span class="comment">//3.检查内核版本，内核4.0后OverlayFS才开始支持overlay2</span></span><br><span class="line">	v, err := kernel.GetKernelVersion()</span><br><span class="line">	<span class="comment">//4.获取后端文件系统,存入全局变量backingFs中</span></span><br><span class="line">	<span class="comment">//home:/var/lib/docker/overlay2</span></span><br><span class="line">	fsMagic, err := graphdriver.GetFSMagic(home)</span><br><span class="line">	<span class="keyword">if</span> err != <span class="literal">nil</span> &#123;</span><br><span class="line">		<span class="keyword">return</span> <span class="literal">nil</span>, err</span><br><span class="line">	&#125;</span><br><span class="line">	<span class="keyword">if</span> fsName, ok := graphdriver.FsNames[fsMagic]; ok &#123;</span><br><span class="line">		backingFs = fsName</span><br><span class="line">	&#125;</span><br><span class="line">	<span class="comment">// 5.检查后端文件系统是否是支持overlay2的文件系统</span></span><br><span class="line">	<span class="keyword">switch</span> fsMagic &#123;</span><br><span class="line">	<span class="keyword">case</span> graphdriver.FsMagicBtrfs, graphdriver.FsMagicAufs, graphdriver.FsMagicZfs, graphdriver.FsMagicOverlay, graphdriver.FsMagicEcryptfs:</span><br><span class="line">		logrus.Errorf(<span class="string">"'overlay2' is not supported over %s"</span>, backingFs)</span><br><span class="line">		<span class="keyword">return</span> <span class="literal">nil</span>, graphdriver.ErrIncompatibleFS</span><br><span class="line">	&#125;</span><br><span class="line">	<span class="comment">// 6.获取rootUID和rootGID</span></span><br><span class="line">	rootUID, rootGID, err := idtools.GetRootUIDGID(uidMaps, gidMaps)</span><br><span class="line">	<span class="comment">// 7.创建overlay2层标识符目录/var/lib/docker/overlay2/l</span></span><br><span class="line">	err := idtools.MkdirAllAs(path.Join(home, linkDir), <span class="number">0700</span>, rootUID, rootGID);</span><br><span class="line">	</span><br><span class="line">	...</span><br><span class="line">	</span><br><span class="line">	<span class="comment">//8.构造overlay2存储驱动结构</span></span><br><span class="line">	d := &amp;Driver&#123;</span><br><span class="line">		home:          home,<span class="comment">// /var/lib/docker/overlay2</span></span><br><span class="line">		uidMaps:       uidMaps,</span><br><span class="line">		gidMaps:       gidMaps,</span><br><span class="line">		ctr:           graphdriver.NewRefCounter(graphdriver.NewFsChecker(graphdriver.FsMagicOverlay)),</span><br><span class="line">		supportsDType: supportsDType,</span><br><span class="line">		locker:        locker.New(),</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	d.naiveDiff = graphdriver.NewNaiveDiffDriver(d, uidMaps, gidMaps)</span><br><span class="line"></span><br><span class="line">	<span class="comment">//9.如果后端文件系统是xfs则支持磁盘配额</span></span><br><span class="line">	<span class="keyword">if</span> backingFs == <span class="string">"xfs"</span> &#123;</span><br><span class="line">		<span class="comment">// Try to enable project quota support over xfs.</span></span><br><span class="line">		<span class="keyword">if</span> d.quotaCtl, err = quota.NewControl(home); err == <span class="literal">nil</span> &#123;</span><br><span class="line">			projectQuotaSupported = <span class="literal">true</span></span><br><span class="line">		&#125;</span><br><span class="line">	&#125;</span><br><span class="line">	...</span><br><span class="line"></span><br><span class="line">	<span class="keyword">return</span> d, <span class="literal">nil</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>具体驱动创建的步骤已经注释在代码中。到此，存储驱动的创建总算是大功告成啦。今后，层存储就可以透过driver字段索引到存储驱动，然后调用存储驱动实现的一系列函数来管理层。（如调用层创建函数来创建容器层或镜像层）</p>
+<h3 id="创建层的元数据存储"><a href="#创建层的元数据存储" class="headerlink" title="创建层的元数据存储"></a>创建层的元数据存储</h3><p>层的元数据存储通过函数NewFSMetadataStore()来创建：</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">func</span> <span class="title">NewFSMetadataStore</span><span class="params">(root <span class="keyword">string</span>)</span> <span class="params">(MetadataStore, error)</span></span> &#123;</span><br><span class="line">	<span class="comment">//1.创建目录/var/lib/docker/image/overlay2/layerdb</span></span><br><span class="line">	<span class="keyword">if</span> err := os.MkdirAll(root, <span class="number">0700</span>); err != <span class="literal">nil</span> &#123;</span><br><span class="line">		<span class="keyword">return</span> <span class="literal">nil</span>, err</span><br><span class="line">	&#125;</span><br><span class="line">	<span class="comment">//2.构建一个fileMetadataStore结构，root字段存储了元数据的根路径</span></span><br><span class="line">	<span class="keyword">return</span> &amp;fileMetadataStore&#123;</span><br><span class="line">		root: root,</span><br><span class="line">	&#125;, <span class="literal">nil</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>层的元数据存储的创建十分简单，主要是创建元数据存储的根目录layerdb，然后构造并返回一个fileMetaStore对象</p>
+<p>虽然只是返回了一个构造出的层的元数据存储对象，但是这个对象实现了很多层的元数据操作的方法，如元数据的读取，接下来就会介绍</p>
+<h3 id="创建层存储-1"><a href="#创建层存储-1" class="headerlink" title="创建层存储"></a>创建层存储</h3><p>现在回到层存储创建的最后一步，即根据存储驱动和层的元数据存储创建层存储：</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">func</span> <span class="title">NewStoreFromGraphDriver</span><span class="params">(store MetadataStore, driver graphdriver.Driver)</span> <span class="params">(Store, error)</span></span> &#123;</span><br><span class="line">	caps := graphdriver.Capabilities&#123;&#125;</span><br><span class="line">	<span class="comment">//go语言中的断言，如果存储驱动能转还成一个</span></span><br><span class="line">	<span class="comment">//graphdriver.CapabilityDriver,则更新caps</span></span><br><span class="line">	<span class="comment">//caps主要用于设置层存储结构的useTarSplit字段</span></span><br><span class="line">	<span class="keyword">if</span> capDriver, ok := driver.(graphdriver.CapabilityDriver); ok &#123;</span><br><span class="line">		caps = capDriver.Capabilities()</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	<span class="comment">//1.构造层存储结构</span></span><br><span class="line">	ls := &amp;layerStore&#123;</span><br><span class="line">		store:       store,<span class="comment">//层的元数据存储</span></span><br><span class="line">		driver:      driver,<span class="comment">//存储驱动</span></span><br><span class="line">		layerMap:    <span class="keyword">map</span>[ChainID]*roLayer&#123;&#125;,<span class="comment">//只读层映射表</span></span><br><span class="line">		mounts:      <span class="keyword">map</span>[<span class="keyword">string</span>]*mountedLayer&#123;&#125;,<span class="comment">//读写层映射表</span></span><br><span class="line">		useTarSplit: !caps.ReproducesExactDiffs,</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	<span class="comment">//2.到元数据根目录/var/lib/docker/image/overlay2/layerdb下读取：</span></span><br><span class="line">	<span class="comment">//	1）目录sha256：这个目录下存在了镜像层的元数据</span></span><br><span class="line">	<span class="comment">//  2）目录mounts：这个目录下存储了容器层的元数据</span></span><br><span class="line">	<span class="comment">// 对于镜像层，返回一个字符串数组ids，字符串形式为"sha256:目录名"</span></span><br><span class="line">	<span class="comment">// 对于容器层，返回一个字符串数组mounts，字符串形式为”目录名“</span></span><br><span class="line">	ids, mounts, err := store.List()</span><br><span class="line">	<span class="keyword">if</span> err != <span class="literal">nil</span> &#123;</span><br><span class="line">		<span class="keyword">return</span> <span class="literal">nil</span>, err</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	<span class="comment">//3.遍历所有镜像层，调用loadLayer()函数加载镜像层的元数据</span></span><br><span class="line">	<span class="keyword">for</span> _, id := <span class="keyword">range</span> ids &#123;</span><br><span class="line">		l, err := ls.loadLayer(id)</span><br><span class="line">		<span class="keyword">if</span> err != <span class="literal">nil</span> &#123;</span><br><span class="line">			logrus.Debugf(<span class="string">"Failed to load layer %s: %s"</span>, id, err)</span><br><span class="line">			<span class="keyword">continue</span></span><br><span class="line">		&#125;</span><br><span class="line">		<span class="keyword">if</span> l.parent != <span class="literal">nil</span> &#123;</span><br><span class="line">			l.parent.referenceCount++</span><br><span class="line">		&#125;</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	<span class="comment">//4.遍历所有容器层，调用loadMount()函数加载容器层的元数据</span></span><br><span class="line">	<span class="keyword">for</span> _, mount := <span class="keyword">range</span> mounts &#123;</span><br><span class="line">		<span class="keyword">if</span> err := ls.loadMount(mount); err != <span class="literal">nil</span> &#123;</span><br><span class="line">			logrus.Debugf(<span class="string">"Failed to load mount %s: %s"</span>, mount, err)</span><br><span class="line">		&#125;</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	<span class="keyword">return</span> ls, <span class="literal">nil</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>这个函数主要完成4个操作：</p>
+<ol>
+<li>根据存储驱动以及层的元数据存储构造层存储结构</li>
+<li>调用<a href="https://github.com/moby/moby/blob/17.05.x/layer/filestore.go#L307" target="_blank" rel="noopener">Store.List()</a>函数获取镜像层和容器层的元数据目录数组</li>
+<li>遍历每个镜像层的元数据目录，调用loadLayer()加载镜像层元数据</li>
+<li>遍历每个容器层的元数据目录，调用loadMount()加载容器层元数据</li>
+</ol>
+<h4 id="加载镜像层元数据"><a href="#加载镜像层元数据" class="headerlink" title="加载镜像层元数据"></a>加载镜像层元数据</h4><p>每层镜像层的元数据通过一个<a href="https://github.com/moby/moby/blob/17.05.x/layer/ro_layer.go#L11" target="_blank" rel="noopener">roLayer</a>结构来记录，加载元数据就是到每个镜像层的元数据目录下读取镜像层的元数据文件，然后构造一个roLayer结构，并将镜像层的元数据添加到<strong>层存储的镜像层元数据映射表</strong>中，由函数loadLayer()完成：</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">func</span> <span class="params">(ls *layerStore)</span> <span class="title">loadLayer</span><span class="params">(layer ChainID)</span> <span class="params">(*roLayer, error)</span></span> &#123;</span><br><span class="line">	<span class="comment">//1.如果镜像层元数据映射表中已经存在，则直接获取并返回</span></span><br><span class="line">	cl, ok := ls.layerMap[layer]</span><br><span class="line">	<span class="keyword">if</span> ok &#123;</span><br><span class="line">		<span class="keyword">return</span> cl, <span class="literal">nil</span></span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	<span class="comment">/*</span></span><br><span class="line"><span class="comment">		2.对layer:shaXX:ID</span></span><br><span class="line"><span class="comment">		到目录/var/lib/docker/image/overlay2/layerdb/shaXX/ID/下读取</span></span><br><span class="line"><span class="comment">		diff,size,parent,cache-id等文件</span></span><br><span class="line"><span class="comment">		读取操作需要用到层的元数据存储结构实现的一系列操作来完成</span></span><br><span class="line"><span class="comment">	*/</span></span><br><span class="line">	diff, err := ls.store.GetDiffID(layer)</span><br><span class="line">	<span class="keyword">if</span> err != <span class="literal">nil</span> &#123;</span><br><span class="line">		<span class="keyword">return</span> <span class="literal">nil</span>, fmt.Errorf(<span class="string">"failed to get diff id for %s: %s"</span>, layer, err)</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	size, err := ls.store.GetSize(layer)</span><br><span class="line">	<span class="keyword">if</span> err != <span class="literal">nil</span> &#123;</span><br><span class="line">		<span class="keyword">return</span> <span class="literal">nil</span>, fmt.Errorf(<span class="string">"failed to get size for %s: %s"</span>, layer, err)</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	cacheID, err := ls.store.GetCacheID(layer)</span><br><span class="line">	<span class="keyword">if</span> err != <span class="literal">nil</span> &#123;</span><br><span class="line">		<span class="keyword">return</span> <span class="literal">nil</span>, fmt.Errorf(<span class="string">"failed to get cache id for %s: %s"</span>, layer, err)</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	parent, err := ls.store.GetParent(layer)</span><br><span class="line">	<span class="keyword">if</span> err != <span class="literal">nil</span> &#123;</span><br><span class="line">		<span class="keyword">return</span> <span class="literal">nil</span>, fmt.Errorf(<span class="string">"failed to get parent for %s: %s"</span>, layer, err)</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	descriptor, err := ls.store.GetDescriptor(layer)</span><br><span class="line">	<span class="keyword">if</span> err != <span class="literal">nil</span> &#123;</span><br><span class="line">		<span class="keyword">return</span> <span class="literal">nil</span>, fmt.Errorf(<span class="string">"failed to get descriptor for %s: %s"</span>, layer, err)</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	<span class="comment">//3.构造镜像层元数据对象</span></span><br><span class="line">	cl = &amp;roLayer&#123;</span><br><span class="line">		chainID:    layer,   <span class="comment">//shaXX:该层在元数据目录下对应的目录名</span></span><br><span class="line">		diffID:     diff,    <span class="comment">//digest ID</span></span><br><span class="line">		size:       size,    <span class="comment">//层的大小</span></span><br><span class="line">		cacheID:    cacheID, <span class="comment">//存储驱动目录下该层镜像层的目录名(缓存ID)</span></span><br><span class="line">		layerStore: ls,      <span class="comment">//指向层存储</span></span><br><span class="line">		references: <span class="keyword">map</span>[Layer]<span class="keyword">struct</span>&#123;&#125;&#123;&#125;,</span><br><span class="line">		descriptor: descriptor,</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	<span class="comment">//如果存在父层，则继续加载父层</span></span><br><span class="line">	<span class="keyword">if</span> parent != <span class="string">""</span> &#123;</span><br><span class="line">		p, err := ls.loadLayer(parent)</span><br><span class="line">		<span class="keyword">if</span> err != <span class="literal">nil</span> &#123;</span><br><span class="line">			<span class="keyword">return</span> <span class="literal">nil</span>, err</span><br><span class="line">		&#125;</span><br><span class="line">		<span class="comment">//设置元数据的parent字段</span></span><br><span class="line">		cl.parent = p</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	<span class="comment">//4.将该层镜像层元数据添加到 层存储的镜像层元数据映射表中</span></span><br><span class="line">	ls.layerMap[cl.chainID] = cl</span><br><span class="line"></span><br><span class="line">	<span class="keyword">return</span> cl, <span class="literal">nil</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h4 id="加载容器层元数据"><a href="#加载容器层元数据" class="headerlink" title="加载容器层元数据"></a>加载容器层元数据</h4><p>每层容器层的元数据通过一个<a href="https://github.com/moby/moby/blob/17.05.x/layer/mounted_layer.go#L9" target="_blank" rel="noopener">mountedLayer</a>结构来记录，加载容器层元数据就是到每个容器层的元数据目录下读取容器层的元数据文件，然后构造一个mountedLayer结构，并将容器层的元数据添加到<strong>层存储的容器层元数据映射表</strong>中，由函数loadMount()完成：</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">func</span> <span class="params">(ls *layerStore)</span> <span class="title">loadMount</span><span class="params">(mount <span class="keyword">string</span>)</span> <span class="title">error</span></span> &#123;</span><br><span class="line">	<span class="comment">//1.如果容器层元数据映射表中已经存在，则直接获取并返回</span></span><br><span class="line">	<span class="keyword">if</span> _, ok := ls.mounts[mount]; ok &#123;</span><br><span class="line">		<span class="keyword">return</span> <span class="literal">nil</span></span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	<span class="comment">/*</span></span><br><span class="line"><span class="comment">		2.对mount:ID</span></span><br><span class="line"><span class="comment">		到目录/var/lib/docker/image/overlay2/layerdb/mounts/ID/下读取</span></span><br><span class="line"><span class="comment">		init-id,mount-id,parent等文件</span></span><br><span class="line"><span class="comment">		读取操作需要用到层的元数据存储结构实现的一系列操作来完成</span></span><br><span class="line"><span class="comment">	*/</span></span><br><span class="line"></span><br><span class="line">	mountID, err := ls.store.GetMountID(mount)</span><br><span class="line">	<span class="keyword">if</span> err != <span class="literal">nil</span> &#123;</span><br><span class="line">		<span class="keyword">return</span> err</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	initID, err := ls.store.GetInitID(mount)</span><br><span class="line">	<span class="keyword">if</span> err != <span class="literal">nil</span> &#123;</span><br><span class="line">		<span class="keyword">return</span> err</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	parent, err := ls.store.GetMountParent(mount)</span><br><span class="line">	<span class="keyword">if</span> err != <span class="literal">nil</span> &#123;</span><br><span class="line">		<span class="keyword">return</span> err</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	<span class="comment">//3.构造容器层元数据对象</span></span><br><span class="line">	ml := &amp;mountedLayer&#123;</span><br><span class="line">		name:       mount,</span><br><span class="line">		mountID:    mountID,</span><br><span class="line">		initID:     initID,</span><br><span class="line">		layerStore: ls,</span><br><span class="line">		references: <span class="keyword">map</span>[RWLayer]*referencedRWLayer&#123;&#125;,</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	<span class="comment">//如果存在父层，则继续加载父层</span></span><br><span class="line">	<span class="keyword">if</span> parent != <span class="string">""</span> &#123;</span><br><span class="line">		p, err := ls.loadLayer(parent)</span><br><span class="line">		<span class="keyword">if</span> err != <span class="literal">nil</span> &#123;</span><br><span class="line">			<span class="keyword">return</span> err</span><br><span class="line">		&#125;</span><br><span class="line">		ml.parent = p</span><br><span class="line"></span><br><span class="line">		p.referenceCount++</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	<span class="comment">//4.将该层容器层元数据添加到 层存储的容器层元数据映射表中</span></span><br><span class="line">	ls.mounts[ml.name] = ml</span><br><span class="line"></span><br><span class="line">	<span class="keyword">return</span> <span class="literal">nil</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>容器层元数据的加载步骤实际上和镜像层的一样，只是镜像层元数据和容器层元数据所在的目录不同</p>
+<p><br></p>
+<h2 id="步骤总结"><a href="#步骤总结" class="headerlink" title="步骤总结"></a>步骤总结</h2><p>总结一下，层存储的创建可以概括为4个步骤：</p>
+<ol>
+<li>创建存储驱动</li>
+<li>创建层的元数据存储</li>
+<li>构建层存储的结构对象</li>
+<li>遍历层的元数据目录，加载层的元数据信息，并存入层存储的两个层元数据映射表中</li>
+</ol>
+
+      
+    </div>
+    
+  </div>
+  
+    
+    <div class="copyright">
+        <p><span>本文标题:</span><a href="/2018/01/14/2018-01-14-docker-layerstore/"> Docker源码分析—层存储 </a></p>
+        <p><span>文章作者:</span><a href="/" title="回到主页">Arking</a></p>
+        <p><span>发布时间:</span>2018-01-14, 02:57:00</p>
+        <p><span>最后更新:</span>2018-12-04, 20:22:46</p>
+        <p>
+            <span>原始链接:</span><a class="post-url" href="/2018/01/14/2018-01-14-docker-layerstore/" title=" Docker源码分析—层存储 ">http://yoursite.com/2018/01/14/2018-01-14-docker-layerstore/</a>
+            <span class="copy-path" data-clipboard-text="原文: http://yoursite.com/2018/01/14/2018-01-14-docker-layerstore/　　作者: Arking" title="点击复制文章链接"><i class="fa fa-clipboard"></i></span>
+            <script> var clipboard = new Clipboard('.copy-path'); </script>
+        </p>
+        <p>
+            <span>许可协议:</span><i class="fa fa-creative-commons"></i> <a rel="license" href="http://creativecommons.org/licenses/by-nc-sa/4.0/" title="CC BY-NC-SA 4.0 International" target="_blank">"署名-非商用-相同方式共享 4.0"</a> 转载请保留原文链接及作者。
+        </p>
+    </div>
+
+
+
+    <nav id="article-nav">
+        
+            <div id="article-nav-newer" class="article-nav-title">
+                <a href="/2018/01/15/2018-01-15-docker-storage-overlay2/">
+                     Docker源码分析—存储驱动 
+                </a>
+            </div>
+        
+        
+            <div id="article-nav-older" class="article-nav-title">
+                <a href="/2018/01/12/2018-01-10-c-stack_frame/">
+                     C函数栈帧 
+                </a>
+            </div>
+        
+    </nav>
+
+  
+</article>
+
+    <div id="toc" class="toc-article">
+        <strong class="toc-title">文章目录</strong>
+        
+            <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#层存储结构说明"><span class="toc-number">1.</span> <span class="toc-text">层存储结构说明</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#几个目录说明"><span class="toc-number">1.1.</span> <span class="toc-text">几个目录说明</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#创建层存储"><span class="toc-number">2.</span> <span class="toc-text">创建层存储</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#创建存储驱动"><span class="toc-number">2.1.</span> <span class="toc-text">创建存储驱动</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#创建层的元数据存储"><span class="toc-number">2.2.</span> <span class="toc-text">创建层的元数据存储</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#创建层存储-1"><span class="toc-number">2.3.</span> <span class="toc-text">创建层存储</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#加载镜像层元数据"><span class="toc-number">2.3.1.</span> <span class="toc-text">加载镜像层元数据</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#加载容器层元数据"><span class="toc-number">2.3.2.</span> <span class="toc-text">加载容器层元数据</span></a></li></ol></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#步骤总结"><span class="toc-number">3.</span> <span class="toc-text">步骤总结</span></a></li></ol>
+        
+    </div>
+    <style>
+        .left-col .switch-btn,
+        .left-col .switch-area {
+            display: none;
+        }
+        .toc-level-3 i,
+        .toc-level-3 ol {
+            display: none !important;
+        }
+    </style>
+
+    <input type="button" id="tocButton" value="隐藏目录" title="点击按钮隐藏或者显示文章目录">
+
+    <script>
+        yiliaConfig.toc = ["隐藏目录", "显示目录", !!"false"];
+    </script>
+
+
+
+    
+<div class="share">
+    
+        <div class="bdsharebuttonbox">
+            <a href="#" class="fa fa-twitter bds_twi" data-cmd="twi" title="分享到推特"></a>
+            <a href="#" class="fa fa-weibo bds_tsina" data-cmd="tsina" title="分享到新浪微博"></a>
+            <a href="#" class="fa fa-qq bds_sqq" data-cmd="sqq" title="分享给 QQ 好友"></a>
+            <a href="#" class="fa fa-files-o bds_copy" data-cmd="copy" title="复制网址"></a>
+            <a href="#" class="fa fa fa-envelope-o bds_mail" data-cmd="mail" title="通过邮件分享"></a>
+            <a href="#" class="fa fa-weixin bds_weixin" data-cmd="weixin" title="生成文章二维码"></a>
+            <a href="#" class="fa fa-share-alt bds_more" data-cmd="more"></a>
+        </div>
+        <script>
+            window._bd_share_config={
+                "common":{"bdSnsKey":{},"bdText":" Docker源码分析—层存储 　| Hexo　","bdMini":"2","bdMiniList":false,"bdPic":"","bdStyle":"0","bdSize":"24"},"share":{}};with(document)0[(getElementsByTagName('head')[0]||body).appendChild(createElement('script')).src='http://bdimg.share.baidu.com/static/api/js/share.js?v=89860593.js?cdnversion='+~(-new Date()/36e5)];
+        </script>
+    
+
+    
+</div>
+
+
+
+
+
+
+
+    
+
+
+
+
+    <div class="scroll" id="post-nav-button">
+        
+            <a href="/2018/01/15/2018-01-15-docker-storage-overlay2/" title="上一篇:  Docker源码分析—存储驱动 ">
+                <i class="fa fa-angle-left"></i>
+            </a>
+        
+
+        <a title="文章列表"><i class="fa fa-bars"></i><i class="fa fa-times"></i></a>
+
+        
+            <a href="/2018/01/12/2018-01-10-c-stack_frame/" title="下一篇:  C函数栈帧 ">
+                <i class="fa fa-angle-right"></i>
+            </a>
+        
+    </div>
+
+    <ul class="post-list"><li class="post-list-item"><a class="post-list-link" href="/2018/09/05/2018-09-05-linux-kernel/">Ubuntu下内核与内核模块的编译过程</a></li><li class="post-list-item"><a class="post-list-link" href="/2018/01/19/2018-01-19-docker-imagestore/"> Docker源码分析—镜像存储 </a></li><li class="post-list-item"><a class="post-list-link" href="/2018/01/15/2018-01-15-docker-storage-overlay2/"> Docker源码分析—存储驱动 </a></li><li class="post-list-item"><a class="post-list-link" href="/2018/01/14/2018-01-14-docker-layerstore/"> Docker源码分析—层存储 </a></li><li class="post-list-item"><a class="post-list-link" href="/2018/01/12/2018-01-10-c-stack_frame/"> C函数栈帧 </a></li><li class="post-list-item"><a class="post-list-link" href="/2017/12/26/2017-12-26-linux-code-overlayfs-read_write/">内核OverlayFS—文件读写</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/12/22/2017-12-22-linux-code-overlayfs-create_delete/">内核OverlayFS—创建与删除文件</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/11/30/2017-11-30-linux-du/"> Linux查看目录大小</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/11/10/2017-11-10-linux-code-overlayfs-dir-op1/">内核OverlayFS—目录搜索</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/10/12/2017-10-12-linux-code-overlayfs-mnt/">内核OverlayFS—注册与挂载</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/09/20/2017-09-20-linux-code-overlayfs-layerinfo/">内核OverlayFS—文件层次信息</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/08/18/2017-08-18-linux-code-vfs/">Linux虚拟文件系统(VFS)</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/05/05/2017-05-05-docker-filesystem-overlay/"> Docker存储驱动—Overlay/Overlay2「译」</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/04/13/2017-04-13-docker-filesystem-aufs/"> Docker存储驱动—Aufs </a></li><li class="post-list-item"><a class="post-list-link" href="/2017/04/09/2017-04-09-linux-uuid/"> Linux存储设备的UUID</a></li></ul>
+
+
+
+
+    <script>
+        
+    </script>
+</div>
+      <footer id="footer">
+    <div class="outer">
+        <div id="footer-info">
+            <div class="footer-left">
+                <i class="fa fa-copyright"></i> 
+                2017-2018 Arking
+            </div>
+            <div class="footer-right">
+                <a href="http://hexo.io/" target="_blank" title="快速、简洁且高效的博客框架">Hexo</a>  Theme <a href="https://github.com/MOxFIVE/hexo-theme-yelee" target="_blank" title="简而不减 Hexo 双栏博客主题  v3.5">Yelee</a> by MOxFIVE <i class="fa fa-heart animated infinite pulse"></i>
+            </div>
+        </div>
+        
+            <div class="visit">
+                
+                    <span id="busuanzi_container_site_pv" style="display:none">
+                        <span id="site-visit" title="本站到访数"><i class="fa fa-user" aria-hidden="true"></i><span id="busuanzi_value_site_uv"></span>
+                        </span>
+                    </span>
+                
+                
+                    <span>| </span>
+                
+                
+                    <span id="busuanzi_container_page_pv" style="display:none">
+                        <span id="page-visit" title="本页阅读量"><i class="fa fa-eye animated infinite pulse" aria-hidden="true"></i><span id="busuanzi_value_page_pv"></span>
+                        </span>
+                    </span>
+                
+            </div>
+        
+    </div>
+</footer>
+    </div>
+    
+<script data-main="/js/main.js" src="//cdn.bootcss.com/require.js/2.2.0/require.min.js"></script>
+
+    <script>
+        $(document).ready(function() {
+            var iPad = window.navigator.userAgent.indexOf('iPad');
+            if (iPad > -1 || $(".left-col").css("display") === "none") {
+                var bgColorList = ["#9db3f4", "#414141", "#e5a859", "#f5dfc6", "#c084a0", "#847e72", "#cd8390", "#996731"];
+                var bgColor = Math.ceil(Math.random() * (bgColorList.length - 1));
+                $("body").css({"background-color": bgColorList[bgColor], "background-size": "cover"});
+            }
+            else {
+                var backgroundnum = 5;
+                var backgroundimg = "url(/background/bg-x.jpg)".replace(/x/gi, Math.ceil(Math.random() * backgroundnum));
+                $("body").css({"background": backgroundimg, "background-attachment": "fixed", "background-size": "cover"});
+            }
+        })
+    </script>
+
+
+
+
+
+<div class="scroll" id="scroll">
+    <a href="#" title="返回顶部"><i class="fa fa-arrow-up"></i></a>
+    <a href="#comments" onclick="load$hide();" title="查看评论"><i class="fa fa-comments-o"></i></a>
+    <a href="#footer" title="转到底部"><i class="fa fa-arrow-down"></i></a>
+</div>
+<script>
+    // Open in New Window
+    
+        var oOpenInNew = {
+            
+            
+            
+            
+            
+            
+             archives: ".archive-article-title", 
+             miniArchives: "a.post-list-link", 
+            
+             friends: "#js-friends a", 
+             socail: ".social a" 
+        }
+        for (var x in oOpenInNew) {
+            $(oOpenInNew[x]).attr("target", "_blank");
+        }
+    
+</script>
+
+<script async src="https://dn-lbstatics.qbox.me/busuanzi/2.3/busuanzi.pure.mini.js">
+</script>
+  </div>
+</body>
+</html>

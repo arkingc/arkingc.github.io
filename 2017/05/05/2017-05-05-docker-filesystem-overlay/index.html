@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html>
+<head><meta name="generator" content="Hexo 3.8.0">
+
+    <!--[if lt IE 9]>
+        <style>body {display: none; background: none !important} </style>
+        <meta http-equiv="Refresh" Content="0; url=//outdatedbrowser.com/" />
+    <![endif]-->
+
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge, chrome=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="format-detection" content="telephone=no">
+<meta name="author" content="Arking">
+
+
+
+<meta name="description" content="该文为译文，代码为本地实际运行的结果，部分内容有修改或删除。实验环境为Ubuntu 14.04；">
+<meta name="keywords" content="docker,storage">
+<meta property="og:type" content="article">
+<meta property="og:title" content=" Docker存储驱动—Overlay&#x2F;Overlay2「译」">
+<meta property="og:url" content="http://yoursite.com/2017/05/05/2017-05-05-docker-filesystem-overlay/index.html">
+<meta property="og:site_name" content="Hexo">
+<meta property="og:description" content="该文为译文，代码为本地实际运行的结果，部分内容有修改或删除。实验环境为Ubuntu 14.04；">
+<meta property="og:locale" content="default">
+<meta property="og:image" content="http://yoursite.com/img/in-post/post-docker-filesystem/overlay_constructs.jpg">
+<meta property="og:updated_time" content="2018-12-04T09:05:31.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content=" Docker存储驱动—Overlay&#x2F;Overlay2「译」">
+<meta name="twitter:description" content="该文为译文，代码为本地实际运行的结果，部分内容有修改或删除。实验环境为Ubuntu 14.04；">
+<meta name="twitter:image" content="http://yoursite.com/img/in-post/post-docker-filesystem/overlay_constructs.jpg">
+
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+
+
+    <link rel="alternate" href="/atom.xml" title="Hexo" type="application/atom+xml">
+
+
+
+    <link rel="shortcut icon" href="/favicon.png">
+
+
+
+    <link href="//cdn.bootcss.com/animate.css/3.5.1/animate.min.css" rel="stylesheet">
+
+
+
+    <link href="//cdn.bootcss.com/fancybox/2.1.5/jquery.fancybox.min.css" rel="stylesheet">
+
+
+
+    <script src="//cdn.bootcss.com/pace/1.0.2/pace.min.js"></script>
+    <link href="//cdn.bootcss.com/pace/1.0.2/themes/blue/pace-theme-minimal.css" rel="stylesheet">
+
+
+<link rel="stylesheet" href="/css/style.css">
+
+
+
+<link href="//cdn.bootcss.com/font-awesome/4.6.3/css/font-awesome.min.css" rel="stylesheet">
+
+
+<title> Docker存储驱动—Overlay/Overlay2「译」 | Hexo</title>
+
+<script src="//cdn.bootcss.com/jquery/2.2.4/jquery.min.js"></script>
+<script src="//cdn.bootcss.com/clipboard.js/1.5.10/clipboard.min.js"></script>
+
+<script>
+    var yiliaConfig = {
+        fancybox: true,
+        animate: true,
+        isHome: false,
+        isPost: true,
+        isArchive: false,
+        isTag: false,
+        isCategory: false,
+        fancybox_js: "//cdn.bootcss.com/fancybox/2.1.5/jquery.fancybox.min.js",
+        scrollreveal: "//cdn.bootcss.com/scrollReveal.js/3.1.4/scrollreveal.min.js",
+        search: false
+    }
+</script>
+
+
+    <script> yiliaConfig.jquery_ui = [false]; </script>
+
+
+
+    <script> yiliaConfig.rootUrl = "\/";</script>
+
+
+
+
+
+
+</head></html>
+<body>
+  <div id="container">
+    <div class="left-col">
+    <div class="overlay"></div>
+<div class="intrude-less">
+    <header id="header" class="inner">
+        <a href="/" class="profilepic">
+            <img src="/img/avatar.png" class="animated zoomIn">
+        </a>
+        <hgroup>
+          <h1 class="header-author"><a href="/">Arking</a></h1>
+        </hgroup>
+
+        
+
+        
+
+
+        
+            <div id="switch-btn" class="switch-btn">
+                <div class="icon">
+                    <div class="icon-ctn">
+                        <div class="icon-wrap icon-house" data-idx="0">
+                            <div class="birdhouse"></div>
+                            <div class="birdhouse_holes"></div>
+                        </div>
+                        <div class="icon-wrap icon-ribbon hide" data-idx="1">
+                            <div class="ribbon"></div>
+                        </div>
+                        
+                        <div class="icon-wrap icon-link hide" data-idx="2">
+                            <div class="loopback_l"></div>
+                            <div class="loopback_r"></div>
+                        </div>
+                        
+                        
+                        <div class="icon-wrap icon-me hide" data-idx="3">
+                            <div class="user"></div>
+                            <div class="shoulder"></div>
+                        </div>
+                        
+                    </div>
+                    
+                </div>
+                <div class="tips-box hide">
+                    <div class="tips-arrow"></div>
+                    <ul class="tips-inner">
+                        <li>菜单</li>
+                        <li>标签</li>
+                        
+                        <li>友情链接</li>
+                        
+                        
+                        <li>关于我</li>
+                        
+                    </ul>
+                </div>
+            </div>
+        
+
+        <div id="switch-area" class="switch-area">
+            <div class="switch-wrap">
+                <section class="switch-part switch-part1">
+                    <nav class="header-menu">
+                        <ul>
+                        
+                            <li><a href="/">主页</a></li>
+                        
+                            <li><a href="/archives/">归档</a></li>
+                        
+                            <li><a href="/tags/">标签</a></li>
+                        
+                            <li><a href="/about/">关于我</a></li>
+                        
+                        </ul>
+                    </nav>
+                    <nav class="header-nav">
+                        <ul class="social">
+                            
+                                <a class="fa Email" href="/ximingchenhust@foxmail.com" title="Email"></a>
+                            
+                                <a class="fa GitHub" href="#" title="GitHub"></a>
+                            
+                        </ul>
+                    </nav>
+                </section>
+                
+                
+                <section class="switch-part switch-part2">
+                    <div class="widget tagcloud" id="js-tagcloud">
+                        <ul class="tag-list"><li class="tag-list-item"><a class="tag-list-link" href="/tags/c/">c</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/docker/">docker</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/filesystem/">filesystem</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/linux/">linux</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/overlayfs/">overlayfs</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/storage/">storage</a></li></ul>
+                    </div>
+                </section>
+                
+                
+                
+                <section class="switch-part switch-part3">
+                    <div id="js-friends">
+                    
+                      <a class="main-nav-link switch-friends-link" href="https://hexo.io">Hexo</a>
+                    
+                      <a class="main-nav-link switch-friends-link" href="https://pages.github.com/">GitHub</a>
+                    
+                      <a class="main-nav-link switch-friends-link" href="http://moxfive.xyz/">MOxFIVE</a>
+                    
+                    </div>
+                </section>
+                
+
+                
+                
+                <section class="switch-part switch-part4">
+                
+                    <div id="js-aboutme">专注于前端</div>
+                </section>
+                
+            </div>
+        </div>
+    </header>                
+</div>
+    </div>
+    <div class="mid-col">
+      <nav id="mobile-nav">
+      <div class="overlay">
+          <div class="slider-trigger"></div>
+          <h1 class="header-author js-mobile-header hide"><a href="/" title="回到主页">Arking</a></h1>
+      </div>
+    <div class="intrude-less">
+        <header id="header" class="inner">
+            <a href="/" class="profilepic">
+                <img src="/img/avatar.png" class="animated zoomIn">
+            </a>
+            <hgroup>
+              <h1 class="header-author"><a href="/" title="回到主页">Arking</a></h1>
+            </hgroup>
+            
+            <nav class="header-menu">
+                <ul>
+                
+                    <li><a href="/">主页</a></li>
+                
+                    <li><a href="/archives/">归档</a></li>
+                
+                    <li><a href="/tags/">标签</a></li>
+                
+                    <li><a href="/about/">关于我</a></li>
+                
+                <div class="clearfix"></div>
+                </ul>
+            </nav>
+            <nav class="header-nav">
+                        <ul class="social">
+                            
+                                <a class="fa Email" target="_blank" href="/ximingchenhust@foxmail.com" title="Email"></a>
+                            
+                                <a class="fa GitHub" target="_blank" href="#" title="GitHub"></a>
+                            
+                        </ul>
+            </nav>
+        </header>                
+    </div>
+    <link class="menu-list" tags="标签" friends="友情链接" about="关于我">
+</nav>
+      <div class="body-wrap"><article id="post-2017-05-05-docker-filesystem-overlay" class="article article-type-post" itemscope="" itemprop="blogPost">
+  
+    <div class="article-meta">
+      <a href="/2017/05/05/2017-05-05-docker-filesystem-overlay/" class="article-date">
+      <time datetime="2017-05-04T18:57:00.000Z" itemprop="datePublished">2017-05-05</time>
+</a>
+
+
+    </div>
+  
+  <div class="article-inner">
+    
+      <input type="hidden" class="isFancy">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="article-title" itemprop="name">
+       Docker存储驱动—Overlay/Overlay2「译」
+    </h1>
+  
+
+      </header>
+      
+      <div class="article-info article-info-post">
+        
+    <div class="article-category tagcloud">
+    <a class="article-category-link" href="/categories/Docker/">Docker</a>
+    </div>
+
+
+        
+    <div class="article-tag tagcloud">
+        <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/docker/">docker</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/storage/">storage</a></li></ul>
+    </div>
+
+        <div class="clearfix"></div>
+      </div>
+      
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+          
+        <blockquote>
+<p>该文为译文，代码为本地实际运行的结果，部分内容有修改或删除。实验环境为Ubuntu 14.04；</p>
+</blockquote>
+<a id="more"></a>
+<p><a href="https://docs.docker.com/engine/userguide/storagedriver/overlayfs-driver/#container-reads-and-writes-with-overlay" target="_blank" rel="noopener">原文链接</a></p>
+<p>OverlayFS是和AUFS相似的联合文件系统(union filesystem)，它有如下特点：</p>
+<ul>
+<li><em>设计简洁；</em></li>
+<li><em>内核3.18开始已经并入内核主线</em></li>
+<li><em>可能更快</em></li>
+</ul>
+<p>因此，它在社区迅速获得广泛关注并被很多人认为是AUFS的继承。但是它任然很年轻，<br>因此在生产环境中使用时要谨慎</p>
+<p>docker的overlay存储驱动利OverlayFS的一些特征来构建以及管理镜像和容器的磁盘结构</p>
+<p>docker1.12后推出的overlay2在inode的利用方面比ovelay更有效<strong>overlay2要求内核版本大于等于4.0</strong></p>
+<h2 id="overlay"><a href="#overlay" class="headerlink" title="overlay"></a>overlay</h2><p>如下图所示，Overlay在主机上用到2个目录，这2个目录被看成是overlay的层。<br>upperdir为容器层、lowerdir为镜像层使用联合挂载技术将它们挂载在同一目录(merged)下，提供统一视图</p>
+<p><img src="/img/in-post/post-docker-filesystem/overlay_constructs.jpg" alt=""></p>
+<p><em><a href="https://docs.docker.com/engine/userguide/storagedriver/images/overlay_constructs.jpg" target="_blank" rel="noopener">图片来源: Docker文档</a></em></p>
+<p>当容器层和镜像层拥有相同的文件时，容器层的文件可见，隐藏了镜像层相同的文件。<br>容器挂载目录(merged)提供了统一视图</p>
+<p>overlay只使用2层，意味着多层镜像不会被实现为多个OverlayFS层。每个镜像被实现为自己的目录，<br>这个目录在路径/var/lib/docker/overlay下。<strong>硬链接</strong>被用来索引和低层共享的数据，节省了空间</p>
+<p>当创建一个容器时，overlay驱动连接代表镜像层顶层的目录(只读)和一个代表容器层的新目录(读写)</p>
+<h3 id="例子：镜像和容器的磁盘结构-overlay"><a href="#例子：镜像和容器的磁盘结构-overlay" class="headerlink" title="例子：镜像和容器的磁盘结构[overlay]"></a>例子：镜像和容器的磁盘结构[overlay]</h3><figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">root@chenximing-MS-7823:/home/chenximing# tree /var/lib/docker/overlay/</span><br><span class="line"></span><br><span class="line">/var/lib/docker/overlay/</span><br></pre></td></tr></table></figure>
+<p>一开始overlay路径下为空，用docker pull命令下载一个由5层镜像层组成的docker镜像:</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">chenximing@chenximing-MS-7823:~$ docker pull ubuntu</span><br><span class="line"></span><br><span class="line">Using default tag: latest</span><br><span class="line">latest: Pulling from library/ubuntu</span><br><span class="line">c62795f78da9: Pull complete </span><br><span class="line">d4fceeeb758e: Pull complete </span><br><span class="line">5c9125a401ae: Pull complete </span><br><span class="line">0062f774e994: Pull complete </span><br><span class="line">6b33fd031fac: Pull complete </span><br><span class="line">Digest: sha256:c2bbf50d276508d73dd865cda7b4ee9b5243f2648647d21e3a471dd3cc4209a0</span><br><span class="line">Status: Downloaded newer image for ubuntu:latests</span><br></pre></td></tr></table></figure>
+<p>此时，在路径/var/lib/docker/overlay/下，每个镜像层都有一个对应的目录，包含了该层镜像的内容，通过tree命令发现，每个镜像层下只包含一个root目录 (因为docker1.10开始，使用基于内容的寻址，因此目录名和镜像层的id不一致)</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line">root@chenximing-MS-7823:/home/chenximing# tree -L 2 /var/lib/docker/overlay/</span><br><span class="line"></span><br><span class="line">/var/lib/docker/overlay/</span><br><span class="line">├── 3279a41fd358cdda798d99cc2da0425b4836a489083ae9db4aedc834f426915a</span><br><span class="line">│   └── root</span><br><span class="line">├── 33629fe3999e692ecbeb340f855a2d05ddf4e173ea915041be217e1c9cc8a48f</span><br><span class="line">│   └── root</span><br><span class="line">├── 6ab876fcc7ad584dd1eebae0d9304abb22561012f6adb87828f57906d799c33b</span><br><span class="line">│   └── root</span><br><span class="line">├── 77806a4b8257cd5508a1131d4d47c2d4b4d51703a1cc0dd8daddf0e86a68d492</span><br><span class="line">│   └── root</span><br><span class="line">└── ed271f2159e3c9de18ede980e4e2ecb0ef39b96927d446ba93deab0b6ff1a8e3</span><br><span class="line">    └── root</span><br></pre></td></tr></table></figure>
+<p>每一层都包含了”该层独有的文件”以及”和其低层共享的数据的硬连接”。如ls命令，每一层都使用一个硬链接来指向实际ls命令的inode号(405241)：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">root@chenximing-MS-7823:/home/chenximing# ls -i /var/lib/docker/overlay/3279a41fd358cdda798d99cc2da0425b4836a489083ae9db4aedc834f426915a/root/bin/ls</span><br><span class="line">    </span><br><span class="line">405241 /var/lib/docker/overlay/3279a41fd358cdda798d99cc2da0425b4836a489083ae9db4aedc834f426915a/root/bin/ls</span><br><span class="line">    </span><br><span class="line">root@chenximing-MS-7823:/home/chenximing# ls -i /var/lib/docker/overlay/33629fe3999e692ecbeb340f855a2d05ddf4e173ea915041be217e1c9cc8a48f/root/bin/ls</span><br><span class="line">    </span><br><span class="line">405241 /var/lib/docker/overlay/33629fe3999e692ecbeb340f855a2d05ddf4e173ea915041be217e1c9cc8a48f/root/bin/ls</span><br></pre></td></tr></table></figure>
+<p>使用刚刚拉取的ubuntu镜像创建一个容器，用docker ps命令查看：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">root@chenximing-MS-7823:/home/chenximing# docker ps</span><br><span class="line">    </span><br><span class="line">CONTAINER ID        IMAGE               COMMAND             CREATED             STATUS              PORTS               NAMES</span><br><span class="line">8963ffb422fa        ubuntu              "/bin/bash"         32 minutes ago      Up 52 seconds                           container_1</span><br></pre></td></tr></table></figure>
+<p>创建容器时，实际上是在已有的镜像层上创建了一层容器层，容器层在路径/var/lib/docker/overlay下也存在对应的目录：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">root@chenximing-MS-7823:/home/chenximing# ls /var/lib/docker/overlay/</span><br><span class="line">    </span><br><span class="line">3279a41fd358cdda798d99cc2da0425b4836a489083ae9db4aedc834f426915a</span><br><span class="line">33629fe3999e692ecbeb340f855a2d05ddf4e173ea915041be217e1c9cc8a48f</span><br><span class="line">6ab876fcc7ad584dd1eebae0d9304abb22561012f6adb87828f57906d799c33b</span><br><span class="line">6abc47fcf668b6820a2a9a8b0d0c6150f9df61ab5a323783630fac3fd282144d       //创建容器后新增的目录</span><br><span class="line">6abc47fcf668b6820a2a9a8b0d0c6150f9df61ab5a323783630fac3fd282144d-init  //创建容器后新增的目录</span><br><span class="line">77806a4b8257cd5508a1131d4d47c2d4b4d51703a1cc0dd8daddf0e86a68d492</span><br><span class="line">ed271f2159e3c9de18ede980e4e2ecb0ef39b96927d446ba93deab0b6ff1a8e3</span><br></pre></td></tr></table></figure>
+<p>“6abc47……”和“6abc47…..-init”为创建容器后<strong>新增的目录</strong>。查看这两个目录的内容：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br></pre></td><td class="code"><pre><span class="line">root@chenximing-MS-7823:/home/chenximing# tree -L 3 /var/lib/docker/overlay/6abc47fcf668b6820a2a9a8b0d0c6150f9df61ab5a323783630fac3fd282144d*/</span><br><span class="line">   </span><br><span class="line">/var/lib/docker/overlay/6abc47fcf668b6820a2a9a8b0d0c6150f9df61ab5a323783630fac3fd282144d/</span><br><span class="line">├── lower-id</span><br><span class="line">├── merged</span><br><span class="line">├── upper</span><br><span class="line">│   ├── dev</span><br><span class="line">│   │   └── console</span><br><span class="line">│   ├── etc</span><br><span class="line">│   │   ├── hostname</span><br><span class="line">│   │   ├── hosts</span><br><span class="line">│   │   ├── mtab -&gt; /proc/mounts</span><br><span class="line">│   │   └── resolv.conf</span><br><span class="line">│   └── root</span><br><span class="line">└── work</span><br><span class="line">    └── work</span><br><span class="line">    </span><br><span class="line">/var/lib/docker/overlay/6abc47fcf668b6820a2a9a8b0d0c6150f9df61ab5a323783630fac3fd282144d-init/</span><br><span class="line">├── lower-id</span><br><span class="line">├── merged</span><br><span class="line">├── upper</span><br><span class="line">│   ├── dev</span><br><span class="line">│   │   └── console</span><br><span class="line">│   └── etc</span><br><span class="line">│       ├── hostname</span><br><span class="line">│       ├── hosts</span><br><span class="line">│       ├── mtab -&gt; /proc/mounts</span><br><span class="line">│       └── resolv.conf</span><br><span class="line">└── work</span><br><span class="line">    └── work</span><br></pre></td></tr></table></figure>
+<p>“6abc47……”为<strong>读写层</strong>，“6abc47…..-init”为<strong>初始层</strong>。初始层中大多是初始化容器环境时，与容器相关的环境信息，如容器主机名，主机host信息以及域名服务文件等。<strong>所有对容器做出的改变都记录在读写层</strong></p>
+<p>文件lower-id用来索引该容器使用的镜像层，upper目录包含了容器层的内容，每当启动一个容器时，会将lower-id指向的镜像层目录以及upper目录联合挂载到merged目录，因此，容器内的视角就是merged目录下的内容。而work目录则是用来完成如copy-on_write的操作</p>
+<p>看看容器使用到了哪一层镜像层：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">root@chenximing-MS-7823:/home/chenximing<span class="comment"># cat /var/lib/docker/overlay/6abc47fcf668b6820a2a9a8b0d0c6150f9df61ab5a323783630fac3fd282144d/lower-id</span></span><br><span class="line">    </span><br><span class="line">ed271f2159e3c9de18ede980e4e2ecb0ef39b96927d446ba93deab0b6ff1a8e3</span><br><span class="line">    </span><br><span class="line">root@chenximing-MS-7823:/home/chenximing<span class="comment"># cat /var/lib/docker/overlay/6abc47fcf668b6820a2a9a8b0d0c6150f9df61ab5a323783630fac3fd282144d-init/lower-id</span></span><br><span class="line">    </span><br><span class="line">ed271f2159e3c9de18ede980e4e2ecb0ef39b96927d446ba93deab0b6ff1a8e3</span><br></pre></td></tr></table></figure>
+<p>在刚才创建的容器中创建一个文件：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">root@8963ffb422fa:/<span class="comment"># touch file</span></span><br><span class="line">    </span><br><span class="line">root@8963ffb422fa:/<span class="comment"># echo "hello world" &gt; file</span></span><br><span class="line">    </span><br><span class="line">root@8963ffb422fa:/<span class="comment"># ls</span></span><br><span class="line">bin   dev  file  lib    media  opt   root  sbin  sys  usr</span><br><span class="line">boot  etc  home  lib64  mnt    proc  run   srv   tmp  var</span><br></pre></td></tr></table></figure>
+<p>此时再观察“6abc47……”目录(读写层)：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line">root@chenximing-MS-7823:/home/chenximing# tree -L 3 /var/lib/docker/overlay/6abc47fcf668b6820a2a9a8b0d0c6150f9df61ab5a323783630fac3fd282144d/  </span><br><span class="line">    </span><br><span class="line">/var/lib/docker/overlay/6abc47fcf668b6820a2a9a8b0d0c6150f9df61ab5a323783630fac3fd282144d/</span><br><span class="line">├── lower-id</span><br><span class="line">├── merged</span><br><span class="line">├── upper</span><br><span class="line">│   ├── dev</span><br><span class="line">│   │   └── console</span><br><span class="line">│   ├── etc</span><br><span class="line">│   │   ├── hostname</span><br><span class="line">│   │   ├── hosts</span><br><span class="line">│   │   ├── mtab -&gt; /proc/mounts</span><br><span class="line">│   │   └── resolv.conf</span><br><span class="line">│   ├── file</span><br><span class="line">│   └── root</span><br><span class="line">└── work</span><br><span class="line">    └── work</span><br></pre></td></tr></table></figure>
+<p>发现upper目录下多出了一个file文件，就是刚才在容器中创建的文件</p>
+<h2 id="overlay2"><a href="#overlay2" class="headerlink" title="overlay2"></a>overlay2</h2><p>和overlay为了实现“两个目录反映多层镜像“而使用硬链接不同，overlay2驱动天生支持多层。(最多128)</p>
+<p>因此，overlay2在使用docker层相关的命令时，能提供更好的性能(如：docker build、docker commit)。而且overlay2消耗的inode节点更少</p>
+<h3 id="例子：镜像和容器的基于磁盘的结构-overlay2"><a href="#例子：镜像和容器的基于磁盘的结构-overlay2" class="headerlink" title="例子：镜像和容器的基于磁盘的结构[overlay2]"></a>例子：镜像和容器的基于磁盘的结构[overlay2]</h3><p>docker pull ubuntu拉取完一个5层的Ubuntu镜像后，/var/lib/docker/overlay2下可以看到6个目录:</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br></pre></td><td class="code"><pre><span class="line">root@chenximing-MS-7823:/home/chenximing# tree -L 2 /var/lib/docker/overlay2</span><br><span class="line">    </span><br><span class="line">/var/lib/docker/overlay2</span><br><span class="line">├── 1d18eac18e483e5af46d52673e254cb89996041d91356c6dd1f0ac1518ba130a</span><br><span class="line">│   ├── diff</span><br><span class="line">│   └── link   //文件</span><br><span class="line">├── 28702e0cca9ff9a3245ce7e61326d098788e855ea599bf160465f537756a56a6</span><br><span class="line">│   ├── diff</span><br><span class="line">│   ├── link   //文件</span><br><span class="line">│   ├── lower   //文件</span><br><span class="line">│   ├── merged</span><br><span class="line">│   └── work</span><br><span class="line">├── 299397034eb96f22d544bf544c9ef993fa32571f466bd8a881aec0fc5a94a8df</span><br><span class="line">│   ├── diff</span><br><span class="line">│   ├── link   //文件</span><br><span class="line">│   ├── lower   //文件</span><br><span class="line">│   ├── merged</span><br><span class="line">│   └── work</span><br><span class="line">├── 8c0de7df4581df4787b08a28356cc8d7ba7b420c70dc36cc0615afdafb6ee15a</span><br><span class="line">│   ├── diff</span><br><span class="line">│   ├── link   //文件</span><br><span class="line">│   ├── lower   //文件</span><br><span class="line">│   ├── merged</span><br><span class="line">│   └── work</span><br><span class="line">├── f21a47541026214e519fccdf8b838ac2c4e11a1a2dd6a5febc061381a1972ad7</span><br><span class="line">│   ├── diff</span><br><span class="line">│   ├── link   //文件</span><br><span class="line">│   ├── lower   //文件</span><br><span class="line">│   ├── merged</span><br><span class="line">│   └── work</span><br><span class="line">└── l</span><br><span class="line">    ├── 5DJFQNGXSA5CVOC6NA6HPUCXXB -&gt; ../299397034eb96f22d544bf544c9ef993fa32571f466bd8a881aec0fc5a94a8df/diff</span><br><span class="line">    ├── EGQNS3O24ONBL5BJSGNTX4NP6E -&gt; ../1d18eac18e483e5af46d52673e254cb89996041d91356c6dd1f0ac1518ba130a/diff</span><br><span class="line">    ├── JWB63ZJDZOTK5N22OMR5BKUVMG -&gt; ../8c0de7df4581df4787b08a28356cc8d7ba7b420c70dc36cc0615afdafb6ee15a/diff</span><br><span class="line">    ├── UZHRLLTPQMODQQYBLN6NOT6N2K -&gt; ../28702e0cca9ff9a3245ce7e61326d098788e855ea599bf160465f537756a56a6/diff</span><br><span class="line">    └── X76VPZDDKIW3GLWBFUHKDFBEPE -&gt; ../f21a47541026214e519fccdf8b838ac2c4e11a1a2dd6a5febc061381a1972ad7/diff</span><br><span class="line">    </span><br><span class="line">24 directories, 9 files</span><br></pre></td></tr></table></figure>
+<p>”l“目录包含一些符号链接作为缩短的层标识符. 这些缩短的标识符用来避免挂载时超出页面大小的限制</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">root@chenximing-MS-7823:/home/chenximing# ls -l /var/lib/docker/overlay2/l/</span><br><span class="line">    </span><br><span class="line">总用量 20</span><br><span class="line">lrwxrwxrwx 1 root root 72  4月 20 17:31 5DJFQNGXSA5CVOC6NA6HPUCXXB -&gt; ../299397034eb96f22d544bf544c9ef993fa32571f466bd8a881aec0fc5a94a8df/diff</span><br><span class="line">lrwxrwxrwx 1 root root 72  4月 20 17:31 EGQNS3O24ONBL5BJSGNTX4NP6E -&gt; ../1d18eac18e483e5af46d52673e254cb89996041d91356c6dd1f0ac1518ba130a/diff</span><br><span class="line">lrwxrwxrwx 1 root root 72  4月 20 17:31 JWB63ZJDZOTK5N22OMR5BKUVMG -&gt; ../8c0de7df4581df4787b08a28356cc8d7ba7b420c70dc36cc0615afdafb6ee15a/diff</span><br><span class="line">lrwxrwxrwx 1 root root 72  4月 20 17:31 UZHRLLTPQMODQQYBLN6NOT6N2K -&gt; ../28702e0cca9ff9a3245ce7e61326d098788e855ea599bf160465f537756a56a6/diff</span><br><span class="line">lrwxrwxrwx 1 root root 72  4月 20 17:31 X76VPZDDKIW3GLWBFUHKDFBEPE -&gt; ../f21a47541026214e519fccdf8b838ac2c4e11a1a2dd6a5febc061381a1972ad7/diff</span><br></pre></td></tr></table></figure>
+<p>最底层包含”link”文件(不包含lower文件，因为是最底层)，在上面的结果中“1d8e….”为最底层。这个文件记录着作为标识符的更短的符号链接的名字、最底层还有一个”diff”目录(包含实际内容)</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">root@chenximing-MS-7823:/home/chenximing# cat /var/lib/docker/overlay2/1d18eac18e483e5af46d52673e254cb89996041d91356c6dd1f0ac1518ba130a/link </span><br><span class="line">    </span><br><span class="line">EGQNS3O24ONBL5BJSGNTX4NP6E</span><br><span class="line">    </span><br><span class="line">root@chenximing-MS-7823:/home/chenximing# ls /var/lib/docker/overlay2/1d18eac18e483e5af46d52673e254cb89996041d91356c6dd1f0ac1518ba130a/diff/</span><br><span class="line">    </span><br><span class="line">bin   dev  home  lib64  mnt  proc  run   srv  tmp  var</span><br><span class="line">boot  etc  lib   media  opt  root  sbin  sys  usr</span><br></pre></td></tr></table></figure>
+<p>从第二层开始，每层镜像层包含”lower“文件，根据这个文件可以索引构建出整个镜像的层次结构。”diff“文件(层的内容)。还包含”merged“和”work”目录，用途和overlay一样</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">root@chenximing-MS-7823:/home/chenximing# cat /var/lib/docker/overlay2/28702e0cca9ff9a3245ce7e61326d098788e855ea599bf160465f537756a56a6/link </span><br><span class="line">    </span><br><span class="line">UZHRLLTPQMODQQYBLN6NOT6N2K</span><br><span class="line">    </span><br><span class="line">root@chenximing-MS-7823:/home/chenximing# ls /var/lib/docker/overlay2/28702e0cca9ff9a3245ce7e61326d098788e855ea599bf160465f537756a56a6/diff/</span><br><span class="line">    </span><br><span class="line">etc  sbin  usr  var</span><br><span class="line">    </span><br><span class="line">root@chenximing-MS-7823:/home/chenximing# cat /var/lib/docker/overlay2/28702e0cca9ff9a3245ce7e61326d098788e855ea599bf160465f537756a56a6/lower</span><br><span class="line">    </span><br><span class="line">l/EGQNS3O24ONBL5BJSGNTX4NP6E</span><br></pre></td></tr></table></figure>
+<p>再来看看容器层，容器层的文件构成和镜像层类似(这点和overlay不同)，使用刚刚拉取的ubuntu镜像创建一个容器，/var/lib/docker/overlay2目录下新增2个目录：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line">├── 2558ed8dd7051c1e78ea980590a228100ec3d299c01b35e9b7fa503723593d19</span><br><span class="line">│   ├── diff</span><br><span class="line">│   ├── link</span><br><span class="line">│   ├── lower</span><br><span class="line">│   ├── merged</span><br><span class="line">│   └── work</span><br><span class="line">├── 2558ed8dd7051c1e78ea980590a228100ec3d299c01b35e9b7fa503723593d19-init</span><br><span class="line">│   ├── diff</span><br><span class="line">│   ├── link</span><br><span class="line">│   ├── lower</span><br><span class="line">│   ├── merged</span><br><span class="line">│   └── work</span><br><span class="line">└── l</span><br><span class="line">    ├── 7H7MUMX4IOAVLIJ2YPLR5MZOO5 -&gt; ../2558ed8dd7051c1e78ea980590a228100ec3d299c01b35e9b7fa503723593d19-init/diff</span><br><span class="line">    ├── EBSBKJBLA2WYBHTMHKSMCEEWNP -&gt; ../2558ed8dd7051c1e78ea980590a228100ec3d299c01b35e9b7fa503723593d19/diff</span><br><span class="line"></span><br><span class="line">    </span><br><span class="line">root@chenximing-MS-7823:/home/chenximing# cat /var/lib/docker/overlay2/2558ed8dd7051c1e78ea980590a228100ec3d299c01b35e9b7fa503723593d19/lower </span><br><span class="line">    </span><br><span class="line">l/7H7MUMX4IOAVLIJ2YPLR5MZOO5:l/5DJFQNGXSA5CVOC6NA6HPUCXXB:l/JWB63ZJDZOTK5N22OMR5BKUVMG:l/X76VPZDDKIW3GLWBFUHKDFBEPE:l/UZHRLLTPQMODQQYBLN6NOT6N2K:l/EGQNS3O24ONBL5BJSGNTX4NP6E</span><br></pre></td></tr></table></figure>
+<h2 id="容器的读写"><a href="#容器的读写" class="headerlink" title="容器的读写"></a>容器的读写</h2><p>对于读，考虑下列3种场景：</p>
+<ul>
+<li><strong>读的文件不在容器层</strong>：如果读的文件不在容器层，则从镜像层进行读</li>
+<li><strong>读的文件只存在在容器层</strong>：直接从容器层读</li>
+<li><strong>读的文件在容器层和镜像层</strong>：读容器层中的文件，因为容器层隐藏了镜像层同名的文件</li>
+</ul>
+<p>对于写，考虑下列场景：</p>
+<ul>
+<li><strong>写的文件不在容器层，在镜像层</strong>：由于文件不在容器层，因此overlay/overlay2存储驱动使用copy_up操作从镜像层拷贝文件到容器层，然后将写入的内容写入到文件新的拷贝中</li>
+<li><strong>删除文件和目录</strong>：删除镜像层的文件，会在容器层创建一个whiteout文件来隐藏它；删除镜像层的目录，会创建opaque目录，它和whiteout文件有相同的效果</li>
+<li><strong>重命名目录</strong>：对一个目录调用rename(2)仅仅在资源和目的地路径都在顶层时才被允许，否则返回EXDEV</li>
+</ul>
+<h2 id="配置Docker使用overlay-overlay2存储驱动"><a href="#配置Docker使用overlay-overlay2存储驱动" class="headerlink" title="配置Docker使用overlay/overlay2存储驱动"></a>配置Docker使用overlay/overlay2存储驱动</h2><ul>
+<li>配置overlay要求内核版本大于等于3.18，且加载了overlay内核模块；  </li>
+<li>配置overlay2要求内核版本大于等于4.0；  </li>
+<li>docker daemon处于stopped状态；</li>
+</ul>
+<p>OverlayFS能在大多数Linux文件系统上运行，但是<strong>ext4是目前在生产环境中被推荐的</strong></p>
+<p><strong>1) stop Docker daemon</strong>  </p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ sudo service docker stop</span><br></pre></td></tr></table></figure>
+<p><strong>2) 确认内核版本以及overlay内核模块已经加载</strong></p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">#查看内核版本</span></span><br><span class="line">$ uname -r  </span><br><span class="line"></span><br><span class="line"><span class="comment">#查看内核是否已加载overlay模块 </span></span><br><span class="line">$ lsmod | grep overlay  </span><br><span class="line">overlay</span><br></pre></td></tr></table></figure>
+<p>如果未加载overlay模块，假设你的内核已经编译了overlay模块，则可以通过下列命令进行加载，或者在启动docker服务时，会自动加载overlay模块：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ modprobe overlay</span><br></pre></td></tr></table></figure>
+<p><strong>3) 启动docker daemon（使用overlay/overlay2存储驱动）</strong></p>
+<p><strong>方法一(推荐)</strong>：<br>在/etc/docker/路径下创建daemon.json文件，并添加下列内容：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">&#123;</span><br><span class="line">  <span class="string">"storage-driver"</span>: <span class="string">"overlay2"</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>然后启动docker服务:</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ sudo service docker start</span><br></pre></td></tr></table></figure>
+<p><strong>方法二</strong>:</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">$</span><span class="bash"> dockerd --storage-driver=overlay &amp;  </span></span><br><span class="line"></span><br><span class="line">[1] 29403  </span><br><span class="line">root@ip-10-0-0-174:/home/ubuntu# INFO[0000] Listening for HTTP on unix (/var/run/docker.sock)  </span><br><span class="line">INFO[0000] Option DefaultDriver: bridge  </span><br><span class="line">INFO[0000] Option DefaultNetwork: bridge</span><br></pre></td></tr></table></figure>
+<p><strong>4) 核实daemon已经在使用overlay/overlay2</strong></p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">$ docker info</span><br><span class="line">    </span><br><span class="line">Containers: 0  </span><br><span class="line">Images: 0  </span><br><span class="line">Storage Driver: overlay  </span><br><span class="line">Backing Filesystem: extfs</span><br><span class="line">...</span><br></pre></td></tr></table></figure>
+<h2 id="OverlayFS-and-Docker-性能"><a href="#OverlayFS-and-Docker-性能" class="headerlink" title="OverlayFS and Docker 性能"></a>OverlayFS and Docker 性能</h2><p>一般来说，overlay/overlay2很快，几乎肯定比aufs和devicemapper快。在某些特定场景下，还可能比btrfs快。<br>此外，还有几点overlay/overlay2驱动性能相关的注意事项：</p>
+<ul>
+<li><strong>页缓存</strong>：OverlayFS支持页缓存共享，意味着多个容器访问相同的文件能够共享一个单一的page cache entry<br>使得overlay/overlay2驱动能高效使用内存，是PaaS以及其它高密度场景一个好的选择</li>
+<li><strong>copy_up</strong>：对镜像层大文件进行写操作时，copy-on-write会给写操作带来大量延迟</li>
+<li><strong>inode 限制</strong>：使用overlay会引起过度的inode消耗，消耗会随着主机上的镜像和容器的增加而增加。拥有大量镜像的主机在大量容器启动和停止时可能会耗尽inodes。不幸的是你只能在文件系统创建时指定inode数，因此你可能需要考虑将/var/lib/docker放在另一个独立的设备上，或者在创建文件系统时手动修改inode值。而overlay2则没有这样的问题</li>
+<li><strong>RPM和Yum</strong>：OverlayFS仅实现了POSIX标准的一部分，某些操作还会违反POSIX标准，copy_up操作就是其中一个</li>
+</ul>
+<p>下面是提升OverlayFS驱动性能的最佳实践：</p>
+<ul>
+<li><strong>SSD</strong>：为了获得最佳性能，一个通常的想法是使用诸如SSD这类更快的存储设备</li>
+<li><strong>使用数据卷</strong>： 数据卷提供了最好的以及最可预见的性能。因为绕过了存储驱动，因此不会存在瘦供给和copy-on-write带来的潜在性能开销。因此，写操作较频繁的数据应该放在数据卷上</li>
+</ul>
+
+      
+    </div>
+    
+  </div>
+  
+    
+    <div class="copyright">
+        <p><span>本文标题:</span><a href="/2017/05/05/2017-05-05-docker-filesystem-overlay/"> Docker存储驱动—Overlay/Overlay2「译」</a></p>
+        <p><span>文章作者:</span><a href="/" title="回到主页">Arking</a></p>
+        <p><span>发布时间:</span>2017-05-05, 02:57:00</p>
+        <p><span>最后更新:</span>2018-12-04, 17:05:31</p>
+        <p>
+            <span>原始链接:</span><a class="post-url" href="/2017/05/05/2017-05-05-docker-filesystem-overlay/" title=" Docker存储驱动—Overlay/Overlay2「译」">http://yoursite.com/2017/05/05/2017-05-05-docker-filesystem-overlay/</a>
+            <span class="copy-path" data-clipboard-text="原文: http://yoursite.com/2017/05/05/2017-05-05-docker-filesystem-overlay/　　作者: Arking" title="点击复制文章链接"><i class="fa fa-clipboard"></i></span>
+            <script> var clipboard = new Clipboard('.copy-path'); </script>
+        </p>
+        <p>
+            <span>许可协议:</span><i class="fa fa-creative-commons"></i> <a rel="license" href="http://creativecommons.org/licenses/by-nc-sa/4.0/" title="CC BY-NC-SA 4.0 International" target="_blank">"署名-非商用-相同方式共享 4.0"</a> 转载请保留原文链接及作者。
+        </p>
+    </div>
+
+
+
+    <nav id="article-nav">
+        
+            <div id="article-nav-newer" class="article-nav-title">
+                <a href="/2017/08/18/2017-08-18-linux-code-vfs/">
+                    Linux虚拟文件系统(VFS)
+                </a>
+            </div>
+        
+        
+            <div id="article-nav-older" class="article-nav-title">
+                <a href="/2017/04/13/2017-04-13-docker-filesystem-aufs/">
+                     Docker存储驱动—Aufs 
+                </a>
+            </div>
+        
+    </nav>
+
+  
+</article>
+
+    <div id="toc" class="toc-article">
+        <strong class="toc-title">文章目录</strong>
+        
+            <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#overlay"><span class="toc-number">1.</span> <span class="toc-text">overlay</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#例子：镜像和容器的磁盘结构-overlay"><span class="toc-number">1.1.</span> <span class="toc-text">例子：镜像和容器的磁盘结构[overlay]</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#overlay2"><span class="toc-number">2.</span> <span class="toc-text">overlay2</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#例子：镜像和容器的基于磁盘的结构-overlay2"><span class="toc-number">2.1.</span> <span class="toc-text">例子：镜像和容器的基于磁盘的结构[overlay2]</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#容器的读写"><span class="toc-number">3.</span> <span class="toc-text">容器的读写</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#配置Docker使用overlay-overlay2存储驱动"><span class="toc-number">4.</span> <span class="toc-text">配置Docker使用overlay/overlay2存储驱动</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#OverlayFS-and-Docker-性能"><span class="toc-number">5.</span> <span class="toc-text">OverlayFS and Docker 性能</span></a></li></ol>
+        
+    </div>
+    <style>
+        .left-col .switch-btn,
+        .left-col .switch-area {
+            display: none;
+        }
+        .toc-level-3 i,
+        .toc-level-3 ol {
+            display: none !important;
+        }
+    </style>
+
+    <input type="button" id="tocButton" value="隐藏目录" title="点击按钮隐藏或者显示文章目录">
+
+    <script>
+        yiliaConfig.toc = ["隐藏目录", "显示目录", !!"false"];
+    </script>
+
+
+
+    
+<div class="share">
+    
+        <div class="bdsharebuttonbox">
+            <a href="#" class="fa fa-twitter bds_twi" data-cmd="twi" title="分享到推特"></a>
+            <a href="#" class="fa fa-weibo bds_tsina" data-cmd="tsina" title="分享到新浪微博"></a>
+            <a href="#" class="fa fa-qq bds_sqq" data-cmd="sqq" title="分享给 QQ 好友"></a>
+            <a href="#" class="fa fa-files-o bds_copy" data-cmd="copy" title="复制网址"></a>
+            <a href="#" class="fa fa fa-envelope-o bds_mail" data-cmd="mail" title="通过邮件分享"></a>
+            <a href="#" class="fa fa-weixin bds_weixin" data-cmd="weixin" title="生成文章二维码"></a>
+            <a href="#" class="fa fa-share-alt bds_more" data-cmd="more"></a>
+        </div>
+        <script>
+            window._bd_share_config={
+                "common":{"bdSnsKey":{},"bdText":" Docker存储驱动—Overlay/Overlay2「译」　| Hexo　","bdMini":"2","bdMiniList":false,"bdPic":"","bdStyle":"0","bdSize":"24"},"share":{}};with(document)0[(getElementsByTagName('head')[0]||body).appendChild(createElement('script')).src='http://bdimg.share.baidu.com/static/api/js/share.js?v=89860593.js?cdnversion='+~(-new Date()/36e5)];
+        </script>
+    
+
+    
+</div>
+
+
+
+
+
+
+
+    
+
+
+
+
+    <div class="scroll" id="post-nav-button">
+        
+            <a href="/2017/08/18/2017-08-18-linux-code-vfs/" title="上一篇: Linux虚拟文件系统(VFS)">
+                <i class="fa fa-angle-left"></i>
+            </a>
+        
+
+        <a title="文章列表"><i class="fa fa-bars"></i><i class="fa fa-times"></i></a>
+
+        
+            <a href="/2017/04/13/2017-04-13-docker-filesystem-aufs/" title="下一篇:  Docker存储驱动—Aufs ">
+                <i class="fa fa-angle-right"></i>
+            </a>
+        
+    </div>
+
+    <ul class="post-list"><li class="post-list-item"><a class="post-list-link" href="/2018/09/05/2018-09-05-linux-kernel/">Ubuntu下内核与内核模块的编译过程</a></li><li class="post-list-item"><a class="post-list-link" href="/2018/01/19/2018-01-19-docker-imagestore/"> Docker源码分析—镜像存储 </a></li><li class="post-list-item"><a class="post-list-link" href="/2018/01/15/2018-01-15-docker-storage-overlay2/"> Docker源码分析—存储驱动 </a></li><li class="post-list-item"><a class="post-list-link" href="/2018/01/14/2018-01-14-docker-layerstore/"> Docker源码分析—层存储 </a></li><li class="post-list-item"><a class="post-list-link" href="/2018/01/12/2018-01-10-c-stack_frame/"> C函数栈帧 </a></li><li class="post-list-item"><a class="post-list-link" href="/2017/12/26/2017-12-26-linux-code-overlayfs-read_write/">内核OverlayFS—文件读写</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/12/22/2017-12-22-linux-code-overlayfs-create_delete/">内核OverlayFS—创建与删除文件</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/11/30/2017-11-30-linux-du/"> Linux查看目录大小</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/11/10/2017-11-10-linux-code-overlayfs-dir-op1/">内核OverlayFS—目录搜索</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/10/12/2017-10-12-linux-code-overlayfs-mnt/">内核OverlayFS—注册与挂载</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/09/20/2017-09-20-linux-code-overlayfs-layerinfo/">内核OverlayFS—文件层次信息</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/08/18/2017-08-18-linux-code-vfs/">Linux虚拟文件系统(VFS)</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/05/05/2017-05-05-docker-filesystem-overlay/"> Docker存储驱动—Overlay/Overlay2「译」</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/04/13/2017-04-13-docker-filesystem-aufs/"> Docker存储驱动—Aufs </a></li><li class="post-list-item"><a class="post-list-link" href="/2017/04/09/2017-04-09-linux-uuid/"> Linux存储设备的UUID</a></li></ul>
+
+
+
+
+    <script>
+        
+    </script>
+</div>
+      <footer id="footer">
+    <div class="outer">
+        <div id="footer-info">
+            <div class="footer-left">
+                <i class="fa fa-copyright"></i> 
+                2017-2018 Arking
+            </div>
+            <div class="footer-right">
+                <a href="http://hexo.io/" target="_blank" title="快速、简洁且高效的博客框架">Hexo</a>  Theme <a href="https://github.com/MOxFIVE/hexo-theme-yelee" target="_blank" title="简而不减 Hexo 双栏博客主题  v3.5">Yelee</a> by MOxFIVE <i class="fa fa-heart animated infinite pulse"></i>
+            </div>
+        </div>
+        
+            <div class="visit">
+                
+                    <span id="busuanzi_container_site_pv" style="display:none">
+                        <span id="site-visit" title="本站到访数"><i class="fa fa-user" aria-hidden="true"></i><span id="busuanzi_value_site_uv"></span>
+                        </span>
+                    </span>
+                
+                
+                    <span>| </span>
+                
+                
+                    <span id="busuanzi_container_page_pv" style="display:none">
+                        <span id="page-visit" title="本页阅读量"><i class="fa fa-eye animated infinite pulse" aria-hidden="true"></i><span id="busuanzi_value_page_pv"></span>
+                        </span>
+                    </span>
+                
+            </div>
+        
+    </div>
+</footer>
+    </div>
+    
+<script data-main="/js/main.js" src="//cdn.bootcss.com/require.js/2.2.0/require.min.js"></script>
+
+    <script>
+        $(document).ready(function() {
+            var iPad = window.navigator.userAgent.indexOf('iPad');
+            if (iPad > -1 || $(".left-col").css("display") === "none") {
+                var bgColorList = ["#9db3f4", "#414141", "#e5a859", "#f5dfc6", "#c084a0", "#847e72", "#cd8390", "#996731"];
+                var bgColor = Math.ceil(Math.random() * (bgColorList.length - 1));
+                $("body").css({"background-color": bgColorList[bgColor], "background-size": "cover"});
+            }
+            else {
+                var backgroundnum = 5;
+                var backgroundimg = "url(/background/bg-x.jpg)".replace(/x/gi, Math.ceil(Math.random() * backgroundnum));
+                $("body").css({"background": backgroundimg, "background-attachment": "fixed", "background-size": "cover"});
+            }
+        })
+    </script>
+
+
+
+
+
+<div class="scroll" id="scroll">
+    <a href="#" title="返回顶部"><i class="fa fa-arrow-up"></i></a>
+    <a href="#comments" onclick="load$hide();" title="查看评论"><i class="fa fa-comments-o"></i></a>
+    <a href="#footer" title="转到底部"><i class="fa fa-arrow-down"></i></a>
+</div>
+<script>
+    // Open in New Window
+    
+        var oOpenInNew = {
+            
+            
+            
+            
+            
+            
+             archives: ".archive-article-title", 
+             miniArchives: "a.post-list-link", 
+            
+             friends: "#js-friends a", 
+             socail: ".social a" 
+        }
+        for (var x in oOpenInNew) {
+            $(oOpenInNew[x]).attr("target", "_blank");
+        }
+    
+</script>
+
+<script async src="https://dn-lbstatics.qbox.me/busuanzi/2.3/busuanzi.pure.mini.js">
+</script>
+  </div>
+</body>
+</html>

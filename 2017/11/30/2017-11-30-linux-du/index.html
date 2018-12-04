@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html>
+<head><meta name="generator" content="Hexo 3.8.0">
+
+    <!--[if lt IE 9]>
+        <style>body {display: none; background: none !important} </style>
+        <meta http-equiv="Refresh" Content="0; url=//outdatedbrowser.com/" />
+    <![endif]-->
+
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge, chrome=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="format-detection" content="telephone=no">
+<meta name="author" content="Arking">
+
+
+
+<meta name="description" content="在Linux上，如果你想查看一个文件的大小，可以使用命令ls -l，但是如果你想查看一个目录的大小(包含目录下的文件)，ls无法做到，基本上用ls命令查看到的目录大小都是4K（假设块大小为4K）: 12345678910111213chenximing@chenximing-MS-7823:~$ ls -lh......-rw-rw-r--  1 chenximing chenximing  16">
+<meta name="keywords" content="linux,storage">
+<meta property="og:type" content="article">
+<meta property="og:title" content=" Linux查看目录大小">
+<meta property="og:url" content="http://yoursite.com/2017/11/30/2017-11-30-linux-du/index.html">
+<meta property="og:site_name" content="Hexo">
+<meta property="og:description" content="在Linux上，如果你想查看一个文件的大小，可以使用命令ls -l，但是如果你想查看一个目录的大小(包含目录下的文件)，ls无法做到，基本上用ls命令查看到的目录大小都是4K（假设块大小为4K）: 12345678910111213chenximing@chenximing-MS-7823:~$ ls -lh......-rw-rw-r--  1 chenximing chenximing  16">
+<meta property="og:locale" content="default">
+<meta property="og:updated_time" content="2018-12-04T08:52:52.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content=" Linux查看目录大小">
+<meta name="twitter:description" content="在Linux上，如果你想查看一个文件的大小，可以使用命令ls -l，但是如果你想查看一个目录的大小(包含目录下的文件)，ls无法做到，基本上用ls命令查看到的目录大小都是4K（假设块大小为4K）: 12345678910111213chenximing@chenximing-MS-7823:~$ ls -lh......-rw-rw-r--  1 chenximing chenximing  16">
+
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+
+
+    <link rel="alternate" href="/atom.xml" title="Hexo" type="application/atom+xml">
+
+
+
+    <link rel="shortcut icon" href="/favicon.png">
+
+
+
+    <link href="//cdn.bootcss.com/animate.css/3.5.1/animate.min.css" rel="stylesheet">
+
+
+
+    <link href="//cdn.bootcss.com/fancybox/2.1.5/jquery.fancybox.min.css" rel="stylesheet">
+
+
+
+    <script src="//cdn.bootcss.com/pace/1.0.2/pace.min.js"></script>
+    <link href="//cdn.bootcss.com/pace/1.0.2/themes/blue/pace-theme-minimal.css" rel="stylesheet">
+
+
+<link rel="stylesheet" href="/css/style.css">
+
+
+
+<link href="//cdn.bootcss.com/font-awesome/4.6.3/css/font-awesome.min.css" rel="stylesheet">
+
+
+<title> Linux查看目录大小 | Hexo</title>
+
+<script src="//cdn.bootcss.com/jquery/2.2.4/jquery.min.js"></script>
+<script src="//cdn.bootcss.com/clipboard.js/1.5.10/clipboard.min.js"></script>
+
+<script>
+    var yiliaConfig = {
+        fancybox: true,
+        animate: true,
+        isHome: false,
+        isPost: true,
+        isArchive: false,
+        isTag: false,
+        isCategory: false,
+        fancybox_js: "//cdn.bootcss.com/fancybox/2.1.5/jquery.fancybox.min.js",
+        scrollreveal: "//cdn.bootcss.com/scrollReveal.js/3.1.4/scrollreveal.min.js",
+        search: false
+    }
+</script>
+
+
+    <script> yiliaConfig.jquery_ui = [false]; </script>
+
+
+
+    <script> yiliaConfig.rootUrl = "\/";</script>
+
+
+
+
+
+
+</head></html>
+<body>
+  <div id="container">
+    <div class="left-col">
+    <div class="overlay"></div>
+<div class="intrude-less">
+    <header id="header" class="inner">
+        <a href="/" class="profilepic">
+            <img src="/img/avatar.png" class="animated zoomIn">
+        </a>
+        <hgroup>
+          <h1 class="header-author"><a href="/">Arking</a></h1>
+        </hgroup>
+
+        
+
+        
+
+
+        
+            <div id="switch-btn" class="switch-btn">
+                <div class="icon">
+                    <div class="icon-ctn">
+                        <div class="icon-wrap icon-house" data-idx="0">
+                            <div class="birdhouse"></div>
+                            <div class="birdhouse_holes"></div>
+                        </div>
+                        <div class="icon-wrap icon-ribbon hide" data-idx="1">
+                            <div class="ribbon"></div>
+                        </div>
+                        
+                        <div class="icon-wrap icon-link hide" data-idx="2">
+                            <div class="loopback_l"></div>
+                            <div class="loopback_r"></div>
+                        </div>
+                        
+                        
+                        <div class="icon-wrap icon-me hide" data-idx="3">
+                            <div class="user"></div>
+                            <div class="shoulder"></div>
+                        </div>
+                        
+                    </div>
+                    
+                </div>
+                <div class="tips-box hide">
+                    <div class="tips-arrow"></div>
+                    <ul class="tips-inner">
+                        <li>菜单</li>
+                        <li>标签</li>
+                        
+                        <li>友情链接</li>
+                        
+                        
+                        <li>关于我</li>
+                        
+                    </ul>
+                </div>
+            </div>
+        
+
+        <div id="switch-area" class="switch-area">
+            <div class="switch-wrap">
+                <section class="switch-part switch-part1">
+                    <nav class="header-menu">
+                        <ul>
+                        
+                            <li><a href="/">主页</a></li>
+                        
+                            <li><a href="/archives/">归档</a></li>
+                        
+                            <li><a href="/tags/">标签</a></li>
+                        
+                            <li><a href="/about/">关于我</a></li>
+                        
+                        </ul>
+                    </nav>
+                    <nav class="header-nav">
+                        <ul class="social">
+                            
+                                <a class="fa Email" href="/ximingchenhust@foxmail.com" title="Email"></a>
+                            
+                                <a class="fa GitHub" href="#" title="GitHub"></a>
+                            
+                        </ul>
+                    </nav>
+                </section>
+                
+                
+                <section class="switch-part switch-part2">
+                    <div class="widget tagcloud" id="js-tagcloud">
+                        <ul class="tag-list"><li class="tag-list-item"><a class="tag-list-link" href="/tags/c/">c</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/docker/">docker</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/filesystem/">filesystem</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/linux/">linux</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/overlayfs/">overlayfs</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/storage/">storage</a></li></ul>
+                    </div>
+                </section>
+                
+                
+                
+                <section class="switch-part switch-part3">
+                    <div id="js-friends">
+                    
+                      <a class="main-nav-link switch-friends-link" href="https://hexo.io">Hexo</a>
+                    
+                      <a class="main-nav-link switch-friends-link" href="https://pages.github.com/">GitHub</a>
+                    
+                      <a class="main-nav-link switch-friends-link" href="http://moxfive.xyz/">MOxFIVE</a>
+                    
+                    </div>
+                </section>
+                
+
+                
+                
+                <section class="switch-part switch-part4">
+                
+                    <div id="js-aboutme">专注于前端</div>
+                </section>
+                
+            </div>
+        </div>
+    </header>                
+</div>
+    </div>
+    <div class="mid-col">
+      <nav id="mobile-nav">
+      <div class="overlay">
+          <div class="slider-trigger"></div>
+          <h1 class="header-author js-mobile-header hide"><a href="/" title="回到主页">Arking</a></h1>
+      </div>
+    <div class="intrude-less">
+        <header id="header" class="inner">
+            <a href="/" class="profilepic">
+                <img src="/img/avatar.png" class="animated zoomIn">
+            </a>
+            <hgroup>
+              <h1 class="header-author"><a href="/" title="回到主页">Arking</a></h1>
+            </hgroup>
+            
+            <nav class="header-menu">
+                <ul>
+                
+                    <li><a href="/">主页</a></li>
+                
+                    <li><a href="/archives/">归档</a></li>
+                
+                    <li><a href="/tags/">标签</a></li>
+                
+                    <li><a href="/about/">关于我</a></li>
+                
+                <div class="clearfix"></div>
+                </ul>
+            </nav>
+            <nav class="header-nav">
+                        <ul class="social">
+                            
+                                <a class="fa Email" target="_blank" href="/ximingchenhust@foxmail.com" title="Email"></a>
+                            
+                                <a class="fa GitHub" target="_blank" href="#" title="GitHub"></a>
+                            
+                        </ul>
+            </nav>
+        </header>                
+    </div>
+    <link class="menu-list" tags="标签" friends="友情链接" about="关于我">
+</nav>
+      <div class="body-wrap"><article id="post-2017-11-30-linux-du" class="article article-type-post" itemscope="" itemprop="blogPost">
+  
+    <div class="article-meta">
+      <a href="/2017/11/30/2017-11-30-linux-du/" class="article-date">
+      <time datetime="2017-11-30T02:51:00.000Z" itemprop="datePublished">2017-11-30</time>
+</a>
+
+
+    </div>
+  
+  <div class="article-inner">
+    
+      <input type="hidden" class="isFancy">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="article-title" itemprop="name">
+       Linux查看目录大小
+    </h1>
+  
+
+      </header>
+      
+      <div class="article-info article-info-post">
+        
+    <div class="article-category tagcloud">
+    <a class="article-category-link" href="/categories/Linux管理/">Linux管理</a>
+    </div>
+
+
+        
+    <div class="article-tag tagcloud">
+        <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/linux/">linux</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/storage/">storage</a></li></ul>
+    </div>
+
+        <div class="clearfix"></div>
+      </div>
+      
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+          
+        <p>在Linux上，如果你想查看一个文件的大小，可以使用命令<code>ls -l</code>，但是如果你想查看一个目录的大小(包含目录下的文件)，ls无法做到，基本上用ls命令查看到的目录大小都是4K（假设块大小为4K）:</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line">chenximing@chenximing-MS-7823:~$ ls -lh</span><br><span class="line">...</span><br><span class="line">...</span><br><span class="line">-rw-rw-r--  1 chenximing chenximing  16K  9月 27 16:38 sysstat-8.0.4.1.tar.gz</span><br><span class="line">-rwxrwxr-x  1 chenximing chenximing  492  5月  2  2017 tmp_lat.sh</span><br><span class="line">drwxr-xr-x  2 chenximing chenximing 4.0K  4月  5  2017 公共的</span><br><span class="line">drwxr-xr-x  2 chenximing chenximing 4.0K  4月  5  2017 模板</span><br><span class="line">drwxr-xr-x  2 chenximing chenximing 4.0K  4月  5  2017 视频</span><br><span class="line">drwxr-xr-x  2 chenximing chenximing 4.0K 10月  9 11:39 图片</span><br><span class="line">drwxr-xr-x  5 chenximing chenximing 4.0K 10月 11 10:15 文档</span><br><span class="line">drwxr-xr-x  2 root       root       4.0K  4月  6  2017 下载</span><br><span class="line">drwxr-xr-x  2 chenximing chenximing 4.0K  4月  5  2017 音乐</span><br><span class="line">drwxr-xr-x  2 chenximing chenximing 4.0K  8月 20 17:53 桌面</span><br></pre></td></tr></table></figure>
+<p>这是由于linux下目录和一般文件在磁盘上都是通过元数据和数据进行记录，在创建一个目录时，分配一个元数据(inode)，并为其分配一个数据块(block)。目录的数据区，也就是目录的block中，记录的是目录下文件inode和文件名的条目列表。当目录下的文件数量较少时，一个块已经足够记录，因此ls命令查看到的目录大小实际上是目录占用的block大小。当目录下文件较多时，需要更多的block来记录，此时ls命令看到的目录大小会变成8K，12K…但是对于一般文件来说ls命令能反映出其实际大小，而不是占用的block大小</p>
+<p>所以，在Linux上，如果想要查看目录总大小时，就需要用到du命令</p>
+<a id="more"></a>
+<h2 id="使用形式"><a href="#使用形式" class="headerlink" title="使用形式"></a>使用形式</h2><p>命令的使用形式如下：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">du [参数] 文件或目录名</span><br></pre></td></tr></table></figure>
+<p>注意du也可以查看文件的大小，但是如果只是查看单个文件的大小，一般用ls命令就够了</p>
+<p><strong>如果不加任何参数，命令默认分析当前目录，默认单位为KB，只显示目录和目录下的子目录，不列出目录下的一般文件：</strong></p>
+<h2 id="查看当前目录"><a href="#查看当前目录" class="headerlink" title="查看当前目录"></a>查看当前目录</h2><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line">chenximing@chenximing-MS-7823:~$ du</span><br><span class="line">28	./bin</span><br><span class="line">1700	./blktrace/cow</span><br><span class="line">110380	./blktrace</span><br><span class="line">708	./.compiz/session</span><br><span class="line">712	./.compiz</span><br><span class="line">16	./.vim/<span class="built_in">autoload</span></span><br><span class="line">...</span><br><span class="line">...</span><br><span class="line">4	./.config/menus</span><br><span class="line">4	./.config/evolution/sources</span><br><span class="line">8	./.config/evolution</span><br><span class="line">8	./.config/ibus/bus</span><br><span class="line">12	./.config/ibus</span><br><span class="line">4	./.config/yelp</span><br><span class="line">8	./.config/Mendeley Ltd.</span><br><span class="line">8	./.config/ubuntu-ui-toolkit</span><br><span class="line">383060	./.config</span><br><span class="line">29800588	. <span class="comment">#当前目录总大小</span></span><br></pre></td></tr></table></figure>
+<p>左边是目录大小，如果不加参数，默认单位为KB。右边是目录名</p>
+<p>注意最后一行，它显示了当前目录的总大小</p>
+<h2 id="查看指定目录"><a href="#查看指定目录" class="headerlink" title="查看指定目录"></a>查看指定目录</h2><p>查看一个名为dir目录的大小，其结构如下：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">chenximing@chenximing-MS-7823:~$ tree dir/</span><br><span class="line">dir/</span><br><span class="line">├── dir</span><br><span class="line">│   ├── dir</span><br><span class="line">│   │   └── file</span><br><span class="line">│   └── file</span><br><span class="line">└── file</span><br><span class="line"></span><br><span class="line">2 directories, 3 files</span><br></pre></td></tr></table></figure>
+<p><strong>3个file文件的大小都为1K。dir目录占用1个block为4K</strong>。使用du命令查看：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">henximing@chenximing-MS-7823:~$ du dir/</span><br><span class="line">8	dir/dir/dir</span><br><span class="line">16	dir/dir</span><br><span class="line">24	dir/</span><br></pre></td></tr></table></figure>
+<p>从上面结果看出，如果不添加任何参数，du命令会列出目录和子目录的大小，不列出一般文件的大小</p>
+<h3 id="按文件实际内容统计大小"><a href="#按文件实际内容统计大小" class="headerlink" title="按文件实际内容统计大小"></a>按文件实际内容统计大小</h3><p>按理来说，最下层子目录dir/dir/dir的大小应该是目录dir/dir/dir的大小加上目录下文件file的大小，也就是5K。dir/dir的大小应该是10K。dir/的大小应该是15K。但是结果却是8K、16K和24K</p>
+<p><strong>原因在于，du对文件和目录的统计都以占用的block数量来计算</strong>。由于1K大小的文件会分配一个block，而一个block不能同时分给多个文件，因此即使分配4K大小的block还有3K空间的剩余，但是也只能被文件file使用，所以从磁盘的角度分析，这个文件的大小也是4K</p>
+<p>那么如何以文件的实际数据内容为大小显示目录的容量？<strong>使用参数-b按字节输出</strong>：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">chenximing@chenximing-MS-7823:~$ du -b dir/</span><br><span class="line">5120	dir/dir/dir</span><br><span class="line">10240	dir/dir</span><br><span class="line">15360	dir/</span><br></pre></td></tr></table></figure>
+<h3 id="显示总计-显示所有条目"><a href="#显示总计-显示所有条目" class="headerlink" title="显示总计/显示所有条目"></a>显示总计/显示所有条目</h3><p>如果只关心目录dir的大小，可以使用<strong>参数-s</strong>显示总计：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">chenximing@chenximing-MS-7823:~$ du -s dir/</span><br><span class="line">24	dir/</span><br></pre></td></tr></table></figure>
+<p>如果除了子目录，还想查看目录dir下一般文件的大小，使用<strong>参数-a</strong>，加入这个参数也<strong>会列出隐藏文件</strong>（注意这里说的只是“列出”，即使不用-a参数，隐藏文件也会参与计算）:</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">chenximing@chenximing-MS-7823:~$ cp dir/file dir/.file</span><br><span class="line">chenximing@chenximing-MS-7823:~$ du -a dir/</span><br><span class="line">4	dir/dir/dir/file</span><br><span class="line">8	dir/dir/dir</span><br><span class="line">4	dir/dir/file</span><br><span class="line">16	dir/dir</span><br><span class="line">4	dir/file</span><br><span class="line">4	dir/.file</span><br><span class="line">28	dir/</span><br></pre></td></tr></table></figure>
+<p>上面两个参数不兼容，-sa会报错</p>
+<h3 id="不递归显示"><a href="#不递归显示" class="headerlink" title="不递归显示"></a>不递归显示</h3><p>有时候你可能不希望在显示的结果中包含递归结果，也就是说，不想显示出子目录下的子目录或文件。可以使用如下命令：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">#也就是对dir下的每个文件/目录执行du -s显示总计</span></span><br><span class="line">chenximing@chenximing-MS-7823:~$ du -s dir/*</span><br><span class="line">16	dir/dir</span><br><span class="line">4	dir/file</span><br></pre></td></tr></table></figure>
+<h3 id="不统计子目录"><a href="#不统计子目录" class="headerlink" title="不统计子目录"></a>不统计子目录</h3><p>如果只想统计目录和目录下的一般文件的总大小，而不包含目录下子目录的大小，可以<strong>使用-S参数</strong>:</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">chenximing@chenximing-MS-7823:~$ du -S dir/</span><br><span class="line">8	dir/dir/dir</span><br><span class="line">8	dir/dir</span><br><span class="line">12	dir/</span><br></pre></td></tr></table></figure>
+<p>对于目录dir，现在显示的大小只统计了目录dir，文件dir/file和文件dir/.file，一共3个block，所以是12K。没有统计子目录dir的大小</p>
+<p>目录dir/dir也只统计目录dir/dir和文件dir/dir/file，一共2个block，也就是8K，不统计子目录dir/dir/dir的大小</p>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>在Linux下可能经常需要查看目录的大小，所以很有必要掌握du命令。在使用du命令时，记住默认情况下它统计的大小是根据文件占用的block来统计。如果希望按实际内容来统计大小，加入参数-b。参数列表不在这介绍，这里介绍了几种常用场景的使用方法，其它参数可以通过man手册查看，实践才是硬道理</p>
+
+      
+    </div>
+    
+  </div>
+  
+    
+    <div class="copyright">
+        <p><span>本文标题:</span><a href="/2017/11/30/2017-11-30-linux-du/"> Linux查看目录大小</a></p>
+        <p><span>文章作者:</span><a href="/" title="回到主页">Arking</a></p>
+        <p><span>发布时间:</span>2017-11-30, 10:51:00</p>
+        <p><span>最后更新:</span>2018-12-04, 16:52:52</p>
+        <p>
+            <span>原始链接:</span><a class="post-url" href="/2017/11/30/2017-11-30-linux-du/" title=" Linux查看目录大小">http://yoursite.com/2017/11/30/2017-11-30-linux-du/</a>
+            <span class="copy-path" data-clipboard-text="原文: http://yoursite.com/2017/11/30/2017-11-30-linux-du/　　作者: Arking" title="点击复制文章链接"><i class="fa fa-clipboard"></i></span>
+            <script> var clipboard = new Clipboard('.copy-path'); </script>
+        </p>
+        <p>
+            <span>许可协议:</span><i class="fa fa-creative-commons"></i> <a rel="license" href="http://creativecommons.org/licenses/by-nc-sa/4.0/" title="CC BY-NC-SA 4.0 International" target="_blank">"署名-非商用-相同方式共享 4.0"</a> 转载请保留原文链接及作者。
+        </p>
+    </div>
+
+
+
+    <nav id="article-nav">
+        
+            <div id="article-nav-newer" class="article-nav-title">
+                <a href="/2017/12/22/2017-12-22-linux-code-overlayfs-create_delete/">
+                    内核OverlayFS—创建与删除文件
+                </a>
+            </div>
+        
+        
+            <div id="article-nav-older" class="article-nav-title">
+                <a href="/2017/11/10/2017-11-10-linux-code-overlayfs-dir-op1/">
+                    内核OverlayFS—目录搜索
+                </a>
+            </div>
+        
+    </nav>
+
+  
+</article>
+
+    <div id="toc" class="toc-article">
+        <strong class="toc-title">文章目录</strong>
+        
+            <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#使用形式"><span class="toc-number">1.</span> <span class="toc-text">使用形式</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#查看当前目录"><span class="toc-number">2.</span> <span class="toc-text">查看当前目录</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#查看指定目录"><span class="toc-number">3.</span> <span class="toc-text">查看指定目录</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#按文件实际内容统计大小"><span class="toc-number">3.1.</span> <span class="toc-text">按文件实际内容统计大小</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#显示总计-显示所有条目"><span class="toc-number">3.2.</span> <span class="toc-text">显示总计/显示所有条目</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#不递归显示"><span class="toc-number">3.3.</span> <span class="toc-text">不递归显示</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#不统计子目录"><span class="toc-number">3.4.</span> <span class="toc-text">不统计子目录</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#总结"><span class="toc-number">4.</span> <span class="toc-text">总结</span></a></li></ol>
+        
+    </div>
+    <style>
+        .left-col .switch-btn,
+        .left-col .switch-area {
+            display: none;
+        }
+        .toc-level-3 i,
+        .toc-level-3 ol {
+            display: none !important;
+        }
+    </style>
+
+    <input type="button" id="tocButton" value="隐藏目录" title="点击按钮隐藏或者显示文章目录">
+
+    <script>
+        yiliaConfig.toc = ["隐藏目录", "显示目录", !!"false"];
+    </script>
+
+
+
+    
+<div class="share">
+    
+        <div class="bdsharebuttonbox">
+            <a href="#" class="fa fa-twitter bds_twi" data-cmd="twi" title="分享到推特"></a>
+            <a href="#" class="fa fa-weibo bds_tsina" data-cmd="tsina" title="分享到新浪微博"></a>
+            <a href="#" class="fa fa-qq bds_sqq" data-cmd="sqq" title="分享给 QQ 好友"></a>
+            <a href="#" class="fa fa-files-o bds_copy" data-cmd="copy" title="复制网址"></a>
+            <a href="#" class="fa fa fa-envelope-o bds_mail" data-cmd="mail" title="通过邮件分享"></a>
+            <a href="#" class="fa fa-weixin bds_weixin" data-cmd="weixin" title="生成文章二维码"></a>
+            <a href="#" class="fa fa-share-alt bds_more" data-cmd="more"></a>
+        </div>
+        <script>
+            window._bd_share_config={
+                "common":{"bdSnsKey":{},"bdText":" Linux查看目录大小　| Hexo　","bdMini":"2","bdMiniList":false,"bdPic":"","bdStyle":"0","bdSize":"24"},"share":{}};with(document)0[(getElementsByTagName('head')[0]||body).appendChild(createElement('script')).src='http://bdimg.share.baidu.com/static/api/js/share.js?v=89860593.js?cdnversion='+~(-new Date()/36e5)];
+        </script>
+    
+
+    
+</div>
+
+
+
+
+
+
+
+    
+
+
+
+
+    <div class="scroll" id="post-nav-button">
+        
+            <a href="/2017/12/22/2017-12-22-linux-code-overlayfs-create_delete/" title="上一篇: 内核OverlayFS—创建与删除文件">
+                <i class="fa fa-angle-left"></i>
+            </a>
+        
+
+        <a title="文章列表"><i class="fa fa-bars"></i><i class="fa fa-times"></i></a>
+
+        
+            <a href="/2017/11/10/2017-11-10-linux-code-overlayfs-dir-op1/" title="下一篇: 内核OverlayFS—目录搜索">
+                <i class="fa fa-angle-right"></i>
+            </a>
+        
+    </div>
+
+    <ul class="post-list"><li class="post-list-item"><a class="post-list-link" href="/2018/09/05/2018-09-05-linux-kernel/">Ubuntu下内核与内核模块的编译过程</a></li><li class="post-list-item"><a class="post-list-link" href="/2018/01/19/2018-01-19-docker-imagestore/"> Docker源码分析—镜像存储 </a></li><li class="post-list-item"><a class="post-list-link" href="/2018/01/15/2018-01-15-docker-storage-overlay2/"> Docker源码分析—存储驱动 </a></li><li class="post-list-item"><a class="post-list-link" href="/2018/01/14/2018-01-14-docker-layerstore/"> Docker源码分析—层存储 </a></li><li class="post-list-item"><a class="post-list-link" href="/2018/01/12/2018-01-10-c-stack_frame/"> C函数栈帧 </a></li><li class="post-list-item"><a class="post-list-link" href="/2017/12/26/2017-12-26-linux-code-overlayfs-read_write/">内核OverlayFS—文件读写</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/12/22/2017-12-22-linux-code-overlayfs-create_delete/">内核OverlayFS—创建与删除文件</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/11/30/2017-11-30-linux-du/"> Linux查看目录大小</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/11/10/2017-11-10-linux-code-overlayfs-dir-op1/">内核OverlayFS—目录搜索</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/10/12/2017-10-12-linux-code-overlayfs-mnt/">内核OverlayFS—注册与挂载</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/09/20/2017-09-20-linux-code-overlayfs-layerinfo/">内核OverlayFS—文件层次信息</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/08/18/2017-08-18-linux-code-vfs/">Linux虚拟文件系统(VFS)</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/05/05/2017-05-05-docker-filesystem-overlay/"> Docker存储驱动—Overlay/Overlay2「译」</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/04/13/2017-04-13-docker-filesystem-aufs/"> Docker存储驱动—Aufs </a></li><li class="post-list-item"><a class="post-list-link" href="/2017/04/09/2017-04-09-linux-uuid/"> Linux存储设备的UUID</a></li></ul>
+
+
+
+
+    <script>
+        
+    </script>
+</div>
+      <footer id="footer">
+    <div class="outer">
+        <div id="footer-info">
+            <div class="footer-left">
+                <i class="fa fa-copyright"></i> 
+                2017-2018 Arking
+            </div>
+            <div class="footer-right">
+                <a href="http://hexo.io/" target="_blank" title="快速、简洁且高效的博客框架">Hexo</a>  Theme <a href="https://github.com/MOxFIVE/hexo-theme-yelee" target="_blank" title="简而不减 Hexo 双栏博客主题  v3.5">Yelee</a> by MOxFIVE <i class="fa fa-heart animated infinite pulse"></i>
+            </div>
+        </div>
+        
+            <div class="visit">
+                
+                    <span id="busuanzi_container_site_pv" style="display:none">
+                        <span id="site-visit" title="本站到访数"><i class="fa fa-user" aria-hidden="true"></i><span id="busuanzi_value_site_uv"></span>
+                        </span>
+                    </span>
+                
+                
+                    <span>| </span>
+                
+                
+                    <span id="busuanzi_container_page_pv" style="display:none">
+                        <span id="page-visit" title="本页阅读量"><i class="fa fa-eye animated infinite pulse" aria-hidden="true"></i><span id="busuanzi_value_page_pv"></span>
+                        </span>
+                    </span>
+                
+            </div>
+        
+    </div>
+</footer>
+    </div>
+    
+<script data-main="/js/main.js" src="//cdn.bootcss.com/require.js/2.2.0/require.min.js"></script>
+
+    <script>
+        $(document).ready(function() {
+            var iPad = window.navigator.userAgent.indexOf('iPad');
+            if (iPad > -1 || $(".left-col").css("display") === "none") {
+                var bgColorList = ["#9db3f4", "#414141", "#e5a859", "#f5dfc6", "#c084a0", "#847e72", "#cd8390", "#996731"];
+                var bgColor = Math.ceil(Math.random() * (bgColorList.length - 1));
+                $("body").css({"background-color": bgColorList[bgColor], "background-size": "cover"});
+            }
+            else {
+                var backgroundnum = 5;
+                var backgroundimg = "url(/background/bg-x.jpg)".replace(/x/gi, Math.ceil(Math.random() * backgroundnum));
+                $("body").css({"background": backgroundimg, "background-attachment": "fixed", "background-size": "cover"});
+            }
+        })
+    </script>
+
+
+
+
+
+<div class="scroll" id="scroll">
+    <a href="#" title="返回顶部"><i class="fa fa-arrow-up"></i></a>
+    <a href="#comments" onclick="load$hide();" title="查看评论"><i class="fa fa-comments-o"></i></a>
+    <a href="#footer" title="转到底部"><i class="fa fa-arrow-down"></i></a>
+</div>
+<script>
+    // Open in New Window
+    
+        var oOpenInNew = {
+            
+            
+            
+            
+            
+            
+             archives: ".archive-article-title", 
+             miniArchives: "a.post-list-link", 
+            
+             friends: "#js-friends a", 
+             socail: ".social a" 
+        }
+        for (var x in oOpenInNew) {
+            $(oOpenInNew[x]).attr("target", "_blank");
+        }
+    
+</script>
+
+<script async src="https://dn-lbstatics.qbox.me/busuanzi/2.3/busuanzi.pure.mini.js">
+</script>
+  </div>
+</body>
+</html>

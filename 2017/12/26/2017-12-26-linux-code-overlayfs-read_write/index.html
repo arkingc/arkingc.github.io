@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html>
+<head><meta name="generator" content="Hexo 3.8.0">
+
+    <!--[if lt IE 9]>
+        <style>body {display: none; background: none !important} </style>
+        <meta http-equiv="Refresh" Content="0; url=//outdatedbrowser.com/" />
+    <![endif]-->
+
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge, chrome=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="format-detection" content="telephone=no">
+<meta name="author" content="Arking">
+
+
+
+<meta name="description" content="内核版本4.4.68  文件（一般文件或目录）的读写和文件的创建删除不同，文件的创建删除作用于inode结构，需要用到inode操作。而文件的读写则是作用于file结构，因此需要用到file操作 通常，读写文件之前需要先打开这个文件，通过open系统调用，传入表示文件的路径字符串，随后内核会根据路径字符串进行路径查找，最终得到一个表示文件的file结构，并使之与当前进程相关联，之后的读写便会根据">
+<meta name="keywords" content="filesystem,overlayfs">
+<meta property="og:type" content="article">
+<meta property="og:title" content="内核OverlayFS—文件读写">
+<meta property="og:url" content="http://yoursite.com/2017/12/26/2017-12-26-linux-code-overlayfs-read_write/index.html">
+<meta property="og:site_name" content="Hexo">
+<meta property="og:description" content="内核版本4.4.68  文件（一般文件或目录）的读写和文件的创建删除不同，文件的创建删除作用于inode结构，需要用到inode操作。而文件的读写则是作用于file结构，因此需要用到file操作 通常，读写文件之前需要先打开这个文件，通过open系统调用，传入表示文件的路径字符串，随后内核会根据路径字符串进行路径查找，最终得到一个表示文件的file结构，并使之与当前进程相关联，之后的读写便会根据">
+<meta property="og:locale" content="default">
+<meta property="og:image" content="http://yoursite.com/img/in-post/post-kernel-overlayfs/mount_tree_2.png">
+<meta property="og:updated_time" content="2018-12-04T09:36:03.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="内核OverlayFS—文件读写">
+<meta name="twitter:description" content="内核版本4.4.68  文件（一般文件或目录）的读写和文件的创建删除不同，文件的创建删除作用于inode结构，需要用到inode操作。而文件的读写则是作用于file结构，因此需要用到file操作 通常，读写文件之前需要先打开这个文件，通过open系统调用，传入表示文件的路径字符串，随后内核会根据路径字符串进行路径查找，最终得到一个表示文件的file结构，并使之与当前进程相关联，之后的读写便会根据">
+<meta name="twitter:image" content="http://yoursite.com/img/in-post/post-kernel-overlayfs/mount_tree_2.png">
+
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+
+
+    <link rel="alternate" href="/atom.xml" title="Hexo" type="application/atom+xml">
+
+
+
+    <link rel="shortcut icon" href="/favicon.png">
+
+
+
+    <link href="//cdn.bootcss.com/animate.css/3.5.1/animate.min.css" rel="stylesheet">
+
+
+
+    <link href="//cdn.bootcss.com/fancybox/2.1.5/jquery.fancybox.min.css" rel="stylesheet">
+
+
+
+    <script src="//cdn.bootcss.com/pace/1.0.2/pace.min.js"></script>
+    <link href="//cdn.bootcss.com/pace/1.0.2/themes/blue/pace-theme-minimal.css" rel="stylesheet">
+
+
+<link rel="stylesheet" href="/css/style.css">
+
+
+
+<link href="//cdn.bootcss.com/font-awesome/4.6.3/css/font-awesome.min.css" rel="stylesheet">
+
+
+<title>内核OverlayFS—文件读写 | Hexo</title>
+
+<script src="//cdn.bootcss.com/jquery/2.2.4/jquery.min.js"></script>
+<script src="//cdn.bootcss.com/clipboard.js/1.5.10/clipboard.min.js"></script>
+
+<script>
+    var yiliaConfig = {
+        fancybox: true,
+        animate: true,
+        isHome: false,
+        isPost: true,
+        isArchive: false,
+        isTag: false,
+        isCategory: false,
+        fancybox_js: "//cdn.bootcss.com/fancybox/2.1.5/jquery.fancybox.min.js",
+        scrollreveal: "//cdn.bootcss.com/scrollReveal.js/3.1.4/scrollreveal.min.js",
+        search: false
+    }
+</script>
+
+
+    <script> yiliaConfig.jquery_ui = [false]; </script>
+
+
+
+    <script> yiliaConfig.rootUrl = "\/";</script>
+
+
+
+
+
+
+</head></html>
+<body>
+  <div id="container">
+    <div class="left-col">
+    <div class="overlay"></div>
+<div class="intrude-less">
+    <header id="header" class="inner">
+        <a href="/" class="profilepic">
+            <img src="/img/avatar.png" class="animated zoomIn">
+        </a>
+        <hgroup>
+          <h1 class="header-author"><a href="/">Arking</a></h1>
+        </hgroup>
+
+        
+
+        
+
+
+        
+            <div id="switch-btn" class="switch-btn">
+                <div class="icon">
+                    <div class="icon-ctn">
+                        <div class="icon-wrap icon-house" data-idx="0">
+                            <div class="birdhouse"></div>
+                            <div class="birdhouse_holes"></div>
+                        </div>
+                        <div class="icon-wrap icon-ribbon hide" data-idx="1">
+                            <div class="ribbon"></div>
+                        </div>
+                        
+                        <div class="icon-wrap icon-link hide" data-idx="2">
+                            <div class="loopback_l"></div>
+                            <div class="loopback_r"></div>
+                        </div>
+                        
+                        
+                        <div class="icon-wrap icon-me hide" data-idx="3">
+                            <div class="user"></div>
+                            <div class="shoulder"></div>
+                        </div>
+                        
+                    </div>
+                    
+                </div>
+                <div class="tips-box hide">
+                    <div class="tips-arrow"></div>
+                    <ul class="tips-inner">
+                        <li>菜单</li>
+                        <li>标签</li>
+                        
+                        <li>友情链接</li>
+                        
+                        
+                        <li>关于我</li>
+                        
+                    </ul>
+                </div>
+            </div>
+        
+
+        <div id="switch-area" class="switch-area">
+            <div class="switch-wrap">
+                <section class="switch-part switch-part1">
+                    <nav class="header-menu">
+                        <ul>
+                        
+                            <li><a href="/">主页</a></li>
+                        
+                            <li><a href="/archives/">归档</a></li>
+                        
+                            <li><a href="/tags/">标签</a></li>
+                        
+                            <li><a href="/about/">关于我</a></li>
+                        
+                        </ul>
+                    </nav>
+                    <nav class="header-nav">
+                        <ul class="social">
+                            
+                                <a class="fa Email" href="/ximingchenhust@foxmail.com" title="Email"></a>
+                            
+                                <a class="fa GitHub" href="#" title="GitHub"></a>
+                            
+                        </ul>
+                    </nav>
+                </section>
+                
+                
+                <section class="switch-part switch-part2">
+                    <div class="widget tagcloud" id="js-tagcloud">
+                        <ul class="tag-list"><li class="tag-list-item"><a class="tag-list-link" href="/tags/c/">c</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/docker/">docker</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/filesystem/">filesystem</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/linux/">linux</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/overlayfs/">overlayfs</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/storage/">storage</a></li></ul>
+                    </div>
+                </section>
+                
+                
+                
+                <section class="switch-part switch-part3">
+                    <div id="js-friends">
+                    
+                      <a class="main-nav-link switch-friends-link" href="https://hexo.io">Hexo</a>
+                    
+                      <a class="main-nav-link switch-friends-link" href="https://pages.github.com/">GitHub</a>
+                    
+                      <a class="main-nav-link switch-friends-link" href="http://moxfive.xyz/">MOxFIVE</a>
+                    
+                    </div>
+                </section>
+                
+
+                
+                
+                <section class="switch-part switch-part4">
+                
+                    <div id="js-aboutme">专注于前端</div>
+                </section>
+                
+            </div>
+        </div>
+    </header>                
+</div>
+    </div>
+    <div class="mid-col">
+      <nav id="mobile-nav">
+      <div class="overlay">
+          <div class="slider-trigger"></div>
+          <h1 class="header-author js-mobile-header hide"><a href="/" title="回到主页">Arking</a></h1>
+      </div>
+    <div class="intrude-less">
+        <header id="header" class="inner">
+            <a href="/" class="profilepic">
+                <img src="/img/avatar.png" class="animated zoomIn">
+            </a>
+            <hgroup>
+              <h1 class="header-author"><a href="/" title="回到主页">Arking</a></h1>
+            </hgroup>
+            
+            <nav class="header-menu">
+                <ul>
+                
+                    <li><a href="/">主页</a></li>
+                
+                    <li><a href="/archives/">归档</a></li>
+                
+                    <li><a href="/tags/">标签</a></li>
+                
+                    <li><a href="/about/">关于我</a></li>
+                
+                <div class="clearfix"></div>
+                </ul>
+            </nav>
+            <nav class="header-nav">
+                        <ul class="social">
+                            
+                                <a class="fa Email" target="_blank" href="/ximingchenhust@foxmail.com" title="Email"></a>
+                            
+                                <a class="fa GitHub" target="_blank" href="#" title="GitHub"></a>
+                            
+                        </ul>
+            </nav>
+        </header>                
+    </div>
+    <link class="menu-list" tags="标签" friends="友情链接" about="关于我">
+</nav>
+      <div class="body-wrap"><article id="post-2017-12-26-linux-code-overlayfs-read_write" class="article article-type-post" itemscope="" itemprop="blogPost">
+  
+    <div class="article-meta">
+      <a href="/2017/12/26/2017-12-26-linux-code-overlayfs-read_write/" class="article-date">
+      <time datetime="2017-12-25T18:51:00.000Z" itemprop="datePublished">2017-12-26</time>
+</a>
+
+
+    </div>
+  
+  <div class="article-inner">
+    
+      <input type="hidden" class="isFancy">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="article-title" itemprop="name">
+      内核OverlayFS—文件读写
+    </h1>
+  
+
+      </header>
+      
+      <div class="article-info article-info-post">
+        
+    <div class="article-category tagcloud">
+    <a class="article-category-link" href="/categories/Linux内核/">Linux内核</a>
+    </div>
+
+
+        
+    <div class="article-tag tagcloud">
+        <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/filesystem/">filesystem</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/overlayfs/">overlayfs</a></li></ul>
+    </div>
+
+        <div class="clearfix"></div>
+      </div>
+      
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+          
+        <blockquote>
+<p><strong>内核版本4.4.68</strong></p>
+</blockquote>
+<p>文件（一般文件或目录）的读写和文件的创建删除不同，文件的创建删除作用于inode结构，需要用到inode操作。而文件的读写则是作用于file结构，因此需要用到file操作</p>
+<p>通常，<strong>读写文件之前需要先打开这个文件</strong>，通过open系统调用，传入表示文件的路径字符串，随后内核会根据路径字符串进行路径查找，最终得到一个表示文件的file结构，并使之与当前进程相关联，之后的读写便会根据这个file结构来进行，这个结构的f_op字段是一个file操作的指针，file操作包含了文件读写函数的指针。OverlayFS中文件的读写也不例外，但是在OverlayFS中，一般文件的读写和目录的读写又有区别：</p>
+<ul>
+<li>一般文件的读写：在OverlayFS中，文件来源于upper层或lower层。在打开文件时，OverlayFS实际上打开的是upper层或者lower层的文件，因此随后发生的读写也就是对upper层或lower层的文件。</li>
+<li>目录的读写：与一般文件不同的是，目录的读写相对复杂。因为对于一个同时存在upper层和lower层的目录，在对该目录进行搜索时，OverlayFS会对upper层和lower层的目录分别进行搜索，然后做一些合并处理。但是对于同时存在于upper层或lower层的文件来说，由于”上层覆盖下层“，因此只需要读取upper层中文件就行了</li>
+</ul>
+<p>正因如此，<strong>对于目录的读取，OverlayFS定义了自己的file操作</strong>，而<strong>对于一般文件的读写，OverlayFS不需要定义自己的操作</strong></p>
+<p>这篇文章重点在分析文件读写如何获得自己的读写操作，而不会深入的某个具体的读写函数。比如目录搜索是一个目录读写的例子，这部分另一篇博文有介绍，这里主要是分析OverlayFS中文件读写的本质</p>
+<a id="more"></a>
+<p><br></p>
+<h2 id="获取file操作"><a href="#获取file操作" class="headerlink" title="获取file操作"></a>获取file操作</h2><p>文件的读写函数由file操作中的函数指针来索引，因此要了解文件读写到底调用了什么函数就需要弄清楚文件何时、如何获得自己的file操作。而文件的file操作又由file结构的f_op字段指向，所以可以看看在路径查找过程中，获取表示文件的file结构时，如何为f_op字段赋值</p>
+<p>在文件打开过程中，解析完路径字符串时，会调用到vfs_open()函数：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">vfs_open</span><span class="params">(<span class="keyword">const</span> struct path *path, struct file *file,</span></span></span><br><span class="line"><span class="function"><span class="params">	     <span class="keyword">const</span> struct cred *cred)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">inode</span> *<span class="title">inode</span> = <span class="title">vfs_select_inode</span>(<span class="title">path</span>-&gt;<span class="title">dentry</span>, <span class="title">file</span>-&gt;<span class="title">f_flags</span>);</span></span><br><span class="line"></span><br><span class="line">	<span class="keyword">if</span> (IS_ERR(inode))</span><br><span class="line">		<span class="keyword">return</span> PTR_ERR(inode);</span><br><span class="line"></span><br><span class="line">	file-&gt;f_path = *path;</span><br><span class="line">	<span class="keyword">return</span> do_dentry_open(file, inode, <span class="literal">NULL</span>, cred);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>这个函数会选取一个inode，设置file的f_path字段，最后调用函数do_dentry_open()，这个函数会进一步设置file的其它字段，包括f_op，最后执行文件打开操作：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">static</span> <span class="keyword">int</span> <span class="title">do_dentry_open</span><span class="params">(struct file *f,</span></span></span><br><span class="line"><span class="function"><span class="params">			  struct inode *inode,</span></span></span><br><span class="line"><span class="function"><span class="params">			  <span class="keyword">int</span> (*open)(struct inode *, struct file *),</span></span></span><br><span class="line"><span class="function"><span class="params">			  <span class="keyword">const</span> struct cred *cred)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">	...</span><br><span class="line">	f-&gt;f_inode = inode;</span><br><span class="line">	f-&gt;f_mapping = inode-&gt;i_mapping;</span><br><span class="line">	</span><br><span class="line">	...</span><br><span class="line">	f-&gt;f_op = fops_get(inode-&gt;i_fop);</span><br><span class="line">	</span><br><span class="line">	...</span><br><span class="line">	<span class="keyword">if</span> (!open)</span><br><span class="line">		open = f-&gt;f_op-&gt;open;</span><br><span class="line">	<span class="keyword">if</span> (open) &#123;</span><br><span class="line">		error = open(inode, f);</span><br><span class="line">		<span class="keyword">if</span> (error)</span><br><span class="line">			<span class="keyword">goto</span> cleanup_all;</span><br><span class="line">	&#125;</span><br><span class="line">	...</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>从代码中可以看出，<strong>file结构的f_op字段使用inode的i_fop字段进行赋值。因此文件的inode决定了file操作</strong>。通过函数vfs_open()发现，传入的inode由vfs_select_inode()决定：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">static</span> <span class="keyword">inline</span> struct inode *<span class="title">vfs_select_inode</span><span class="params">(struct dentry *dentry,</span></span></span><br><span class="line"><span class="function"><span class="params">					     <span class="keyword">unsigned</span> open_flags)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">inode</span> *<span class="title">inode</span> = <span class="title">d_inode</span>(<span class="title">dentry</span>);</span><span class="comment">//dentry-&gt;d_inode</span></span><br><span class="line"></span><br><span class="line">	<span class="keyword">if</span> (inode &amp;&amp; unlikely(dentry-&gt;d_flags &amp; DCACHE_OP_SELECT_INODE))</span><br><span class="line">		inode = dentry-&gt;d_op-&gt;d_select_inode(dentry, open_flags);</span><br><span class="line"></span><br><span class="line">	<span class="keyword">return</span> inode;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>dentry表示路径字符串最后一个分量的目录项，也就是OverlayFS中，所需打开的文件的目录项。对于OverlayFS中的目录项，函数的if条件成立，因此会进一步调用dentry操作的d_select_inode()函数，OverlayFS实现了对应的函数：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">struct inode *<span class="title">ovl_d_select_inode</span><span class="params">(struct dentry *dentry, <span class="keyword">unsigned</span> file_flags)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">	<span class="keyword">int</span> err;</span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">path</span> <span class="title">realpath</span>;</span></span><br><span class="line">	<span class="keyword">enum</span> ovl_path_type type;</span><br><span class="line"></span><br><span class="line">	<span class="keyword">if</span> (d_is_dir(dentry))</span><br><span class="line">		<span class="keyword">return</span> d_backing_inode(dentry);</span><br><span class="line"></span><br><span class="line">	<span class="comment">//如果不是一个dir，则会执行后面的代码</span></span><br><span class="line"></span><br><span class="line">	type = ovl_path_real(dentry, &amp;realpath);<span class="comment">//获取真实路径</span></span><br><span class="line">	<span class="keyword">if</span> (ovl_open_need_copy_up(file_flags, type, realpath.dentry)) &#123;</span><br><span class="line">		err = ovl_want_write(dentry);</span><br><span class="line">		<span class="keyword">if</span> (err)</span><br><span class="line">			<span class="keyword">return</span> ERR_PTR(err);</span><br><span class="line"></span><br><span class="line">		<span class="keyword">if</span> (file_flags &amp; O_TRUNC)</span><br><span class="line">			err = ovl_copy_up_truncate(dentry);</span><br><span class="line">		<span class="keyword">else</span></span><br><span class="line">			err = ovl_copy_up(dentry);</span><br><span class="line">		ovl_drop_write(dentry);</span><br><span class="line">		<span class="keyword">if</span> (err)</span><br><span class="line">			<span class="keyword">return</span> ERR_PTR(err);</span><br><span class="line"></span><br><span class="line">		ovl_path_upper(dentry, &amp;realpath);</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	<span class="keyword">if</span> (realpath.dentry-&gt;d_flags &amp; DCACHE_OP_SELECT_INODE)</span><br><span class="line">		<span class="keyword">return</span> realpath.dentry-&gt;d_op-&gt;d_select_inode(realpath.dentry, file_flags);</span><br><span class="line"></span><br><span class="line">	<span class="keyword">return</span> d_backing_inode(realpath.dentry);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>通过这个函数，我们可以发现，对于目录和一般文件，返回的inode不同：</p>
+<ul>
+<li>目录：如果是一个目录，则直接返回dentry-&gt;d_inode。因为dentry是OverlayFS中所要打开文件的目录项，所以其指向的inode为OverlayFS下，所要打开文件对应的inode</li>
+<li>一般文件：如果是一个一般文件，则会根据打开标志以及对应upper或lower层文件的目录项决定是否要执行copy-up操作。比方说，如果是一个lower层的一般文件，以读写方式打开，则会将这个文件拷贝至upper层。如果是以只读方式打开，则不需要。然后根据最终upper层或lower层相应文件的目录项的d_flags字段决定是否需要进一步调用d_select_inode()函数。如果不需要则返回upper层或lower层相应文件的inode</li>
+</ul>
+<p>分析到这已经可以得出结论了，对于一个目录，函数返回OverlayFS中该目录的inode，然后根据inode的i_fop字段来决定文件的读写操作。对于一个一般文件，返回的并不是OverlayFS中文件的inode，通常情况下，返回的是upper或lower层对应文件的inode</p>
+<p><br></p>
+<h2 id="一般文件读写"><a href="#一般文件读写" class="headerlink" title="一般文件读写"></a>一般文件读写</h2><p>假设要对OverlayFS下的file1进行读写，在文件打开过程中，会得到一个表示file1的file结构，函数vfs_select_inode()会返回upper目录下file1的inode，然后根据这个inode设置file结构的f_inode字段，根据inode的i_fop字段来定义file操作，因此，实际上打开的是upper目录下的file1文件。由于upper目录下的file1是ext4下的一个文件，因此file操作由ext4实现，今后读写OverlayFS中的file1，实际上是对upper目录中的file1进行读写</p>
+<div align="center"> <img src="/img/in-post/post-kernel-overlayfs/mount_tree_2.png" width="50%" height="50%"> </div>
+
+<p><br></p>
+<h2 id="目录读写"><a href="#目录读写" class="headerlink" title="目录读写"></a>目录读写</h2><p>假设要对OverlayFS下的目录d进行读写，在文件打开过程中，会得到一个表示d的file结构。和一般文件不同，函数vfs_select_inode()返回的inode就是OverlayFS下目录d对应的inode。接着会根据这个inode设置file结构的f_inode字段，根据inode的i_fop字段来定义file操作，因此，实际上打开的文件就是OverlayFS下的目录d，而不是upper目录下的目录d。今后读写OverlayFS中的目录d并不会转化为读写upper下目录d，相应的file操作由OverlayFS实现</p>
+<p>通过OverlayFS的inode分配函数也可以看出，如果不是为目录分配inode，则不会设置inode的i_fop字段。因为实际的读写操作作用于upper层或lower层的相应文件，因此不需要OverlayFS中文件的inode。但是为目录分配inode时，会设置i_fop字段，在目录读写时，为file结构的f_op字段赋值：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">struct inode *<span class="title">ovl_new_inode</span><span class="params">(struct super_block *sb, <span class="keyword">umode_t</span> mode,</span></span></span><br><span class="line"><span class="function"><span class="params">			    struct ovl_entry *oe)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">inode</span> *<span class="title">inode</span>;</span></span><br><span class="line"></span><br><span class="line">	inode = new_inode(sb);<span class="comment">//在sb下分配一个inode</span></span><br><span class="line">	<span class="keyword">if</span> (!inode)</span><br><span class="line">		<span class="keyword">return</span> <span class="literal">NULL</span>;</span><br><span class="line"></span><br><span class="line">	inode-&gt;i_ino = get_next_ino();<span class="comment">//设置inode号</span></span><br><span class="line">	inode-&gt;i_mode = mode;<span class="comment">//设置mode</span></span><br><span class="line">	inode-&gt;i_flags |= S_NOATIME | S_NOCMTIME;<span class="comment">//设置flag</span></span><br><span class="line"></span><br><span class="line">	mode &amp;= S_IFMT;</span><br><span class="line">	<span class="comment">//根据inode类型设置inode操作</span></span><br><span class="line">	<span class="keyword">switch</span> (mode) &#123;</span><br><span class="line">	<span class="keyword">case</span> S_IFDIR:</span><br><span class="line">		inode-&gt;i_private = oe;</span><br><span class="line">		inode-&gt;i_op = &amp;ovl_dir_inode_operations;</span><br><span class="line">		inode-&gt;i_fop = &amp;ovl_dir_operations;</span><br><span class="line">		<span class="keyword">break</span>;</span><br><span class="line"></span><br><span class="line">	<span class="keyword">case</span> S_IFLNK:</span><br><span class="line">		inode-&gt;i_op = &amp;ovl_symlink_inode_operations;</span><br><span class="line">		<span class="keyword">break</span>;</span><br><span class="line"></span><br><span class="line">	<span class="keyword">case</span> S_IFREG:</span><br><span class="line">	<span class="keyword">case</span> S_IFSOCK:</span><br><span class="line">	<span class="keyword">case</span> S_IFBLK:</span><br><span class="line">	<span class="keyword">case</span> S_IFCHR:</span><br><span class="line">	<span class="keyword">case</span> S_IFIFO:</span><br><span class="line">		inode-&gt;i_op = &amp;ovl_file_inode_operations;</span><br><span class="line">		<span class="keyword">break</span>;</span><br><span class="line"></span><br><span class="line">	<span class="keyword">default</span>:</span><br><span class="line">		WARN(<span class="number">1</span>, <span class="string">"illegal file type: %i\n"</span>, mode);</span><br><span class="line">		iput(inode);</span><br><span class="line">		inode = <span class="literal">NULL</span>;</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	<span class="keyword">return</span> inode;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+      
+    </div>
+    
+  </div>
+  
+    
+    <div class="copyright">
+        <p><span>本文标题:</span><a href="/2017/12/26/2017-12-26-linux-code-overlayfs-read_write/">内核OverlayFS—文件读写</a></p>
+        <p><span>文章作者:</span><a href="/" title="回到主页">Arking</a></p>
+        <p><span>发布时间:</span>2017-12-26, 02:51:00</p>
+        <p><span>最后更新:</span>2018-12-04, 17:36:03</p>
+        <p>
+            <span>原始链接:</span><a class="post-url" href="/2017/12/26/2017-12-26-linux-code-overlayfs-read_write/" title="内核OverlayFS—文件读写">http://yoursite.com/2017/12/26/2017-12-26-linux-code-overlayfs-read_write/</a>
+            <span class="copy-path" data-clipboard-text="原文: http://yoursite.com/2017/12/26/2017-12-26-linux-code-overlayfs-read_write/　　作者: Arking" title="点击复制文章链接"><i class="fa fa-clipboard"></i></span>
+            <script> var clipboard = new Clipboard('.copy-path'); </script>
+        </p>
+        <p>
+            <span>许可协议:</span><i class="fa fa-creative-commons"></i> <a rel="license" href="http://creativecommons.org/licenses/by-nc-sa/4.0/" title="CC BY-NC-SA 4.0 International" target="_blank">"署名-非商用-相同方式共享 4.0"</a> 转载请保留原文链接及作者。
+        </p>
+    </div>
+
+
+
+    <nav id="article-nav">
+        
+            <div id="article-nav-newer" class="article-nav-title">
+                <a href="/2018/01/12/2018-01-10-c-stack_frame/">
+                     C函数栈帧 
+                </a>
+            </div>
+        
+        
+            <div id="article-nav-older" class="article-nav-title">
+                <a href="/2017/12/22/2017-12-22-linux-code-overlayfs-create_delete/">
+                    内核OverlayFS—创建与删除文件
+                </a>
+            </div>
+        
+    </nav>
+
+  
+</article>
+
+    <div id="toc" class="toc-article">
+        <strong class="toc-title">文章目录</strong>
+        
+            <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#获取file操作"><span class="toc-number">1.</span> <span class="toc-text">获取file操作</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#一般文件读写"><span class="toc-number">2.</span> <span class="toc-text">一般文件读写</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#目录读写"><span class="toc-number">3.</span> <span class="toc-text">目录读写</span></a></li></ol>
+        
+    </div>
+    <style>
+        .left-col .switch-btn,
+        .left-col .switch-area {
+            display: none;
+        }
+        .toc-level-3 i,
+        .toc-level-3 ol {
+            display: none !important;
+        }
+    </style>
+
+    <input type="button" id="tocButton" value="隐藏目录" title="点击按钮隐藏或者显示文章目录">
+
+    <script>
+        yiliaConfig.toc = ["隐藏目录", "显示目录", !!"false"];
+    </script>
+
+
+
+    
+<div class="share">
+    
+        <div class="bdsharebuttonbox">
+            <a href="#" class="fa fa-twitter bds_twi" data-cmd="twi" title="分享到推特"></a>
+            <a href="#" class="fa fa-weibo bds_tsina" data-cmd="tsina" title="分享到新浪微博"></a>
+            <a href="#" class="fa fa-qq bds_sqq" data-cmd="sqq" title="分享给 QQ 好友"></a>
+            <a href="#" class="fa fa-files-o bds_copy" data-cmd="copy" title="复制网址"></a>
+            <a href="#" class="fa fa fa-envelope-o bds_mail" data-cmd="mail" title="通过邮件分享"></a>
+            <a href="#" class="fa fa-weixin bds_weixin" data-cmd="weixin" title="生成文章二维码"></a>
+            <a href="#" class="fa fa-share-alt bds_more" data-cmd="more"></a>
+        </div>
+        <script>
+            window._bd_share_config={
+                "common":{"bdSnsKey":{},"bdText":"内核OverlayFS—文件读写　| Hexo　","bdMini":"2","bdMiniList":false,"bdPic":"","bdStyle":"0","bdSize":"24"},"share":{}};with(document)0[(getElementsByTagName('head')[0]||body).appendChild(createElement('script')).src='http://bdimg.share.baidu.com/static/api/js/share.js?v=89860593.js?cdnversion='+~(-new Date()/36e5)];
+        </script>
+    
+
+    
+</div>
+
+
+
+
+
+
+
+    
+
+
+
+
+    <div class="scroll" id="post-nav-button">
+        
+            <a href="/2018/01/12/2018-01-10-c-stack_frame/" title="上一篇:  C函数栈帧 ">
+                <i class="fa fa-angle-left"></i>
+            </a>
+        
+
+        <a title="文章列表"><i class="fa fa-bars"></i><i class="fa fa-times"></i></a>
+
+        
+            <a href="/2017/12/22/2017-12-22-linux-code-overlayfs-create_delete/" title="下一篇: 内核OverlayFS—创建与删除文件">
+                <i class="fa fa-angle-right"></i>
+            </a>
+        
+    </div>
+
+    <ul class="post-list"><li class="post-list-item"><a class="post-list-link" href="/2018/09/05/2018-09-05-linux-kernel/">Ubuntu下内核与内核模块的编译过程</a></li><li class="post-list-item"><a class="post-list-link" href="/2018/01/19/2018-01-19-docker-imagestore/"> Docker源码分析—镜像存储 </a></li><li class="post-list-item"><a class="post-list-link" href="/2018/01/15/2018-01-15-docker-storage-overlay2/"> Docker源码分析—存储驱动 </a></li><li class="post-list-item"><a class="post-list-link" href="/2018/01/14/2018-01-14-docker-layerstore/"> Docker源码分析—层存储 </a></li><li class="post-list-item"><a class="post-list-link" href="/2018/01/12/2018-01-10-c-stack_frame/"> C函数栈帧 </a></li><li class="post-list-item"><a class="post-list-link" href="/2017/12/26/2017-12-26-linux-code-overlayfs-read_write/">内核OverlayFS—文件读写</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/12/22/2017-12-22-linux-code-overlayfs-create_delete/">内核OverlayFS—创建与删除文件</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/11/30/2017-11-30-linux-du/"> Linux查看目录大小</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/11/10/2017-11-10-linux-code-overlayfs-dir-op1/">内核OverlayFS—目录搜索</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/10/12/2017-10-12-linux-code-overlayfs-mnt/">内核OverlayFS—注册与挂载</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/09/20/2017-09-20-linux-code-overlayfs-layerinfo/">内核OverlayFS—文件层次信息</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/08/18/2017-08-18-linux-code-vfs/">Linux虚拟文件系统(VFS)</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/05/05/2017-05-05-docker-filesystem-overlay/"> Docker存储驱动—Overlay/Overlay2「译」</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/04/13/2017-04-13-docker-filesystem-aufs/"> Docker存储驱动—Aufs </a></li><li class="post-list-item"><a class="post-list-link" href="/2017/04/09/2017-04-09-linux-uuid/"> Linux存储设备的UUID</a></li></ul>
+
+
+
+
+    <script>
+        
+    </script>
+</div>
+      <footer id="footer">
+    <div class="outer">
+        <div id="footer-info">
+            <div class="footer-left">
+                <i class="fa fa-copyright"></i> 
+                2017-2018 Arking
+            </div>
+            <div class="footer-right">
+                <a href="http://hexo.io/" target="_blank" title="快速、简洁且高效的博客框架">Hexo</a>  Theme <a href="https://github.com/MOxFIVE/hexo-theme-yelee" target="_blank" title="简而不减 Hexo 双栏博客主题  v3.5">Yelee</a> by MOxFIVE <i class="fa fa-heart animated infinite pulse"></i>
+            </div>
+        </div>
+        
+            <div class="visit">
+                
+                    <span id="busuanzi_container_site_pv" style="display:none">
+                        <span id="site-visit" title="本站到访数"><i class="fa fa-user" aria-hidden="true"></i><span id="busuanzi_value_site_uv"></span>
+                        </span>
+                    </span>
+                
+                
+                    <span>| </span>
+                
+                
+                    <span id="busuanzi_container_page_pv" style="display:none">
+                        <span id="page-visit" title="本页阅读量"><i class="fa fa-eye animated infinite pulse" aria-hidden="true"></i><span id="busuanzi_value_page_pv"></span>
+                        </span>
+                    </span>
+                
+            </div>
+        
+    </div>
+</footer>
+    </div>
+    
+<script data-main="/js/main.js" src="//cdn.bootcss.com/require.js/2.2.0/require.min.js"></script>
+
+    <script>
+        $(document).ready(function() {
+            var iPad = window.navigator.userAgent.indexOf('iPad');
+            if (iPad > -1 || $(".left-col").css("display") === "none") {
+                var bgColorList = ["#9db3f4", "#414141", "#e5a859", "#f5dfc6", "#c084a0", "#847e72", "#cd8390", "#996731"];
+                var bgColor = Math.ceil(Math.random() * (bgColorList.length - 1));
+                $("body").css({"background-color": bgColorList[bgColor], "background-size": "cover"});
+            }
+            else {
+                var backgroundnum = 5;
+                var backgroundimg = "url(/background/bg-x.jpg)".replace(/x/gi, Math.ceil(Math.random() * backgroundnum));
+                $("body").css({"background": backgroundimg, "background-attachment": "fixed", "background-size": "cover"});
+            }
+        })
+    </script>
+
+
+
+
+
+<div class="scroll" id="scroll">
+    <a href="#" title="返回顶部"><i class="fa fa-arrow-up"></i></a>
+    <a href="#comments" onclick="load$hide();" title="查看评论"><i class="fa fa-comments-o"></i></a>
+    <a href="#footer" title="转到底部"><i class="fa fa-arrow-down"></i></a>
+</div>
+<script>
+    // Open in New Window
+    
+        var oOpenInNew = {
+            
+            
+            
+            
+            
+            
+             archives: ".archive-article-title", 
+             miniArchives: "a.post-list-link", 
+            
+             friends: "#js-friends a", 
+             socail: ".social a" 
+        }
+        for (var x in oOpenInNew) {
+            $(oOpenInNew[x]).attr("target", "_blank");
+        }
+    
+</script>
+
+<script async src="https://dn-lbstatics.qbox.me/busuanzi/2.3/busuanzi.pure.mini.js">
+</script>
+  </div>
+</body>
+</html>

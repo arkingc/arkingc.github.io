@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html>
+<head><meta name="generator" content="Hexo 3.8.0">
+
+    <!--[if lt IE 9]>
+        <style>body {display: none; background: none !important} </style>
+        <meta http-equiv="Refresh" Content="0; url=//outdatedbrowser.com/" />
+    <![endif]-->
+
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge, chrome=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="format-detection" content="telephone=no">
+<meta name="author" content="Arking">
+
+
+
+<meta name="description" content="内核版本为4.4.68  我们知道，在OverlayFS中，读写操作和文件所在的层息息相关。尤其是写一个只读层的文件时，由于只读层不能修改，因此会触发copy-up操作。那么内核怎么知道一个文件到底是一个upper层（读写层）的文件还是一个lower（只读层）的文件？也就是说，在OverlayFS中如何记录文件的层次信息？">
+<meta name="keywords" content="filesystem,overlayfs">
+<meta property="og:type" content="article">
+<meta property="og:title" content="内核OverlayFS—文件层次信息">
+<meta property="og:url" content="http://yoursite.com/2017/09/20/2017-09-20-linux-code-overlayfs-layerinfo/index.html">
+<meta property="og:site_name" content="Hexo">
+<meta property="og:description" content="内核版本为4.4.68  我们知道，在OverlayFS中，读写操作和文件所在的层息息相关。尤其是写一个只读层的文件时，由于只读层不能修改，因此会触发copy-up操作。那么内核怎么知道一个文件到底是一个upper层（读写层）的文件还是一个lower（只读层）的文件？也就是说，在OverlayFS中如何记录文件的层次信息？">
+<meta property="og:locale" content="default">
+<meta property="og:image" content="http://yoursite.com/img/in-post/post-kernel-overlayfs/file_layer_info.png">
+<meta property="og:image" content="http://yoursite.com/img/in-post/post-kernel-overlayfs/mount_tree.png">
+<meta property="og:updated_time" content="2018-12-04T09:54:06.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="内核OverlayFS—文件层次信息">
+<meta name="twitter:description" content="内核版本为4.4.68  我们知道，在OverlayFS中，读写操作和文件所在的层息息相关。尤其是写一个只读层的文件时，由于只读层不能修改，因此会触发copy-up操作。那么内核怎么知道一个文件到底是一个upper层（读写层）的文件还是一个lower（只读层）的文件？也就是说，在OverlayFS中如何记录文件的层次信息？">
+<meta name="twitter:image" content="http://yoursite.com/img/in-post/post-kernel-overlayfs/file_layer_info.png">
+
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+
+
+    <link rel="alternate" href="/atom.xml" title="Hexo" type="application/atom+xml">
+
+
+
+    <link rel="shortcut icon" href="/favicon.png">
+
+
+
+    <link href="//cdn.bootcss.com/animate.css/3.5.1/animate.min.css" rel="stylesheet">
+
+
+
+    <link href="//cdn.bootcss.com/fancybox/2.1.5/jquery.fancybox.min.css" rel="stylesheet">
+
+
+
+    <script src="//cdn.bootcss.com/pace/1.0.2/pace.min.js"></script>
+    <link href="//cdn.bootcss.com/pace/1.0.2/themes/blue/pace-theme-minimal.css" rel="stylesheet">
+
+
+<link rel="stylesheet" href="/css/style.css">
+
+
+
+<link href="//cdn.bootcss.com/font-awesome/4.6.3/css/font-awesome.min.css" rel="stylesheet">
+
+
+<title>内核OverlayFS—文件层次信息 | Hexo</title>
+
+<script src="//cdn.bootcss.com/jquery/2.2.4/jquery.min.js"></script>
+<script src="//cdn.bootcss.com/clipboard.js/1.5.10/clipboard.min.js"></script>
+
+<script>
+    var yiliaConfig = {
+        fancybox: true,
+        animate: true,
+        isHome: false,
+        isPost: true,
+        isArchive: false,
+        isTag: false,
+        isCategory: false,
+        fancybox_js: "//cdn.bootcss.com/fancybox/2.1.5/jquery.fancybox.min.js",
+        scrollreveal: "//cdn.bootcss.com/scrollReveal.js/3.1.4/scrollreveal.min.js",
+        search: false
+    }
+</script>
+
+
+    <script> yiliaConfig.jquery_ui = [false]; </script>
+
+
+
+    <script> yiliaConfig.rootUrl = "\/";</script>
+
+
+
+
+
+
+</head></html>
+<body>
+  <div id="container">
+    <div class="left-col">
+    <div class="overlay"></div>
+<div class="intrude-less">
+    <header id="header" class="inner">
+        <a href="/" class="profilepic">
+            <img src="/img/avatar.png" class="animated zoomIn">
+        </a>
+        <hgroup>
+          <h1 class="header-author"><a href="/">Arking</a></h1>
+        </hgroup>
+
+        
+
+        
+
+
+        
+            <div id="switch-btn" class="switch-btn">
+                <div class="icon">
+                    <div class="icon-ctn">
+                        <div class="icon-wrap icon-house" data-idx="0">
+                            <div class="birdhouse"></div>
+                            <div class="birdhouse_holes"></div>
+                        </div>
+                        <div class="icon-wrap icon-ribbon hide" data-idx="1">
+                            <div class="ribbon"></div>
+                        </div>
+                        
+                        <div class="icon-wrap icon-link hide" data-idx="2">
+                            <div class="loopback_l"></div>
+                            <div class="loopback_r"></div>
+                        </div>
+                        
+                        
+                        <div class="icon-wrap icon-me hide" data-idx="3">
+                            <div class="user"></div>
+                            <div class="shoulder"></div>
+                        </div>
+                        
+                    </div>
+                    
+                </div>
+                <div class="tips-box hide">
+                    <div class="tips-arrow"></div>
+                    <ul class="tips-inner">
+                        <li>菜单</li>
+                        <li>标签</li>
+                        
+                        <li>友情链接</li>
+                        
+                        
+                        <li>关于我</li>
+                        
+                    </ul>
+                </div>
+            </div>
+        
+
+        <div id="switch-area" class="switch-area">
+            <div class="switch-wrap">
+                <section class="switch-part switch-part1">
+                    <nav class="header-menu">
+                        <ul>
+                        
+                            <li><a href="/">主页</a></li>
+                        
+                            <li><a href="/archives/">归档</a></li>
+                        
+                            <li><a href="/tags/">标签</a></li>
+                        
+                            <li><a href="/about/">关于我</a></li>
+                        
+                        </ul>
+                    </nav>
+                    <nav class="header-nav">
+                        <ul class="social">
+                            
+                                <a class="fa Email" href="/ximingchenhust@foxmail.com" title="Email"></a>
+                            
+                                <a class="fa GitHub" href="#" title="GitHub"></a>
+                            
+                        </ul>
+                    </nav>
+                </section>
+                
+                
+                <section class="switch-part switch-part2">
+                    <div class="widget tagcloud" id="js-tagcloud">
+                        <ul class="tag-list"><li class="tag-list-item"><a class="tag-list-link" href="/tags/c/">c</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/docker/">docker</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/filesystem/">filesystem</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/linux/">linux</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/overlayfs/">overlayfs</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/storage/">storage</a></li></ul>
+                    </div>
+                </section>
+                
+                
+                
+                <section class="switch-part switch-part3">
+                    <div id="js-friends">
+                    
+                      <a class="main-nav-link switch-friends-link" href="https://hexo.io">Hexo</a>
+                    
+                      <a class="main-nav-link switch-friends-link" href="https://pages.github.com/">GitHub</a>
+                    
+                      <a class="main-nav-link switch-friends-link" href="http://moxfive.xyz/">MOxFIVE</a>
+                    
+                    </div>
+                </section>
+                
+
+                
+                
+                <section class="switch-part switch-part4">
+                
+                    <div id="js-aboutme">专注于前端</div>
+                </section>
+                
+            </div>
+        </div>
+    </header>                
+</div>
+    </div>
+    <div class="mid-col">
+      <nav id="mobile-nav">
+      <div class="overlay">
+          <div class="slider-trigger"></div>
+          <h1 class="header-author js-mobile-header hide"><a href="/" title="回到主页">Arking</a></h1>
+      </div>
+    <div class="intrude-less">
+        <header id="header" class="inner">
+            <a href="/" class="profilepic">
+                <img src="/img/avatar.png" class="animated zoomIn">
+            </a>
+            <hgroup>
+              <h1 class="header-author"><a href="/" title="回到主页">Arking</a></h1>
+            </hgroup>
+            
+            <nav class="header-menu">
+                <ul>
+                
+                    <li><a href="/">主页</a></li>
+                
+                    <li><a href="/archives/">归档</a></li>
+                
+                    <li><a href="/tags/">标签</a></li>
+                
+                    <li><a href="/about/">关于我</a></li>
+                
+                <div class="clearfix"></div>
+                </ul>
+            </nav>
+            <nav class="header-nav">
+                        <ul class="social">
+                            
+                                <a class="fa Email" target="_blank" href="/ximingchenhust@foxmail.com" title="Email"></a>
+                            
+                                <a class="fa GitHub" target="_blank" href="#" title="GitHub"></a>
+                            
+                        </ul>
+            </nav>
+        </header>                
+    </div>
+    <link class="menu-list" tags="标签" friends="友情链接" about="关于我">
+</nav>
+      <div class="body-wrap"><article id="post-2017-09-20-linux-code-overlayfs-layerinfo" class="article article-type-post" itemscope="" itemprop="blogPost">
+  
+    <div class="article-meta">
+      <a href="/2017/09/20/2017-09-20-linux-code-overlayfs-layerinfo/" class="article-date">
+      <time datetime="2017-09-19T18:51:00.000Z" itemprop="datePublished">2017-09-20</time>
+</a>
+
+
+    </div>
+  
+  <div class="article-inner">
+    
+      <input type="hidden" class="isFancy">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="article-title" itemprop="name">
+      内核OverlayFS—文件层次信息
+    </h1>
+  
+
+      </header>
+      
+      <div class="article-info article-info-post">
+        
+    <div class="article-category tagcloud">
+    <a class="article-category-link" href="/categories/Linux内核/">Linux内核</a>
+    </div>
+
+
+        
+    <div class="article-tag tagcloud">
+        <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/filesystem/">filesystem</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/overlayfs/">overlayfs</a></li></ul>
+    </div>
+
+        <div class="clearfix"></div>
+      </div>
+      
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+          
+        <blockquote>
+<p><strong>内核版本为4.4.68</strong></p>
+</blockquote>
+<p>我们知道，在OverlayFS中，读写操作和文件所在的层息息相关。尤其是写一个只读层的文件时，由于只读层不能修改，因此会触发copy-up操作。那么内核怎么知道一个文件到底是一个upper层（读写层）的文件还是一个lower（只读层）的文件？也就是说，在OverlayFS中如何记录文件的层次信息？</p>
+<a id="more"></a>
+<p><strong>OverlayFS通过一个名为ovl_entry的结构体来记录文件的层次信息</strong>。在OverlayFS中，会为每个文件分配一个ovl_entry变量，通过<strong>文件dentry的d_fsdata字段</strong>指向这个分配的ovl_entry变量。d_fsdata是一个void类型的指针，记录文件系统特有的信息:</p>
+<div align="left"> <img src="/img/in-post/post-kernel-overlayfs/file_layer_info.png" width="40%" height="40%"> </div>
+
+<p>对于OverlayFS中的每个文件，内核首先得到它的dentry，然后通过下面的方式访问文件的层次信息：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">ovl_entry</span> *<span class="title">oe</span> = <span class="title">dentry</span>-&gt;<span class="title">d_fsdata</span>;</span></span><br></pre></td></tr></table></figure>
+<p>因此，<strong>只要知道了文件的dentry，就能得到文件的层次信息</strong></p>
+<p><br></p>
+<h2 id="OverlayFS的本质"><a href="#OverlayFS的本质" class="headerlink" title="OverlayFS的本质"></a>OverlayFS的本质</h2><p>OverlayFS之所以需要一个结构来记录文件的层次信息是因为<strong>OverlayFS下的文件（联合挂载目录下的文件）并不是upper层或者lower层文件的拷贝。在OverlayFS下访问一个文件，实际上都会转化成对upper层或者lower层真实文件的访问。</strong>因此，就需要一个结构来记录每个文件到底源自哪层</p>
+<p><br></p>
+<h2 id="文件层次信息"><a href="#文件层次信息" class="headerlink" title="文件层次信息"></a>文件层次信息</h2><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">ovl_entry</span> &#123;</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">dentry</span> *__<span class="title">upperdentry</span>;</span><span class="comment">//记录upper层dentry</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">ovl_dir_cache</span> *<span class="title">cache</span>;</span></span><br><span class="line">	<span class="keyword">union</span> &#123;</span><br><span class="line">		<span class="class"><span class="keyword">struct</span> &#123;</span></span><br><span class="line">			u64 version;</span><br><span class="line">			<span class="keyword">bool</span> opaque;</span><br><span class="line">		&#125;;</span><br><span class="line">		<span class="class"><span class="keyword">struct</span> <span class="title">rcu_head</span> <span class="title">rcu</span>;</span></span><br><span class="line">	&#125;;</span><br><span class="line">	<span class="keyword">unsigned</span> numlower;<span class="comment">//lower层数</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">path</span> <span class="title">lowerstack</span>[];</span><span class="comment">//记录lower层路径</span></span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+<p>ovl_entry结构中的__upperdentry记录了upper层信息，lowerstack字段记录了lower层信息。由于可以有多个lower层，所以lower层信息使用一个数组记录，数组的每个元素对应每一层lower层的信息：</p>
+<ul>
+<li>如果一个文件只存在upper层，则lower层信息为空</li>
+<li>如果一个文件只存在lower层，则__upperdentry字段为NULL</li>
+<li>如果文件同时存在upper层和lower层，则两个字段都不为空</li>
+</ul>
+<p>因此，只要得到了文件的dentry，就可以通过ovl_entry访问upper层或lower层文件的dentry，通过upper层或lower层文件的dentry可以进一步访问upper层或lower层文件的inode，实现对upper层和lower层的访问</p>
+<p>比如说在下图中，upper目录作为upper层，lowerdir_1-3目录作为lower层，联合挂载到merged目录下：</p>
+<div align="left"> <img src="/img/in-post/post-kernel-overlayfs/mount_tree.png" width="40%" height="40%"> </div>
+
+<ul>
+<li>对于OverlayFS中的file1，其dentry对应的ovl_entry结构的lowerstack[0].dentry，就指向lowerdir_3/file1文件的dentry</li>
+<li>对于OverlayFS中的file2，其dentry对应的ovl_entry结构的lowerstack[0].dentry，就指向lowerdir_2/file2文件的dentry</li>
+<li>对于OverlayFS中的file3，其dentry对应的ovl_entry结构的__upperdentry字段就指向upper/file3文件的dentry。对应的ovl_entry结构的lowerstack[0].dentry，就指向lowerdir_1/file3文件的dentry</li>
+<li>对于OverlayFS中的file4，其dentry对应的ovl_entry结构的__upperdentry字段就指向upper/file4文件的dentry。对应的ovl_entry结构的lowerstack[0].dentry，就指向lowerdir_1/file4文件的dentry。对应的ovl_entry结构的lowerstack[1].dentry，就指向lowerdir_2/file4文件的dentry。对应的ovl_entry结构的lowerstack[2].dentry，就指向lowerdir_3/file4文件的dentry</li>
+<li><strong>对于OverlayFS的根目录/，其dentry对应的ovl_entry结构的__upperdentry字段就指向upper目录的dentry。对应的ovl_entry结构的lowerstack[0].dentry，就指向lowerdir_1目录的dentry。对应的ovl_entry结构的lowerstack[1].dentry，就指向lowerdir_2目录的dentry。对应的ovl_entry结构的lowerstack[2].dentry，就指向lowerdir_3目录的dentry</strong></li>
+</ul>
+<p><br></p>
+<h2 id="文件路径类型"><a href="#文件路径类型" class="headerlink" title="文件路径类型"></a>文件路径类型</h2><p>文件路径类型也是OverlayFS中文件层次信息的反应，通过文件的路径类型，你可以知道一个文件：</p>
+<ul>
+<li>1）只存在于upper层</li>
+<li>2）只存在于lower层</li>
+<li>3）同时存在于lower层和upper层</li>
+</ul>
+<p>文件路径在访问文件相关的代码中经常出现。在OverlayFS中，通常访问一个文件之前，都要先判断文件的路径类型，然后根据路径类型访问ovl_entry结构中记录有upper层或lower层信息的字段，最后进一步访问upper层或lower层中的实际文件。OverlayFS中文件路径类型由枚举类型ovl_path_type表示:</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">enum</span> ovl_path_type &#123;</span><br><span class="line">	__OVL_PATH_PURE		= (<span class="number">1</span> &lt;&lt; <span class="number">0</span>),<span class="comment">//1</span></span><br><span class="line">	__OVL_PATH_UPPER	= (<span class="number">1</span> &lt;&lt; <span class="number">1</span>),<span class="comment">//2</span></span><br><span class="line">	__OVL_PATH_MERGE	= (<span class="number">1</span> &lt;&lt; <span class="number">2</span>),<span class="comment">//4</span></span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+<p>根据文件的dentry，可以调用函数ovl_path_type()得到文件路径类型：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">enum</span> ovl_path_type <span class="title">ovl_path_type</span><span class="params">(struct dentry *dentry)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">ovl_entry</span> *<span class="title">oe</span> = <span class="title">dentry</span>-&gt;<span class="title">d_fsdata</span>;</span></span><br><span class="line">	<span class="keyword">enum</span> ovl_path_type type = <span class="number">0</span>;</span><br><span class="line"></span><br><span class="line">	<span class="keyword">if</span> (oe-&gt;__upperdentry) &#123;<span class="comment">//说明这个文件存在upper层</span></span><br><span class="line">		type = __OVL_PATH_UPPER;<span class="comment">//__OVL_PATH_UPPER (2)</span></span><br><span class="line">		<span class="comment">/*</span></span><br><span class="line"><span class="comment">		 * Non-dir dentry can hold lower dentry from previous</span></span><br><span class="line"><span class="comment">		 * location. Its purity depends only on opaque flag.</span></span><br><span class="line"><span class="comment">		 */</span></span><br><span class="line">		<span class="keyword">if</span> (oe-&gt;numlower &amp;&amp; S_ISDIR(dentry-&gt;d_inode-&gt;i_mode))</span><br><span class="line">			<span class="comment">//__OVL_PATH_UPPER |  __OVL_PATH_MERGE (6)</span></span><br><span class="line">			type |= __OVL_PATH_MERGE;</span><br><span class="line">		<span class="keyword">else</span> <span class="keyword">if</span> (!oe-&gt;opaque)</span><br><span class="line">			<span class="comment">//__OVL_PATH_UPPER | __OVL_PATH_PURE (3)</span></span><br><span class="line">			type |= __OVL_PATH_PURE;</span><br><span class="line">	&#125; <span class="keyword">else</span> &#123;</span><br><span class="line">		<span class="keyword">if</span> (oe-&gt;numlower &gt; <span class="number">1</span>)</span><br><span class="line">			<span class="comment">//__OVL_PATH_MERGE (4)</span></span><br><span class="line">			type |= __OVL_PATH_MERGE;</span><br><span class="line">	&#125;</span><br><span class="line">	<span class="keyword">return</span> type;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>从函数中可以看到，整个路径类型的判断都是围绕ovl_entry结构中记录的upper层和lower层信息进行。有了这个函数，内核就可以知道一个文件的分布，<strong>这一切都是借助了ovl_entry结构</strong></p>
+<p>这里<strong>假设只有1层lower层</strong>，给出下列几种常见文件及其文件路径类型：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:center">描述</th>
+<th style="text-align:center">文件路径类型(值)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:center">只在lower层中存在的<strong>一般文件或目录</strong></td>
+<td style="text-align:center">(0)</td>
+</tr>
+<tr>
+<td style="text-align:center">只在upper层中存在的<strong>一般文件或目录</strong></td>
+<td style="text-align:center">__OVL_PATH_UPPER \</td>
+<td>__OVL_PATH_PURE (3)</td>
+</tr>
+<tr>
+<td style="text-align:center">同时存在lower和upper层的<strong>一般文件</strong></td>
+<td style="text-align:center">__OVL_PATH_UPPER (2)</td>
+</tr>
+<tr>
+<td style="text-align:center">同时存在lower和upper层的<strong>目录</strong></td>
+<td style="text-align:center">__OVL_PATH_UPPER \</td>
+<td>__OVL_PATH_MERGE (6)</td>
+</tr>
+</tbody>
+</table>
+<p>同时存在lower和upper层的文件和目录的文件路径类型不一样的原因在于，同名文件上层会覆盖下层，而同名目录则是会进行合并</p>
+<p>所以文件层次信息中的opaque字段被设置时，可以理解成一种“覆盖隐藏”，也就是说由于下层信息被覆盖，不会展示在联合目录下，所以不需要再对下层的信息进行分析。删除文件和目录也是使用了whiteout文件实现这种“覆盖隐藏”</p>
+<p><br></p>
+<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>结构体ovl_entry记录了OverlayFS中文件的层次信息，通过这个结构体，内核可以根据一个OverlayFS文件的dentry来实现对相应upper层和lower层的文件访问。由于OverlayFS的本质是将对文件的操作转化为对底层文件系统upper层或lower层文件的操作。因此在OverlayFS中，会大量涉及到对文件层次信息的访问。理解这个结构有助于理解OverlayFS如何实现操作转化。因此这个结构很重要</p>
+
+      
+    </div>
+    
+  </div>
+  
+    
+    <div class="copyright">
+        <p><span>本文标题:</span><a href="/2017/09/20/2017-09-20-linux-code-overlayfs-layerinfo/">内核OverlayFS—文件层次信息</a></p>
+        <p><span>文章作者:</span><a href="/" title="回到主页">Arking</a></p>
+        <p><span>发布时间:</span>2017-09-20, 02:51:00</p>
+        <p><span>最后更新:</span>2018-12-04, 17:54:06</p>
+        <p>
+            <span>原始链接:</span><a class="post-url" href="/2017/09/20/2017-09-20-linux-code-overlayfs-layerinfo/" title="内核OverlayFS—文件层次信息">http://yoursite.com/2017/09/20/2017-09-20-linux-code-overlayfs-layerinfo/</a>
+            <span class="copy-path" data-clipboard-text="原文: http://yoursite.com/2017/09/20/2017-09-20-linux-code-overlayfs-layerinfo/　　作者: Arking" title="点击复制文章链接"><i class="fa fa-clipboard"></i></span>
+            <script> var clipboard = new Clipboard('.copy-path'); </script>
+        </p>
+        <p>
+            <span>许可协议:</span><i class="fa fa-creative-commons"></i> <a rel="license" href="http://creativecommons.org/licenses/by-nc-sa/4.0/" title="CC BY-NC-SA 4.0 International" target="_blank">"署名-非商用-相同方式共享 4.0"</a> 转载请保留原文链接及作者。
+        </p>
+    </div>
+
+
+
+    <nav id="article-nav">
+        
+            <div id="article-nav-newer" class="article-nav-title">
+                <a href="/2017/10/12/2017-10-12-linux-code-overlayfs-mnt/">
+                    内核OverlayFS—注册与挂载
+                </a>
+            </div>
+        
+        
+            <div id="article-nav-older" class="article-nav-title">
+                <a href="/2017/08/18/2017-08-18-linux-code-vfs/">
+                    Linux虚拟文件系统(VFS)
+                </a>
+            </div>
+        
+    </nav>
+
+  
+</article>
+
+    <div id="toc" class="toc-article">
+        <strong class="toc-title">文章目录</strong>
+        
+            <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#OverlayFS的本质"><span class="toc-number">1.</span> <span class="toc-text">OverlayFS的本质</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#文件层次信息"><span class="toc-number">2.</span> <span class="toc-text">文件层次信息</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#文件路径类型"><span class="toc-number">3.</span> <span class="toc-text">文件路径类型</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#总结"><span class="toc-number">4.</span> <span class="toc-text">总结</span></a></li></ol>
+        
+    </div>
+    <style>
+        .left-col .switch-btn,
+        .left-col .switch-area {
+            display: none;
+        }
+        .toc-level-3 i,
+        .toc-level-3 ol {
+            display: none !important;
+        }
+    </style>
+
+    <input type="button" id="tocButton" value="隐藏目录" title="点击按钮隐藏或者显示文章目录">
+
+    <script>
+        yiliaConfig.toc = ["隐藏目录", "显示目录", !!"false"];
+    </script>
+
+
+
+    
+<div class="share">
+    
+        <div class="bdsharebuttonbox">
+            <a href="#" class="fa fa-twitter bds_twi" data-cmd="twi" title="分享到推特"></a>
+            <a href="#" class="fa fa-weibo bds_tsina" data-cmd="tsina" title="分享到新浪微博"></a>
+            <a href="#" class="fa fa-qq bds_sqq" data-cmd="sqq" title="分享给 QQ 好友"></a>
+            <a href="#" class="fa fa-files-o bds_copy" data-cmd="copy" title="复制网址"></a>
+            <a href="#" class="fa fa fa-envelope-o bds_mail" data-cmd="mail" title="通过邮件分享"></a>
+            <a href="#" class="fa fa-weixin bds_weixin" data-cmd="weixin" title="生成文章二维码"></a>
+            <a href="#" class="fa fa-share-alt bds_more" data-cmd="more"></a>
+        </div>
+        <script>
+            window._bd_share_config={
+                "common":{"bdSnsKey":{},"bdText":"内核OverlayFS—文件层次信息　| Hexo　","bdMini":"2","bdMiniList":false,"bdPic":"","bdStyle":"0","bdSize":"24"},"share":{}};with(document)0[(getElementsByTagName('head')[0]||body).appendChild(createElement('script')).src='http://bdimg.share.baidu.com/static/api/js/share.js?v=89860593.js?cdnversion='+~(-new Date()/36e5)];
+        </script>
+    
+
+    
+</div>
+
+
+
+
+
+
+
+    
+
+
+
+
+    <div class="scroll" id="post-nav-button">
+        
+            <a href="/2017/10/12/2017-10-12-linux-code-overlayfs-mnt/" title="上一篇: 内核OverlayFS—注册与挂载">
+                <i class="fa fa-angle-left"></i>
+            </a>
+        
+
+        <a title="文章列表"><i class="fa fa-bars"></i><i class="fa fa-times"></i></a>
+
+        
+            <a href="/2017/08/18/2017-08-18-linux-code-vfs/" title="下一篇: Linux虚拟文件系统(VFS)">
+                <i class="fa fa-angle-right"></i>
+            </a>
+        
+    </div>
+
+    <ul class="post-list"><li class="post-list-item"><a class="post-list-link" href="/2018/09/05/2018-09-05-linux-kernel/">Ubuntu下内核与内核模块的编译过程</a></li><li class="post-list-item"><a class="post-list-link" href="/2018/01/19/2018-01-19-docker-imagestore/"> Docker源码分析—镜像存储 </a></li><li class="post-list-item"><a class="post-list-link" href="/2018/01/15/2018-01-15-docker-storage-overlay2/"> Docker源码分析—存储驱动 </a></li><li class="post-list-item"><a class="post-list-link" href="/2018/01/14/2018-01-14-docker-layerstore/"> Docker源码分析—层存储 </a></li><li class="post-list-item"><a class="post-list-link" href="/2018/01/12/2018-01-10-c-stack_frame/"> C函数栈帧 </a></li><li class="post-list-item"><a class="post-list-link" href="/2017/12/26/2017-12-26-linux-code-overlayfs-read_write/">内核OverlayFS—文件读写</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/12/22/2017-12-22-linux-code-overlayfs-create_delete/">内核OverlayFS—创建与删除文件</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/11/30/2017-11-30-linux-du/"> Linux查看目录大小</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/11/10/2017-11-10-linux-code-overlayfs-dir-op1/">内核OverlayFS—目录搜索</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/10/12/2017-10-12-linux-code-overlayfs-mnt/">内核OverlayFS—注册与挂载</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/09/20/2017-09-20-linux-code-overlayfs-layerinfo/">内核OverlayFS—文件层次信息</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/08/18/2017-08-18-linux-code-vfs/">Linux虚拟文件系统(VFS)</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/05/05/2017-05-05-docker-filesystem-overlay/"> Docker存储驱动—Overlay/Overlay2「译」</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/04/13/2017-04-13-docker-filesystem-aufs/"> Docker存储驱动—Aufs </a></li><li class="post-list-item"><a class="post-list-link" href="/2017/04/09/2017-04-09-linux-uuid/"> Linux存储设备的UUID</a></li></ul>
+
+
+
+
+    <script>
+        
+    </script>
+</div>
+      <footer id="footer">
+    <div class="outer">
+        <div id="footer-info">
+            <div class="footer-left">
+                <i class="fa fa-copyright"></i> 
+                2017-2018 Arking
+            </div>
+            <div class="footer-right">
+                <a href="http://hexo.io/" target="_blank" title="快速、简洁且高效的博客框架">Hexo</a>  Theme <a href="https://github.com/MOxFIVE/hexo-theme-yelee" target="_blank" title="简而不减 Hexo 双栏博客主题  v3.5">Yelee</a> by MOxFIVE <i class="fa fa-heart animated infinite pulse"></i>
+            </div>
+        </div>
+        
+            <div class="visit">
+                
+                    <span id="busuanzi_container_site_pv" style="display:none">
+                        <span id="site-visit" title="本站到访数"><i class="fa fa-user" aria-hidden="true"></i><span id="busuanzi_value_site_uv"></span>
+                        </span>
+                    </span>
+                
+                
+                    <span>| </span>
+                
+                
+                    <span id="busuanzi_container_page_pv" style="display:none">
+                        <span id="page-visit" title="本页阅读量"><i class="fa fa-eye animated infinite pulse" aria-hidden="true"></i><span id="busuanzi_value_page_pv"></span>
+                        </span>
+                    </span>
+                
+            </div>
+        
+    </div>
+</footer>
+    </div>
+    
+<script data-main="/js/main.js" src="//cdn.bootcss.com/require.js/2.2.0/require.min.js"></script>
+
+    <script>
+        $(document).ready(function() {
+            var iPad = window.navigator.userAgent.indexOf('iPad');
+            if (iPad > -1 || $(".left-col").css("display") === "none") {
+                var bgColorList = ["#9db3f4", "#414141", "#e5a859", "#f5dfc6", "#c084a0", "#847e72", "#cd8390", "#996731"];
+                var bgColor = Math.ceil(Math.random() * (bgColorList.length - 1));
+                $("body").css({"background-color": bgColorList[bgColor], "background-size": "cover"});
+            }
+            else {
+                var backgroundnum = 5;
+                var backgroundimg = "url(/background/bg-x.jpg)".replace(/x/gi, Math.ceil(Math.random() * backgroundnum));
+                $("body").css({"background": backgroundimg, "background-attachment": "fixed", "background-size": "cover"});
+            }
+        })
+    </script>
+
+
+
+
+
+<div class="scroll" id="scroll">
+    <a href="#" title="返回顶部"><i class="fa fa-arrow-up"></i></a>
+    <a href="#comments" onclick="load$hide();" title="查看评论"><i class="fa fa-comments-o"></i></a>
+    <a href="#footer" title="转到底部"><i class="fa fa-arrow-down"></i></a>
+</div>
+<script>
+    // Open in New Window
+    
+        var oOpenInNew = {
+            
+            
+            
+            
+            
+            
+             archives: ".archive-article-title", 
+             miniArchives: "a.post-list-link", 
+            
+             friends: "#js-friends a", 
+             socail: ".social a" 
+        }
+        for (var x in oOpenInNew) {
+            $(oOpenInNew[x]).attr("target", "_blank");
+        }
+    
+</script>
+
+<script async src="https://dn-lbstatics.qbox.me/busuanzi/2.3/busuanzi.pure.mini.js">
+</script>
+  </div>
+</body>
+</html>
