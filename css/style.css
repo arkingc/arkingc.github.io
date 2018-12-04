@@ -2096,14 +2096,14 @@ aside.comment-bar:active {
 }
 .article-entry pre,
 .article-entry .highlight {
-  background: rgba(32,34,37,0.85);
+  background: rgba(0,40,91,0.8);
   margin: auto;
   padding: 0.35em 1.5em;
   border-style: solid;
   border-color: #ddd;
   border-width: 1px;
   overflow: auto;
-  color: #c5c8c6;
+  color: #fff;
   line-height: 1.3rem;
 }
 .article-entry .highlight .gutter pre,
@@ -2120,7 +2120,7 @@ aside.comment-bar:active {
   text-shadow: none;
   padding: 0;
   background: none;
-  color: #c5c8c6;
+  color: #fff;
   -webkit-box-shadow: none;
   box-shadow: none;
 }
@@ -2149,7 +2149,7 @@ aside.comment-bar:active {
 }
 .article-entry .highlight figcaption {
   font-size: 0.85em;
-  color: #969896;
+  color: #7285b7;
   line-height: 1em;
   margin-bottom: 1em;
 }
@@ -2176,7 +2176,7 @@ aside.comment-bar:active {
   border-style: solid;
   border-color: #ddd;
   border-width: 1px 0;
-  background: rgba(32,34,37,0.85);
+  background: rgba(0,40,91,0.8);
   padding: 15px 20px 15px 0;
 }
 .article-entry .gist .gist-file {
@@ -2202,8 +2202,8 @@ aside.comment-bar:active {
   border: none;
 }
 .article-entry .gist .gist-file .gist-meta {
-  background: rgba(32,34,37,0.85);
-  color: #969896;
+  background: rgba(0,40,91,0.8);
+  color: #7285b7;
   font: 0.85em "Lucida Grande", Verdana, "Helvetica Neue", Arial;
   text-shadow: 0 0;
   padding: 0;
@@ -2224,15 +2224,13 @@ aside.comment-bar:active {
   border-radius: 3px;
   -webkit-box-shadow: 1px 1px 1px rgba(0,0,0,0.08);
   box-shadow: 1px 1px 1px rgba(0,0,0,0.08);
-  var: 2;
+  var: 0;
   color: #fff;
-  background: rgba(153,204,153,0.7);
-  color: #f48385;
-  background: rgba(199,38,79,0.07);
+  color: #808080;
 }
 pre .comment,
 pre .title {
-  color: #969896;
+  color: #7285b7;
 }
 pre .variable,
 pre .attribute,
@@ -2246,7 +2244,7 @@ pre .html .doctype,
 pre .css .id,
 pre .css .class,
 pre .css .pseudo {
-  color: #c66;
+  color: #ff9da4;
 }
 pre .number,
 pre .preprocessor,
@@ -2254,12 +2252,12 @@ pre .built_in,
 pre .literal,
 pre .params,
 pre .constant {
-  color: #de935f;
+  color: #ffc58f;
 }
 pre .class,
 pre .ruby .class .title,
 pre .css .rules .attribute {
-  color: #b5bd68;
+  color: #d1f1a9;
 }
 pre .string,
 pre .value,
@@ -2267,10 +2265,10 @@ pre .inheritance,
 pre .header,
 pre .ruby .symbol,
 pre .xml .cdata {
-  color: #b5bd68;
+  color: #d1f1a9;
 }
 pre .css .hexcolor {
-  color: #8abeb7;
+  color: #9ff;
 }
 pre .function,
 pre .python .decorator,
@@ -2280,11 +2278,11 @@ pre .ruby .title .keyword,
 pre .perl .sub,
 pre .javascript .title,
 pre .coffeescript .title {
-  color: #81a2be;
+  color: #bbdaff;
 }
 pre .keyword,
 pre .javascript .function {
-  color: #b294bb;
+  color: #ebbbff;
 }
 #footer {
   font-size: 0.8rem;
