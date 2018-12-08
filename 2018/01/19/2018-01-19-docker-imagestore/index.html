@@ -323,7 +323,7 @@
         <blockquote>
 <p>基于Docker 17.05.x</p>
 </blockquote>
-<p>Docker使用<a href="https://arkingc.github.io/2018/01/14/docker-layerstore/" target="_blank" rel="noopener">层存储</a>来管理容器和镜像的层，那么如何知道哪些层属于某一个镜像？也就说如果现在系统上有很多个镜像，每个镜像又包括很多层，如果使用Overlay2，你可以在存储驱动目录下看到一大堆目录，如何知道哪些层是属于某个镜像？也就是说<strong>一个镜像如何和镜像层之间建立起关系</strong>？</p>
+<p>Docker使用<a href="https://arkingc.github.io/2018/01/14/docker-layerstore/">层存储</a>来管理容器和镜像的层，那么如何知道哪些层属于某一个镜像？也就说如果现在系统上有很多个镜像，每个镜像又包括很多层，如果使用Overlay2，你可以在存储驱动目录下看到一大堆目录，如何知道哪些层是属于某个镜像？也就是说<strong>一个镜像如何和镜像层之间建立起关系</strong>？</p>
 <p>这篇文章主要通过分析Docker源码，介绍镜像存储的创建过程</p>
 <a id="more"></a>
 <p>Docker使用镜像存储来管理镜像，通过镜像存储可以查找系统当前所有镜像，以及每个镜像的镜像层信息。镜像存储主要通过镜像的元数据(imageMeta类型)来索引镜像的顶层镜像层，然后可以通过层存储来完成所有镜像层的查找等操作，关系结构如下：</p>

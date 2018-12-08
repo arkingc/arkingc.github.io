@@ -323,7 +323,7 @@
         <blockquote>
 <p>基于Docker 17.05.x</p>
 </blockquote>
-<p>Docker使用<a href="https://arkingc.github.io/2018/01/14/docker-layerstore/" target="_blank" rel="noopener">层存储</a>来管理镜像层和容器层。使用<strong>存储驱动</strong>来管理层的内容，使用<strong>层的元数据存储</strong>管理层的元数据</p>
+<p>Docker使用<a href="https://arkingc.github.io/2018/01/14/docker-layerstore/">层存储</a>来管理镜像层和容器层。使用<strong>存储驱动</strong>来管理层的内容，使用<strong>层的元数据存储</strong>管理层的元数据</p>
 <p><strong>这篇文章以overlay2作为存储驱动</strong>，通过分析源码介绍存储驱动如何管理容器层和镜像层的内容</p>
 <a id="more"></a>
 <p><br></p>
@@ -336,7 +336,7 @@
 <li>其它层：由于不是最底层，所以除了diff目录和link文件外，还有描述下层信息的lower文件，联合挂载目录merged，以及copy-up等操作会用到的work目录</li>
 </ul>
 <p>除此之外，存储驱动目录下还有一个l目录，这个目录是层标识符目录，里面是一些称为“层标识符”的软链接，指向每一层的“层文件”目录diff</p>
-<p>可以通过<a href="https://arkingc.github.io/2017/05/05/docker-filesystem-overlay/#overlay2" target="_blank" rel="noopener">这里</a>了解更多</p>
+<p>可以通过<a href="https://arkingc.github.io/2017/05/05/docker-filesystem-overlay/#overlay2">这里</a>了解更多</p>
 <p><br></p>
 <h2 id="创建层"><a href="#创建层" class="headerlink" title="创建层"></a>创建层</h2><p>一般在下列情况情况下会创建层：</p>
 <ul>
