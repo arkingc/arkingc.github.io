@@ -19,28 +19,28 @@
 <meta name="keywords" content="filesystem,overlayfs">
 <meta property="og:type" content="article">
 <meta property="og:title" content="内核OverlayFS—目录搜索">
-<meta property="og:url" content="http://yoursite.com/2017/11/10/2017-11-10-linux-code-overlayfs-dir-op1/index.html">
+<meta property="og:url" content="http://arkingc.github.io/2017/11/10/2017-11-10-linux-code-overlayfs-dir-op1/index.html">
 <meta property="og:site_name" content="Arking">
 <meta property="og:description" content="内核版本4.4.68  在OverlayFS联合挂载目录下，使用命令ls看到的文件实际上来自联合挂载的upper层和lower层。前面的博文中有提到过，OverlayFS的本质在于实现操作转化，因此在对OverlayFS中的一个目录进行搜索时（使用命令ls时），实际上会搜索目录对应upper层和lower层的目录，然后对搜索结果进行处理、展示。最终得到我们在OverlayFS下ls dir看到的">
 <meta property="og:locale" content="default">
-<meta property="og:image" content="http://yoursite.com/img/in-post/post-kernel-overlayfs/mount_tree.png">
-<meta property="og:image" content="http://yoursite.com/img/in-post/post-kernel-overlayfs/dir-op1-strace.png">
-<meta property="og:image" content="http://yoursite.com/img/in-post/post-kernel-overlayfs/dir-op1-open.png">
-<meta property="og:image" content="http://yoursite.com/img/in-post/post-kernel-overlayfs/dir-op1-iterator.png">
+<meta property="og:image" content="http://arkingc.github.io/img/in-post/post-kernel-overlayfs/mount_tree.png">
+<meta property="og:image" content="http://arkingc.github.io/img/in-post/post-kernel-overlayfs/dir-op1-strace.png">
+<meta property="og:image" content="http://arkingc.github.io/img/in-post/post-kernel-overlayfs/dir-op1-open.png">
+<meta property="og:image" content="http://arkingc.github.io/img/in-post/post-kernel-overlayfs/dir-op1-iterator.png">
 <meta property="og:updated_time" content="2018-12-04T09:46:01.000Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="内核OverlayFS—目录搜索">
 <meta name="twitter:description" content="内核版本4.4.68  在OverlayFS联合挂载目录下，使用命令ls看到的文件实际上来自联合挂载的upper层和lower层。前面的博文中有提到过，OverlayFS的本质在于实现操作转化，因此在对OverlayFS中的一个目录进行搜索时（使用命令ls时），实际上会搜索目录对应upper层和lower层的目录，然后对搜索结果进行处理、展示。最终得到我们在OverlayFS下ls dir看到的">
-<meta name="twitter:image" content="http://yoursite.com/img/in-post/post-kernel-overlayfs/mount_tree.png">
+<meta name="twitter:image" content="http://arkingc.github.io/img/in-post/post-kernel-overlayfs/mount_tree.png">
 
-<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="apple-touch-icon" href="http://arkingc.github.io/apple-touch-icon.png">
 
 
     <link rel="alternate" href="/atom.xml" title="Arking" type="application/atom+xml">
 
 
 
-    <link rel="shortcut icon" href="/favicon.png">
+    <link rel="shortcut icon" href="http://arkingc.github.io/favicon.png">
 
 
 
@@ -88,7 +88,7 @@
 
 
 
-    <script> yiliaConfig.rootUrl = "\/";</script>
+    <script> yiliaConfig.rootUrl = http://arkingc.github.io; </script>
 
 
 
@@ -113,7 +113,7 @@
 <div class="intrude-less">
     <header id="header" class="inner">
         <a href="/" class="profilepic">
-            <img src="/img/avatar.png" class="animated zoomIn">
+            <img src="http://arkingc.github.io/img/avatar.png" class="animated zoomIn">
         </a>
         <hgroup>
           <h1 class="header-author"><a href="/">Arking</a></h1>
@@ -172,15 +172,15 @@
                     <nav class="header-menu">
                         <ul>
                         
-                            <li><a href="/">主页</a></li>
+                            <li><a href="http://arkingc.github.io/">主页</a></li>
                         
-                            <li><a href="/archives/">归档</a></li>
+                            <li><a href="http://arkingc.github.io/archives/">归档</a></li>
                         
-                            <li><a href="/tags/">标签</a></li>
+                            <li><a href="http://arkingc.github.io/tags/">标签</a></li>
                         
-                            <li><a href="/link/">链接</a></li>
+                            <li><a href="http://arkingc.github.io/link/">链接</a></li>
                         
-                            <li><a href="/about/">关于我</a></li>
+                            <li><a href="http://arkingc.github.io/about/">关于我</a></li>
                         
                         </ul>
                     </nav>
@@ -244,7 +244,7 @@
     <div class="intrude-less">
         <header id="header" class="inner">
             <a href="/" class="profilepic">
-                <img src="/img/avatar.png" class="animated zoomIn">
+                <img src="http://arkingc.github.io/img/avatar.png" class="animated zoomIn">
             </a>
             <hgroup>
               <h1 class="header-author"><a href="/" title="回到主页">Arking</a></h1>
@@ -414,8 +414,8 @@
         <p><span>发布时间:</span>2017-11-10, 02:51:00</p>
         <p><span>最后更新:</span>2018-12-04, 17:46:01</p>
         <p>
-            <span>原始链接:</span><a class="post-url" href="/2017/11/10/2017-11-10-linux-code-overlayfs-dir-op1/" title="内核OverlayFS—目录搜索">http://yoursite.com/2017/11/10/2017-11-10-linux-code-overlayfs-dir-op1/</a>
-            <span class="copy-path" data-clipboard-text="原文: http://yoursite.com/2017/11/10/2017-11-10-linux-code-overlayfs-dir-op1/　　作者: Arking" title="点击复制文章链接"><i class="fa fa-clipboard"></i></span>
+            <span>原始链接:</span><a class="post-url" href="/2017/11/10/2017-11-10-linux-code-overlayfs-dir-op1/" title="内核OverlayFS—目录搜索">http://arkingc.github.io/2017/11/10/2017-11-10-linux-code-overlayfs-dir-op1/</a>
+            <span class="copy-path" data-clipboard-text="原文: http://arkingc.github.io/2017/11/10/2017-11-10-linux-code-overlayfs-dir-op1/　　作者: Arking" title="点击复制文章链接"><i class="fa fa-clipboard"></i></span>
             <script> var clipboard = new Clipboard('.copy-path'); </script>
         </p>
         <p>
@@ -576,7 +576,7 @@
             }
             else {
                 var backgroundnum = 5;
-                var backgroundimg = "url(/background/bg-x.jpg)".replace(/x/gi, Math.ceil(Math.random() * backgroundnum));
+                var backgroundimg = "url(http://arkingc.github.io/background/bg-x.jpg)".replace(/x/gi, Math.ceil(Math.random() * backgroundnum));
                 $("body").css({"background": backgroundimg, "background-attachment": "fixed", "background-size": "cover"});
             }
         })
