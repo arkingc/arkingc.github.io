@@ -305,7 +305,8 @@
     <div class="article-entry" itemprop="articleBody">
       
           
-              <p>并行I/O技术是一项用于提升应用性能的技术。随着NVMe设备的出现与发展，并发I/O能力增强。同时，CPU核数呈现增长的趋势。这使得很多高性能数据库开始利用多核来加速核心操作。但是，由于文件系统中存在诸如锁竞争、引用计数、cache-line竞争等扩展性瓶颈，因此文件系统操作的处理能力并不能随着核数的增加呈现出线性增长的关系。<a href="https://github.com/sslab-gatech/fxmark" target="_blank" rel="noopener">FxMark</a>就是 USENIX Annual Technical Conference(ATC’16) 中文章 “Understanding Manycore Scalability of File Systems” 的作者开源的一套microbench套件，可以测试文件系统创建、删除、读/写等操作的多核扩展性。这篇文章从源码的角度分析FxMark的使用</p>
+              <p>并行I/O技术是一项用于提升应用性能的技术。随着NVMe设备的出现与发展，并发I/O能力增强。同时，CPU核数呈现增长的趋势。这使得很多高性能数据库开始利用多核来加速核心操作。但是，由于文件系统中存在诸如锁竞争、引用计数、cache-line竞争等扩展性瓶颈，因此文件系统操作的处理能力并不能随着核数的增加呈现出线性增长的关系。<a href="https://github.com/sslab-gatech/fxmark" target="_blank" rel="noopener">FxMark</a>就是 USENIX Annual Technical Conference(ATC’16) 中文章 “Understanding Manycore Scalability of File Systems” 的作者开源的一套microbench套件，可以测试文件系统创建、删除、读/写等操作的多核扩展性</p>
+<p>这篇博文从源码的角度分析FxMark的使用</p>
           
       
     </div>
