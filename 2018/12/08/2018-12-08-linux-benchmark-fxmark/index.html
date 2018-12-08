@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html>
+<head><meta name="generator" content="Hexo 3.8.0">
+
+    <!--[if lt IE 9]>
+        <style>body {display: none; background: none !important} </style>
+        <meta http-equiv="Refresh" Content="0; url=//outdatedbrowser.com/" />
+    <![endif]-->
+
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge, chrome=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="format-detection" content="telephone=no">
+<meta name="author" content="Arking">
+
+
+
+<meta name="description" content="并行I/O技术是一项用于提升应用性能的技术。随着NVMe设备的出现与发展，并发I/O能力增强。同时，CPU核数呈现增长的趋势。这使得很多高性能数据库开始利用多核来加速核心操作。但是，由于文件系统中存在诸如锁竞争、引用计数、cache-line竞争等扩展性瓶颈，因此文件系统操作的处理能力并不能随着核数的增加呈现出线性增长的关系。FxMark就是 USENIX Annual Technical Con">
+<meta name="keywords" content="linux">
+<meta property="og:type" content="article">
+<meta property="og:title" content="使用FXMARK测试文件系统的多核可扩展性">
+<meta property="og:url" content="http://yoursite.com/2018/12/08/2018-12-08-linux-benchmark-fxmark/index.html">
+<meta property="og:site_name" content="Arking">
+<meta property="og:description" content="并行I/O技术是一项用于提升应用性能的技术。随着NVMe设备的出现与发展，并发I/O能力增强。同时，CPU核数呈现增长的趋势。这使得很多高性能数据库开始利用多核来加速核心操作。但是，由于文件系统中存在诸如锁竞争、引用计数、cache-line竞争等扩展性瓶颈，因此文件系统操作的处理能力并不能随着核数的增加呈现出线性增长的关系。FxMark就是 USENIX Annual Technical Con">
+<meta property="og:locale" content="default">
+<meta property="og:image" content="http://yoursite.com/img/in-post/post-benchmark-fxmark/microbench.png">
+<meta property="og:image" content="http://yoursite.com/img/in-post/post-benchmark-fxmark/struct.png">
+<meta property="og:image" content="http://yoursite.com/img/in-post/post-benchmark-fxmark/MWCL.png">
+<meta property="og:image" content="http://yoursite.com/img/in-post/post-benchmark-fxmark/flame.png">
+<meta property="og:updated_time" content="2018-12-08T09:33:00.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="使用FXMARK测试文件系统的多核可扩展性">
+<meta name="twitter:description" content="并行I/O技术是一项用于提升应用性能的技术。随着NVMe设备的出现与发展，并发I/O能力增强。同时，CPU核数呈现增长的趋势。这使得很多高性能数据库开始利用多核来加速核心操作。但是，由于文件系统中存在诸如锁竞争、引用计数、cache-line竞争等扩展性瓶颈，因此文件系统操作的处理能力并不能随着核数的增加呈现出线性增长的关系。FxMark就是 USENIX Annual Technical Con">
+<meta name="twitter:image" content="http://yoursite.com/img/in-post/post-benchmark-fxmark/microbench.png">
+
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+
+
+    <link rel="alternate" href="/atom.xml" title="Arking" type="application/atom+xml">
+
+
+
+    <link rel="shortcut icon" href="/favicon.png">
+
+
+
+    <link href="//cdn.bootcss.com/animate.css/3.5.1/animate.min.css" rel="stylesheet">
+
+
+
+    <link href="//cdn.bootcss.com/fancybox/2.1.5/jquery.fancybox.min.css" rel="stylesheet">
+
+
+
+    <script src="//cdn.bootcss.com/pace/1.0.2/pace.min.js"></script>
+    <link href="//cdn.bootcss.com/pace/1.0.2/themes/blue/pace-theme-minimal.css" rel="stylesheet">
+
+
+<link rel="stylesheet" href="/css/style.css">
+
+
+
+<link href="//cdn.bootcss.com/font-awesome/4.6.3/css/font-awesome.min.css" rel="stylesheet">
+
+
+<title>使用FXMARK测试文件系统的多核可扩展性 | Arking</title>
+
+<script src="//cdn.bootcss.com/jquery/2.2.4/jquery.min.js"></script>
+<script src="//cdn.bootcss.com/clipboard.js/1.5.10/clipboard.min.js"></script>
+
+<script>
+    var yiliaConfig = {
+        fancybox: true,
+        animate: true,
+        isHome: false,
+        isPost: true,
+        isArchive: false,
+        isTag: false,
+        isCategory: false,
+        fancybox_js: "//cdn.bootcss.com/fancybox/2.1.5/jquery.fancybox.min.js",
+        scrollreveal: "//cdn.bootcss.com/scrollReveal.js/3.1.4/scrollreveal.min.js",
+        search: false
+    }
+</script>
+
+
+    <script> yiliaConfig.jquery_ui = [false]; </script>
+
+
+
+    <script> yiliaConfig.rootUrl = "\/";</script>
+
+
+
+
+
+    <script>
+        var _hmt = _hmt || [];
+        (function() {
+            var hm = document.createElement("script");
+            hm.src = "//hm.baidu.com/hm.js?95fde47c8eb7fd8f64bddfc637e05427";
+            var s = document.getElementsByTagName("script")[0]; 
+            s.parentNode.insertBefore(hm, s);
+        })();
+    </script>
+
+
+</head></html>
+<body>
+  <div id="container">
+    <div class="left-col">
+    <div class="overlay"></div>
+<div class="intrude-less">
+    <header id="header" class="inner">
+        <a href="/" class="profilepic">
+            <img src="/img/avatar.png" class="animated zoomIn">
+        </a>
+        <hgroup>
+          <h1 class="header-author"><a href="/">Arking</a></h1>
+        </hgroup>
+
+        
+
+        
+
+
+        
+            <div id="switch-btn" class="switch-btn">
+                <div class="icon">
+                    <div class="icon-ctn">
+                        <div class="icon-wrap icon-house" data-idx="0">
+                            <div class="birdhouse"></div>
+                            <div class="birdhouse_holes"></div>
+                        </div>
+                        <div class="icon-wrap icon-ribbon hide" data-idx="1">
+                            <div class="ribbon"></div>
+                        </div>
+                        
+                        <div class="icon-wrap icon-link hide" data-idx="2">
+                            <div class="loopback_l"></div>
+                            <div class="loopback_r"></div>
+                        </div>
+                        
+                        
+                        <div class="icon-wrap icon-me hide" data-idx="3">
+                            <div class="user"></div>
+                            <div class="shoulder"></div>
+                        </div>
+                        
+                    </div>
+                    
+                </div>
+                <div class="tips-box hide">
+                    <div class="tips-arrow"></div>
+                    <ul class="tips-inner">
+                        <li>菜单</li>
+                        <li>标签</li>
+                        
+                        <li>友情链接</li>
+                        
+                        
+                        <li>关于我</li>
+                        
+                    </ul>
+                </div>
+            </div>
+        
+
+        <div id="switch-area" class="switch-area">
+            <div class="switch-wrap">
+                <section class="switch-part switch-part1">
+                    <nav class="header-menu">
+                        <ul>
+                        
+                            <li><a href="/">主页</a></li>
+                        
+                            <li><a href="/archives/">归档</a></li>
+                        
+                            <li><a href="/tags/">标签</a></li>
+                        
+                            <li><a href="/link/">链接</a></li>
+                        
+                            <li><a href="/about/">关于我</a></li>
+                        
+                        </ul>
+                    </nav>
+                    <nav class="header-nav">
+                        <ul class="social">
+                            
+                                <a class="fa Email" href="mailto:ximingchenhust@foxmail.com" title="Email"></a>
+                            
+                                <a class="fa GitHub" href="https://github.com/arkingc" title="GitHub"></a>
+                            
+                        </ul>
+                    </nav>
+                </section>
+                
+                
+                <section class="switch-part switch-part2">
+                    <div class="widget tagcloud" id="js-tagcloud">
+                        <ul class="tag-list"><li class="tag-list-item"><a class="tag-list-link" href="/tags/c/">c</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/docker/">docker</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/filesystem/">filesystem</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/linux/">linux</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/overlayfs/">overlayfs</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/storage/">storage</a></li></ul>
+                    </div>
+                </section>
+                
+                
+                
+                <section class="switch-part switch-part3">
+                    <div id="js-friends">
+                    
+                      <a class="main-nav-link switch-friends-link" href="http://xiaohuazheng.github.io/">华仔</a>
+                    
+                      <a class="main-nav-link switch-friends-link" href="https://guanjunjian.github.io/">健哥</a>
+                    
+                      <a class="main-nav-link switch-friends-link" href="http://blog.xbblfz.site/">波波</a>
+                    
+                      <a class="main-nav-link switch-friends-link" href="https://starrymoon.github.io/">扛把子</a>
+                    
+                      <a class="main-nav-link switch-friends-link" href="https://hexo.io">Hexo</a>
+                    
+                      <a class="main-nav-link switch-friends-link" href="https://github.com/MOxFIVE/hexo-theme-yelee">yelle</a>
+                    
+                    </div>
+                </section>
+                
+
+                
+                
+                <section class="switch-part switch-part4">
+                
+                    <div id="js-aboutme">专注于后台</div>
+                </section>
+                
+            </div>
+        </div>
+    </header>                
+</div>
+    </div>
+    <div class="mid-col">
+      <nav id="mobile-nav">
+      <div class="overlay">
+          <div class="slider-trigger"></div>
+          <h1 class="header-author js-mobile-header hide"><a href="/" title="回到主页">Arking</a></h1>
+      </div>
+    <div class="intrude-less">
+        <header id="header" class="inner">
+            <a href="/" class="profilepic">
+                <img src="/img/avatar.png" class="animated zoomIn">
+            </a>
+            <hgroup>
+              <h1 class="header-author"><a href="/" title="回到主页">Arking</a></h1>
+            </hgroup>
+            
+            <nav class="header-menu">
+                <ul>
+                
+                    <li><a href="/">主页</a></li>
+                
+                    <li><a href="/archives/">归档</a></li>
+                
+                    <li><a href="/tags/">标签</a></li>
+                
+                    <li><a href="/link/">链接</a></li>
+                
+                    <li><a href="/about/">关于我</a></li>
+                
+                <div class="clearfix"></div>
+                </ul>
+            </nav>
+            <nav class="header-nav">
+                        <ul class="social">
+                            
+                                <a class="fa Email" target="_blank" href="mailto:ximingchenhust@foxmail.com" title="Email"></a>
+                            
+                                <a class="fa GitHub" target="_blank" href="https://github.com/arkingc" title="GitHub"></a>
+                            
+                        </ul>
+            </nav>
+        </header>                
+    </div>
+    <link class="menu-list" tags="标签" friends="友情链接" about="关于我">
+</nav>
+      <div class="body-wrap"><article id="post-2018-12-08-linux-benchmark-fxmark" class="article article-type-post" itemscope="" itemprop="blogPost">
+  
+    <div class="article-meta">
+      <a href="/2018/12/08/2018-12-08-linux-benchmark-fxmark/" class="article-date">
+      <time datetime="2018-12-08T08:35:00.000Z" itemprop="datePublished">2018-12-08</time>
+</a>
+
+
+    </div>
+  
+  <div class="article-inner">
+    
+      <input type="hidden" class="isFancy">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="article-title" itemprop="name">
+      使用FXMARK测试文件系统的多核可扩展性
+    </h1>
+  
+
+      </header>
+      
+      <div class="article-info article-info-post">
+        
+    <div class="article-category tagcloud">
+    <a class="article-category-link" href="/categories/性能调优/">性能调优</a>
+    </div>
+
+
+        
+    <div class="article-tag tagcloud">
+        <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/linux/">linux</a></li></ul>
+    </div>
+
+        <div class="clearfix"></div>
+      </div>
+      
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+          
+        <p>并行I/O技术是一项用于提升应用性能的技术。随着NVMe设备的出现与发展，并发I/O能力增强。同时，CPU核数呈现增长的趋势。这使得很多高性能数据库开始利用多核来加速核心操作。但是，由于文件系统中存在诸如锁竞争、引用计数、cache-line竞争等扩展性瓶颈，因此文件系统操作的处理能力并不能随着核数的增加呈现出线性增长的关系。<a href="https://github.com/sslab-gatech/fxmark" target="_blank" rel="noopener">FxMark</a>就是 USENIX Annual Technical Conference(ATC’16) 中文章 “Understanding Manycore Scalability of File Systems” 的作者开源的一套microbench套件，可以测试文件系统创建、删除、读/写等操作的多核扩展性。这篇文章从源码的角度分析FxMark的使用</p>
+<a id="more"></a>
+<p>源码结构如下：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">fxmark</span><br><span class="line">   |------bin           #一些python脚本，主程序</span><br><span class="line">   |------logs</span><br><span class="line">   |------script</span><br><span class="line">   |------src           #包含了每个microbench的c文件</span><br><span class="line">   |------Makefile</span><br><span class="line">   |------README.md     #使用文档</span><br></pre></td></tr></table></figure>
+<p><br></p>
+<h2 id="主程序"><a href="#主程序" class="headerlink" title="主程序"></a>主程序</h2><p>主程序位于<code>bin/</code>目录中，<code>run-fxmark.py</code>作为命令入口，调用关系如下：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line">run-fxmark.py</span><br><span class="line">     |------ run()</span><br><span class="line">              |--------mount()</span><br><span class="line">              |--------fxmark()</span><br><span class="line">                          |</span><br><span class="line">     |--------------------|</span><br><span class="line">     |</span><br><span class="line">     |</span><br><span class="line">   fxmark</span><br><span class="line">     |------main()</span><br><span class="line">              |--------alloc_bench()</span><br><span class="line">              |--------init_bench()</span><br><span class="line">              |--------run_bench() #fork，总共ncpu个进程，每个都调用work_main()</span><br><span class="line">              |            |---------work_main() </span><br><span class="line">              |                          |---------pre_work()</span><br><span class="line">              |                          |---------main_work()</span><br><span class="line">              |                          |---------post_work()</span><br><span class="line">              |--------report_bench()</span><br></pre></td></tr></table></figure>
+<h3 id="run-fxmark-py"><a href="#run-fxmark-py" class="headerlink" title="run-fxmark.py"></a>run-fxmark.py</h3><figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">if</span> __name__ == <span class="string">"__main__"</span>:</span><br><span class="line">    <span class="comment"># config parameters</span></span><br><span class="line">    <span class="comment"># -----------------</span></span><br><span class="line">    <span class="comment">#</span></span><br><span class="line">    <span class="comment"># o testing core granularity</span></span><br><span class="line">    <span class="comment"># - Runner.CORE_FINE_GRAIN</span></span><br><span class="line">    <span class="comment"># - Runner.CORE_COARSE_GRAIN</span></span><br><span class="line">    <span class="comment">#</span></span><br><span class="line">    <span class="comment"># o profiling level</span></span><br><span class="line">    <span class="comment"># - PerfMon.LEVEL_LOW</span></span><br><span class="line">    <span class="comment"># - PerfMon.LEVEL_PERF_RECORD</span></span><br><span class="line">    <span class="comment"># - PerfMon.LEVEL_PERF_PROBE_SLEEP_LOCK</span></span><br><span class="line">    <span class="comment"># - PerfMon.LEVEL_PERF_PROBE_SLEEP_LOCK_D  # do NOT use if you don't understand what it is</span></span><br><span class="line">    <span class="comment"># - PerfMon.LEVEL_PERF_LOCK                # do NOT use if you don't understand what it is</span></span><br><span class="line">    <span class="comment"># - PerfMon.LEVEL_PERF_STAT                # for cycles and instructions</span></span><br><span class="line">    <span class="comment">#</span></span><br><span class="line">    <span class="comment"># o testcase filter</span></span><br><span class="line">    <span class="comment"># - (storage device, filesystem, test case, # core, directio | bufferedio)</span></span><br><span class="line"></span><br><span class="line">    <span class="comment"># <span class="doctag">TODO:</span> make it scriptable</span></span><br><span class="line">    run_config = [</span><br><span class="line">        (Runner.CORE_FINE_GRAIN,</span><br><span class="line">         PerfMon.LEVEL_LOW,</span><br><span class="line">         (<span class="string">"mem"</span>, <span class="string">"*"</span>, <span class="string">"DWOL"</span>, <span class="string">"*"</span>, <span class="string">"directio"</span>)),</span><br><span class="line">        <span class="comment"># ("mem", "tmpfs", "filebench_varmail", "32", "directio")),</span></span><br><span class="line">        <span class="comment"># (Runner.CORE_COARSE_GRAIN,</span></span><br><span class="line">        <span class="comment">#  PerfMon.LEVEL_PERF_RECORD,</span></span><br><span class="line">        <span class="comment">#  ("*", "*", "*", "*", "bufferedio")),</span></span><br><span class="line">        <span class="comment">#</span></span><br><span class="line">        <span class="comment"># (Runner.CORE_COARSE_GRAIN,</span></span><br><span class="line">        <span class="comment">#  PerfMon.LEVEL_PERF_RECORD,</span></span><br><span class="line">        <span class="comment">#  ("*", "*", "*", str(cpupol.PHYSICAL_CHIPS * cpupol.CORE_PER_CHIP), "*"))</span></span><br><span class="line">    ]</span><br><span class="line"></span><br><span class="line">    confirm_media_path()</span><br><span class="line">    <span class="keyword">for</span> c <span class="keyword">in</span> run_config:</span><br><span class="line">        runner = Runner(c[<span class="number">0</span>], c[<span class="number">1</span>], c[<span class="number">2</span>])</span><br><span class="line">        runner.run()</span><br></pre></td></tr></table></figure>
+<p><code>run_config</code>是运行配置，上面代码中<code>(&quot;mem&quot;, &quot;*&quot;, &quot;DWOL&quot;, &quot;*&quot;, &quot;directio&quot;)</code>是核心配置，格式为<code>(&quot;后端设备名&quot;,&quot;文件系统名&quot;,&quot;microbench名&quot;,&quot;核数&quot;,&quot;I/O模式&quot;)</code>。<code>*</code>表示通配，即测试所有可选的配置</p>
+<ol>
+<li><strong>后端设备</strong></li>
+</ol>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">self.MEDIA_TYPES   = [&quot;ssd&quot;, &quot;hdd&quot;, &quot;nvme&quot;, &quot;mem&quot;]</span><br></pre></td></tr></table></figure>
+<ol start="2">
+<li><strong>文件系统</strong></li>
+</ol>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">self.FS_TYPES = [</span><br><span class="line">#   self.FS_TYPES      = [&quot;tmpfs&quot;,</span><br><span class="line">    &quot;ext4&quot;, &quot;ext4_no_jnl&quot;,</span><br><span class="line">    &quot;xfs&quot;,</span><br><span class="line">    &quot;btrfs&quot;, &quot;f2fs&quot;,</span><br><span class="line">#   &quot;jfs&quot;, &quot;reiserfs&quot;, &quot;ext2&quot;, &quot;ext3&quot;,</span><br><span class="line">]</span><br></pre></td></tr></table></figure>
+<ol start="3">
+<li><strong>microbench</strong></li>
+</ol>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br></pre></td><td class="code"><pre><span class="line">self.BENCH_TYPES   = [</span><br><span class="line">    # write/write</span><br><span class="line">    &quot;DWAL&quot;,</span><br><span class="line">    &quot;DWOL&quot;,</span><br><span class="line">    &quot;DWOM&quot;,</span><br><span class="line">    &quot;DWSL&quot;,</span><br><span class="line">    &quot;MWRL&quot;,</span><br><span class="line">    &quot;MWRM&quot;,</span><br><span class="line">    &quot;MWCL&quot;,</span><br><span class="line">    &quot;MWCM&quot;,</span><br><span class="line">    &quot;MWUM&quot;,</span><br><span class="line">    &quot;MWUL&quot;,</span><br><span class="line">    &quot;DWTL&quot;,</span><br><span class="line"></span><br><span class="line">    # filebench</span><br><span class="line">    &quot;filebench_varmail&quot;,</span><br><span class="line">    &quot;filebench_oltp&quot;,</span><br><span class="line">    &quot;filebench_fileserver&quot;</span><br><span class="line"></span><br><span class="line">    # dbench</span><br><span class="line">    &quot;dbench_client&quot;,</span><br><span class="line"></span><br><span class="line">    # read/read</span><br><span class="line">    &quot;MRPL&quot;,</span><br><span class="line">    &quot;MRPM&quot;,</span><br><span class="line">    &quot;MRPH&quot;,</span><br><span class="line">    &quot;MRDM&quot;,</span><br><span class="line">    &quot;MRDL&quot;,</span><br><span class="line">    &quot;DRBH&quot;,</span><br><span class="line">    &quot;DRBM&quot;,</span><br><span class="line">    &quot;DRBL&quot;,</span><br><span class="line"></span><br><span class="line">    # read/write</span><br><span class="line">    # &quot;MRPM_bg&quot;,</span><br><span class="line">    # &quot;DRBM_bg&quot;,</span><br><span class="line">    # &quot;MRDM_bg&quot;,</span><br><span class="line">    # &quot;DRBH_bg&quot;,</span><br><span class="line">    # &quot;DRBL_bg&quot;,</span><br><span class="line">    # &quot;MRDL_bg&quot;,</span><br><span class="line">]</span><br></pre></td></tr></table></figure>
+<p>下表详细解释了每个microbench：</p>
+<div align="center"> <img src="/img/in-post/post-benchmark-fxmark/microbench.png" width="70%" height="70%"> </div>
+
+<ol start="4">
+<li><strong>I/O模式</strong>：直接I/O或buffer I/O，直接I/O不经过page cache</li>
+</ol>
+<p>设备配置信息后，会调用函数<code>confirm_media_path()</code>：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">confirm_media_path</span><span class="params">()</span>:</span></span><br><span class="line">    print(<span class="string">"%"</span> * <span class="number">80</span>)</span><br><span class="line">    print(<span class="string">"%% WARNING! WARNING! WARNING! WARNING! WARNING!"</span>)</span><br><span class="line">    print(<span class="string">"%"</span> * <span class="number">80</span>)</span><br><span class="line">    yn = input(<span class="string">"All data in %s, %s, %s and %s will be deleted. Is it ok? [Y,N]: "</span></span><br><span class="line">            % (Runner.HDDDEV, Runner.SSDDEV, Runner.NVMEDEV, Runner.LOOPDEV))</span><br><span class="line">    <span class="keyword">if</span> yn != <span class="string">"Y"</span>:</span><br><span class="line">        print(<span class="string">"Please, check Runner.LOOPDEV and Runner.NVMEDEV"</span>)</span><br><span class="line">        exit(<span class="number">1</span>)</span><br><span class="line">    yn = input(<span class="string">"Are you sure? [Y,N]: "</span>)</span><br><span class="line">    <span class="keyword">if</span> yn != <span class="string">"Y"</span>:</span><br><span class="line">        print(<span class="string">"Please, check Runner.LOOPDEV and Runner.NVMEDEV"</span>)</span><br><span class="line">        exit(<span class="number">1</span>)</span><br><span class="line">    print(<span class="string">"%"</span> * <span class="number">80</span>)</span><br><span class="line">    print(<span class="string">"\n\n"</span>)</span><br></pre></td></tr></table></figure>
+<p>这个函数会输出提示信息，告诉用户以下设备中的数据都会被删除，因为每次运行fxmark都会在这些设备上创建文件并进行测试，所以对于每组测试，测试开始之前需要进行一些格式化处理</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">LOOPDEV = <span class="string">"/dev/loopX"</span></span><br><span class="line">NVMEDEV = <span class="string">"/dev/nvme0n1pX"</span></span><br><span class="line">HDDDEV  = <span class="string">"/dev/sdX"</span></span><br><span class="line">SSDDEV  = <span class="string">"/dev/sdY"</span></span><br></pre></td></tr></table></figure>
+<p>接着，对<code>run_config</code>中的”每组“配置（由于通配符<code>*</code>的关系，”一组“配置中可能包含多个配置），调用<code>run()</code>函数进行测试：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">run</span><span class="params">(self)</span>:</span></span><br><span class="line">    <span class="keyword">try</span>:</span><br><span class="line">        cnt = <span class="number">-1</span></span><br><span class="line">        self.log_start() <span class="comment">#创建日志目录和日志文件、将配置信息写入日志文件</span></span><br><span class="line">        <span class="keyword">for</span> (cnt, (media, fs, bench, ncore, dio)) <span class="keyword">in</span> enumerate(self.gen_config()):</span><br><span class="line">            (ncore, nbg) = self.add_bg_worker_if_needed(bench, ncore)</span><br><span class="line">            nfg = ncore - nbg</span><br><span class="line"></span><br><span class="line">            <span class="keyword">if</span> self.DRYRUN:</span><br><span class="line">                self.log(<span class="string">"## %s:%s:%s:%s:%s"</span> % (media, fs, bench, nfg, dio))</span><br><span class="line">                <span class="keyword">continue</span></span><br><span class="line"></span><br><span class="line">            self.prepre_work(ncore) <span class="comment"># 做一些清理工作、设置cpu数</span></span><br><span class="line">            <span class="keyword">if</span> <span class="keyword">not</span> self.mount(media, fs, self.test_root):</span><br><span class="line">                self.log(<span class="string">"# Fail to mount %s on %s."</span> % (fs, media))</span><br><span class="line">                <span class="keyword">continue</span></span><br><span class="line">            self.log(<span class="string">"## %s:%s:%s:%s:%s"</span> % (media, fs, bench, nfg, dio))</span><br><span class="line">            self.pre_work() <span class="comment"># 清空缓存</span></span><br><span class="line">            self.fxmark(media, fs, bench, ncore, nfg, nbg, dio)</span><br><span class="line">            self.post_work()</span><br><span class="line">        self.log(<span class="string">"### NUM_TEST_CONF  = %d"</span> % (cnt + <span class="number">1</span>))</span><br><span class="line">    <span class="keyword">finally</span>:</span><br><span class="line">        signal.signal(signal.SIGINT, catch_ctrl_C)</span><br><span class="line">        self.log_end()</span><br><span class="line">        self.fxmark_cleanup()</span><br><span class="line">        self.umount(self.test_root)</span><br><span class="line">        self.set_cpus(<span class="number">0</span>)</span><br></pre></td></tr></table></figure>
+<p><code>run()</code>函数首先将该组配置信息记录到日志文件中，然后for循环生成该组配置的每一个配置，针对每一个配置，首先调用<code>mount()</code>函数准备后端存储设备。比如hdd，函数会根据配置的文件系统信息，对设备进行格式化，然后将设备挂载到测试目录相关的一个<code>root/</code>目录下。因此，所有测试需要的文件，以及测试操作，都在这个<code>root/</code>目录中进行。当使用Ext4作为文件系统时，<code>mount()</code>函数会调用下面的命令（注意，下面代码中的/dev/sdb1是我测试时使用的hdd设备上的一个分区，这个值在前面提到的<code>HDDDEV  = &quot;/dev/sdX&quot;</code>处设置）：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">sudo umount bin/root</span><br><span class="line">sudo mkdir -p bin/root</span><br><span class="line"></span><br><span class="line">sudo mkfs.ext4 -F /dev/sdb1</span><br><span class="line">sudo mount -t ext4 /dev/sdb1 bin/root</span><br><span class="line">sudo chmod 777 bin/root</span><br></pre></td></tr></table></figure>
+<p>接着<code>run()</code>函数会调用<code>pre_work()</code>函数进行预处理，然后调用<code>fxmark()</code>函数进行测试，最后调用<code>post_work()</code>函数进程收尾工作。所以核心测试工作由<code>fxmark()</code>完成：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">fxmark</span><span class="params">(self, media, fs, bench, ncore, nfg, nbg, dio)</span>:</span></span><br><span class="line">    <span class="comment">#perf数据的日志文件</span></span><br><span class="line">    self.perfmon_log = os.path.normpath(</span><br><span class="line">        os.path.join(self.log_dir,</span><br><span class="line">                     <span class="string">'.'</span>.join([media, fs, bench, str(nfg), <span class="string">"pm"</span>])))</span><br><span class="line">    (bin, type) = self.get_bin_type(bench) <span class="comment"># 获取benchmark 二进制执行文件的路径</span></span><br><span class="line">    directio = <span class="string">'1'</span> <span class="keyword">if</span> dio <span class="keyword">is</span> <span class="string">"directio"</span> <span class="keyword">else</span> <span class="string">'0'</span></span><br><span class="line"></span><br><span class="line">    <span class="keyword">if</span> directio <span class="keyword">is</span> <span class="string">'1'</span>:</span><br><span class="line">        <span class="keyword">if</span> fs <span class="keyword">is</span> <span class="string">"tmpfs"</span>: </span><br><span class="line">            print(<span class="string">"# INFO: DirectIO under tmpfs disabled by default"</span>)</span><br><span class="line">            directio=<span class="string">'0'</span>;</span><br><span class="line">        <span class="keyword">else</span>: </span><br><span class="line">            print(<span class="string">"# INFO: DirectIO Enabled"</span>)</span><br><span class="line"></span><br><span class="line">    <span class="comment"># 执行benchmark</span></span><br><span class="line">    cmd = <span class="string">' '</span>.join([self.fxmark_env(),</span><br><span class="line">                    bin,</span><br><span class="line">                    <span class="string">"--type"</span>, type,</span><br><span class="line">                    <span class="string">"--ncore"</span>, str(ncore),</span><br><span class="line">                    <span class="string">"--nbg"</span>,  str(nbg),</span><br><span class="line">                    <span class="string">"--duration"</span>, str(self.DURATION),</span><br><span class="line">                    <span class="string">"--directio"</span>, directio,</span><br><span class="line">                    <span class="string">"--root"</span>, self.test_root,</span><br><span class="line">                    <span class="string">"--profbegin"</span>, <span class="string">"\"%s\""</span> % self.perfmon_start,</span><br><span class="line">                    <span class="string">"--profend"</span>,   <span class="string">"\"%s\""</span> % self.perfmon_stop,</span><br><span class="line">                    <span class="string">"--proflog"</span>, self.perfmon_log])</span><br><span class="line">    p = self.exec_cmd(cmd, self.redirect)</span><br><span class="line">    <span class="keyword">if</span> self.redirect:</span><br><span class="line">        <span class="keyword">for</span> l <span class="keyword">in</span> p.stdout.readlines():</span><br><span class="line">            self.log(l.decode(<span class="string">"utf-8"</span>).strip())</span><br></pre></td></tr></table></figure>
+<p>可以看到，这个函数最后会调用命令<code>bin</code>进行测试，这个命令由函数<code>get_bin_type()</code>决定：</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">def</span> <span class="title">get_bin_type</span><span class="params">(self, bench)</span>:</span></span><br><span class="line">    <span class="keyword">if</span> bench.startswith(<span class="string">"filebench_"</span>):</span><br><span class="line">        <span class="keyword">return</span> (self.filebench_path, bench[len(<span class="string">"filebench_"</span>):])</span><br><span class="line">    <span class="keyword">if</span> bench.startswith(<span class="string">"dbench_"</span>):</span><br><span class="line">        <span class="keyword">return</span> (self.dbench_path, bench[len(<span class="string">"dbench_"</span>):])</span><br><span class="line">    <span class="keyword">return</span> (self.fxmark_path, bench)</span><br></pre></td></tr></table></figure>
+<p>fxmark除了设计了一套microbench外，还能使用filebench和dbench进行测试，由于这里主要讨论microbench，所以前面我们提到的<code>bin</code>命令由<code>self.fxmark_path</code>决定，而microbench的类型由<code>bench</code>变量决定</p>
+<figure class="highlight python"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">self.FXMARK_NAME    = <span class="string">"fxmark"</span></span><br><span class="line">...</span><br><span class="line">self.fxmark_path = os.path.normpath(</span><br><span class="line">            os.path.join(CUR_DIR, self.FXMARK_NAME))</span><br></pre></td></tr></table></figure>
+<p>所以<code>fxmark()</code>函数中，实际的测试工作转移给了与<code>run-fxmark.py</code>同目录下的<code>fxmark</code>文件。这个文件是<code>src/</code>目录中的<code>fxmark.c</code>编译得到的二进制可执行文件</p>
+<h3 id="fxmark"><a href="#fxmark" class="headerlink" title="fxmark"></a>fxmark</h3><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">int</span> <span class="title">main</span><span class="params">(<span class="keyword">int</span> argc, <span class="keyword">char</span> *argv[])</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">cmd_opt</span> <span class="title">opt</span> = &#123;</span><span class="literal">NULL</span>, <span class="number">0</span>, <span class="number">0</span>, <span class="number">0</span>, <span class="number">0</span>, <span class="literal">NULL</span>&#125;;</span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">bench</span> *<span class="title">bench</span>;</span> </span><br><span class="line"></span><br><span class="line">    <span class="comment">/* parse command line options */</span></span><br><span class="line">    <span class="keyword">if</span> (parse_option(argc, argv, &amp;opt) &lt; <span class="number">4</span>) &#123;</span><br><span class="line">        usage(<span class="built_in">stderr</span>);</span><br><span class="line">        <span class="built_in">exit</span>(<span class="number">1</span>);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* create, initialize, and run a bench */</span> </span><br><span class="line">    bench = alloc_bench(opt.ncore, opt.nbg);</span><br><span class="line">    init_bench(bench, &amp;opt);</span><br><span class="line">    run_bench(bench);</span><br><span class="line">    report_bench(bench, <span class="built_in">stdout</span>);</span><br><span class="line"></span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>对每个配置的测试，<code>fxmark</code>命令首先会解析命令行参数并调用函数<code>alloc_bench</code>为测试需要的<code>bench</code>结构和<code>worker</code>结构分配空间：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br></pre></td><td class="code"><pre><span class="line"><span class="function">struct bench *<span class="title">alloc_bench</span><span class="params">(<span class="keyword">int</span> ncpu, <span class="keyword">int</span> nbg)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">bench</span> *<span class="title">bench</span>;</span> </span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">worker</span> *<span class="title">worker</span>;</span></span><br><span class="line">    <span class="keyword">void</span> *shmem;</span><br><span class="line">    <span class="keyword">int</span> shmem_size = <span class="keyword">sizeof</span>(*bench) + <span class="keyword">sizeof</span>(*worker) * ncpu;</span><br><span class="line">    <span class="keyword">int</span> i;</span><br><span class="line">        </span><br><span class="line">    <span class="comment">/* alloc shared memory using mmap */</span></span><br><span class="line">    shmem = mmap(<span class="number">0</span>, shmem_size, PROT_READ | PROT_WRITE, </span><br><span class="line">                MAP_SHARED | MAP_ANONYMOUS, <span class="number">-1</span>, <span class="number">0</span>);</span><br><span class="line">    <span class="keyword">if</span> (shmem == MAP_FAILED)</span><br><span class="line">        <span class="keyword">return</span> <span class="literal">NULL</span>;</span><br><span class="line">    <span class="built_in">memset</span>(shmem, <span class="number">0</span>, shmem_size);</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* init. */</span> </span><br><span class="line">    bench = (struct bench *)shmem;</span><br><span class="line">    bench-&gt;ncpu = ncpu; </span><br><span class="line">    bench-&gt;nbg  = nbg;</span><br><span class="line">    bench-&gt;workers = (struct worker*)(shmem + <span class="keyword">sizeof</span>(*bench));</span><br><span class="line">    <span class="keyword">for</span> (i = <span class="number">0</span>; i &lt; ncpu; ++i) &#123;</span><br><span class="line">        worker = &amp;bench-&gt;workers[i];</span><br><span class="line">        worker-&gt;bench = bench;</span><br><span class="line">        worker-&gt;id = seq_cores[i];</span><br><span class="line">        worker-&gt;is_bg = i &gt;= (ncpu - nbg);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">return</span> bench;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>该函数调用<code>mmap()</code>分配一段内存（使用共享内存是因为测试时，每个进程都需要访问这段内存），<code>fd</code>为-1表示使用匿名内存映射，即fd可忽略。大小是一个<code>bench</code>结构的大小加上<code>ncpu</code>个<code>worker</code>结构的大小</p>
+<ul>
+<li><code>bench</code>结构记录了配置的信息，如cpu核数、测试持续时间、I/O模式。由主进程管理</li>
+<li><code>worker</code>结构记录了测试的实际时间、操作完成次数，返回值等信息。测试过程中每个子进程会管理一个<code>worker</code></li>
+</ul>
+<p>并为每个结构实例设置基本信息，结构的关系如下：</p>
+<div align="center"> <img src="/img/in-post/post-benchmark-fxmark/struct.png" width="50%" height="50%"> </div>
+
+<p>然后，<code>fxmark</code>命令会调用函数<code>init_bench()</code>，根据解析出的命令行参数，进一步设置<code>bench</code>实例中的剩余成员。其中<code>ops</code>记录了实际的microbench。对于每个microbench，<code>pre_work</code>指向的函数完成测试前的准备工作，主要用于准备测试文件。<code>main_work</code>指向测试函数，<code>post_work</code>指向的函数完成结束后的收尾工作</p>
+<p>接着，<code>fxmark</code>命令会调用函数<code>run_bench()</code>。经过千山万水，测试总算准备开始了：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">run_bench</span><span class="params">(struct bench *bench)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">    <span class="keyword">int</span> i;</span><br><span class="line">    <span class="keyword">for</span> (i = <span class="number">1</span>; i &lt; bench-&gt;ncpu; ++i) &#123;</span><br><span class="line">        <span class="comment">/**</span></span><br><span class="line"><span class="comment">        * fork() is intentionally used instead of pthread</span></span><br><span class="line"><span class="comment">        * to avoid known scalability bottlenecks </span></span><br><span class="line"><span class="comment">        * of linux virtual memory subsystem. </span></span><br><span class="line"><span class="comment">        */</span> </span><br><span class="line">        <span class="keyword">pid_t</span> p = fork();</span><br><span class="line">        <span class="keyword">if</span> (p &lt; <span class="number">0</span>)</span><br><span class="line">            bench-&gt;workers[i].ret = errno;</span><br><span class="line">        <span class="keyword">else</span> <span class="keyword">if</span> (!p) &#123;</span><br><span class="line">            worker_main(&amp;bench-&gt;workers[i]);</span><br><span class="line">            <span class="built_in">exit</span>(<span class="number">0</span>);</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    worker_main(&amp;bench-&gt;workers[<span class="number">0</span>]);</span><br><span class="line">    wait(bench);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>该函数会根据配置信息中的cpu个数派生子进程，加上主进程，所有<code>ncpu</code>个进程调用<code>worker_main()</code>进行测试：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">static</span> <span class="keyword">void</span> <span class="title">worker_main</span><span class="params">(<span class="keyword">void</span> *arg)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">worker</span> *<span class="title">worker</span> = (<span class="title">struct</span> <span class="title">worker</span>*)<span class="title">arg</span>;</span></span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">bench</span> *<span class="title">bench</span> = <span class="title">worker</span>-&gt;<span class="title">bench</span>;</span></span><br><span class="line">    <span class="keyword">uint64_t</span> s_clk = <span class="number">1</span>, s_us = <span class="number">1</span>;</span><br><span class="line">    <span class="keyword">uint64_t</span> e_clk = <span class="number">0</span>, e_us = <span class="number">0</span>;</span><br><span class="line">    <span class="keyword">int</span> err = <span class="number">0</span>;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* set affinity */</span> </span><br><span class="line">    setaffinity(worker-&gt;id);</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* pre-work */</span></span><br><span class="line">    <span class="keyword">if</span> (bench-&gt;ops.pre_work) &#123;</span><br><span class="line">        err = bench-&gt;ops.pre_work(worker);</span><br><span class="line">        <span class="keyword">if</span> (err) <span class="keyword">goto</span> err_out;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* wait for start signal */</span> </span><br><span class="line">    worker-&gt;ready = <span class="number">1</span>;</span><br><span class="line">    <span class="keyword">if</span> (worker-&gt;id) &#123;</span><br><span class="line">        <span class="keyword">while</span> (!bench-&gt;start)</span><br><span class="line">        nop_pause();</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="keyword">else</span> &#123;</span><br><span class="line">        <span class="comment">/* are all workers ready? */</span></span><br><span class="line">        <span class="keyword">int</span> i;</span><br><span class="line">        <span class="keyword">for</span> (i = <span class="number">1</span>; i &lt; bench-&gt;ncpu; i++) &#123;</span><br><span class="line">            <span class="class"><span class="keyword">struct</span> <span class="title">worker</span> *<span class="title">w</span> = &amp;<span class="title">bench</span>-&gt;<span class="title">workers</span>[<span class="title">i</span>];</span></span><br><span class="line">            <span class="keyword">while</span> (!w-&gt;ready)</span><br><span class="line">                nop_pause();</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="comment">/* make things more deterministic */</span></span><br><span class="line">        sync();</span><br><span class="line"></span><br><span class="line">        <span class="comment">/* start performance profiling */</span></span><br><span class="line">        <span class="keyword">if</span> (bench-&gt;profile_start_cmd[<span class="number">0</span>])</span><br><span class="line">            system(bench-&gt;profile_start_cmd);</span><br><span class="line"></span><br><span class="line">        <span class="comment">/* ok, before running, set timer */</span></span><br><span class="line">        <span class="keyword">if</span> (signal(SIGALRM, sighandler) == SIG_ERR) &#123;</span><br><span class="line">            err = errno;</span><br><span class="line">            <span class="keyword">goto</span> err_out;</span><br><span class="line">        &#125;</span><br><span class="line">        running_bench = bench;</span><br><span class="line">        alarm(bench-&gt;duration);</span><br><span class="line">        bench-&gt;start = <span class="number">1</span>;</span><br><span class="line">        wmb();</span><br><span class="line">    &#125;</span><br><span class="line">        </span><br><span class="line">    <span class="comment">/* start time */</span></span><br><span class="line">    s_clk = rdtsc_beg();</span><br><span class="line">    s_us = usec();</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* main work */</span></span><br><span class="line">    <span class="keyword">if</span> (bench-&gt;ops.main_work) &#123;</span><br><span class="line">        err = bench-&gt;ops.main_work(worker);</span><br><span class="line">        <span class="keyword">if</span> (err &amp;&amp; err != ENOSPC)</span><br><span class="line">            <span class="keyword">goto</span> err_out;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* end time */</span> </span><br><span class="line">    e_clk = rdtsc_end();</span><br><span class="line">    e_us = usec();</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* stop performance profiling */</span></span><br><span class="line">    <span class="keyword">if</span> (!worker-&gt;id &amp;&amp; bench-&gt;profile_stop_cmd[<span class="number">0</span>])</span><br><span class="line">        system(bench-&gt;profile_stop_cmd);</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* post-work */</span> </span><br><span class="line">    <span class="keyword">if</span> (bench-&gt;ops.post_work)</span><br><span class="line">        err = bench-&gt;ops.post_work(worker);</span><br><span class="line">err_out:</span><br><span class="line">    worker-&gt;ret = err;</span><br><span class="line">    worker-&gt;usecs = e_us - s_us;</span><br><span class="line">    wmb();</span><br><span class="line">    worker-&gt;clocks = e_clk - s_clk;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>所有进程首先调用<code>bench-&gt;ops.pre_work()</code>准备测试文件：</p>
+<ul>
+<li>子进程准备文件完成后，设置自己<code>worker</code>结构实例的<code>ready = 1</code>，表示我已经准备好可以开始了，接着子进程会检查<code>bench</code>结构实例的<code>start</code>成员，看看能否开始，不能则等待</li>
+<li>主进程准备文件完成后，会检查所有子进程<code>worker</code>结构实例的<code>ready</code>成员是否都设置为<code>1</code>，也就是是否所有子进程都准备好了，当所有子进程都准备好之后，会将<code>bench</code>结构实例的<code>start</code>成员设置为1，表示可以开始测试了</li>
+</ul>
+<p>通过上述方式，所有进程能够保证在完成准备工作后一起开始测试，实现同步。这样可以避免测试过程中，其它进程在准备测试文件所带来的干扰</p>
+<p>在调用<code>bench-&gt;ops.main_work()</code>进行测试的前后，每个进程会记录时间，前后时间相减就是每个进程测试的real time。如果<code>bench-&gt;ops.post_work()</code>不为<code>NULL</code>，每个进程还会调用该函数进程一些收尾工作。</p>
+<p>最后，当测试完成后，每个子进程将各自完成的操作数记录在了各自的<code>worker</code>结构实例中，<code>fxmark</code>命令会调用<code>report_bench()</code>进行结果汇总：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">void</span> <span class="title">report_bench</span><span class="params">(struct bench *bench, FILE *out)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">    <span class="keyword">static</span> <span class="keyword">char</span> *empty_str = <span class="string">""</span>;</span><br><span class="line">    <span class="keyword">uint64_t</span> total_usecs = <span class="number">0</span>;</span><br><span class="line">    <span class="keyword">double</span>   total_works = <span class="number">0.0</span>;</span><br><span class="line">    <span class="keyword">double</span>   avg_secs;</span><br><span class="line">    <span class="keyword">char</span> *profile_name, *profile_data;</span><br><span class="line">    <span class="keyword">int</span> i, n_fg_cpu;</span><br><span class="line"></span><br><span class="line">        <span class="comment">/* if report_bench is overloaded */</span> </span><br><span class="line">    <span class="keyword">if</span> (bench-&gt;ops.report_bench) &#123;</span><br><span class="line">        bench-&gt;ops.report_bench(bench, out);</span><br><span class="line">        <span class="keyword">return</span>;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* default report_bench impl. */</span></span><br><span class="line">    <span class="keyword">for</span> (i = <span class="number">0</span>; i &lt; bench-&gt;ncpu; ++i) &#123;</span><br><span class="line">        <span class="class"><span class="keyword">struct</span> <span class="title">worker</span> *<span class="title">w</span> = &amp;<span class="title">bench</span>-&gt;<span class="title">workers</span>[<span class="title">i</span>];</span></span><br><span class="line">        <span class="keyword">if</span> (w-&gt;is_bg) <span class="keyword">continue</span>;</span><br><span class="line">        total_usecs += w-&gt;usecs;</span><br><span class="line">        total_works += w-&gt;works;</span><br><span class="line">    &#125;</span><br><span class="line">    n_fg_cpu = bench-&gt;ncpu - bench-&gt;nbg;</span><br><span class="line">    avg_secs = (<span class="keyword">double</span>)total_usecs/(<span class="keyword">double</span>)n_fg_cpu/<span class="number">1000000.0</span>;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/* get profiling result */</span> </span><br><span class="line">    profile_name = profile_data = empty_str;</span><br><span class="line">    <span class="keyword">if</span> (bench-&gt;profile_stat_file[<span class="number">0</span>]) &#123;</span><br><span class="line">        FILE *fp = fopen(bench-&gt;profile_stat_file, <span class="string">"r"</span>);</span><br><span class="line">        <span class="keyword">size_t</span> len;</span><br><span class="line">        </span><br><span class="line">        <span class="keyword">if</span> (fp) &#123;</span><br><span class="line">            profile_name = profile_data = <span class="literal">NULL</span>;</span><br><span class="line">            getline(&amp;profile_name, &amp;len, fp);</span><br><span class="line">            getline(&amp;profile_data, &amp;len, fp);</span><br><span class="line">            fclose(fp);</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="built_in">fprintf</span>(out, <span class="string">"# ncpu secs works works/sec %s\n"</span>, profile_name);</span><br><span class="line">    <span class="built_in">fprintf</span>(out, <span class="string">"%d %f %f %f %s\n"</span>, </span><br><span class="line">            n_fg_cpu, avg_secs, total_works, total_works/avg_secs, profile_data);</span><br><span class="line"></span><br><span class="line">    <span class="keyword">if</span> (profile_name != empty_str)</span><br><span class="line">        <span class="built_in">free</span>(profile_name);</span><br><span class="line">    <span class="keyword">if</span> (profile_data != empty_str)</span><br><span class="line">        <span class="built_in">free</span>(profile_data);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><br></p>
+<h2 id="microbench"><a href="#microbench" class="headerlink" title="microbench"></a>microbench</h2><p>前面已经分析过，每个进程都会调用<code>work_main()</code>进行测试，<code>work_main()</code>中会调用<code>bench-&gt;ops</code>中的3个函数：<code>pre_work</code>，<code>main_work</code>和<code>post_work</code>。每个microbench定义了自己的这3个函数，所以最终调用什么函数，由microbench决定。下面的代码为每个microbench对应的操作地址，即<code>bench_operations</code>结构的地址：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">static</span> <span class="class"><span class="keyword">struct</span> <span class="title">bench_desc</span> <span class="title">bench_table</span>[] = &#123;</span></span><br><span class="line">    &#123;<span class="string">"MWCL"</span>,</span><br><span class="line">     <span class="string">"inode allocation: each process creates files at its private directory"</span>,</span><br><span class="line">     &amp;n_inode_alloc_ops&#125;,</span><br><span class="line">    &#123;<span class="string">"DWAL"</span>,</span><br><span class="line">     <span class="string">"block allocation: each process appends pages to a private file"</span>,</span><br><span class="line">     &amp;n_blk_alloc_ops&#125;,</span><br><span class="line">    &#123;<span class="string">"DWOL"</span>,</span><br><span class="line">     <span class="string">"block write: each process overwrite a pages to a private file"</span>,</span><br><span class="line">     &amp;n_blk_wrt_ops&#125;,</span><br><span class="line">    &#123;<span class="string">"MWRM"</span>,</span><br><span class="line">     <span class="string">"directory insert: each process moves files from its private directory to a common direcotry"</span>,</span><br><span class="line">     &amp;n_dir_ins_ops&#125;,</span><br><span class="line">    &#123;<span class="string">"DWSL"</span>,</span><br><span class="line">     <span class="string">"journal commit: each process fsync a private file"</span>,</span><br><span class="line">     &amp;n_jnl_cmt_ops&#125;,</span><br><span class="line">    &#123;<span class="string">"DWOM"</span>,</span><br><span class="line">     <span class="string">"mtime update: each process updates a private page of the shared file"</span>,</span><br><span class="line">     &amp;n_mtime_upt_ops&#125;,</span><br><span class="line">    &#123;<span class="string">"MWRL"</span>,</span><br><span class="line">     <span class="string">"rename a file: each process rename a file in its private directory"</span>,</span><br><span class="line">     &amp;n_file_rename_ops&#125;,</span><br><span class="line">    &#123;<span class="string">"DRBL"</span>,</span><br><span class="line">     <span class="string">"file read: each process read a block of its private file"</span>,</span><br><span class="line">     &amp;n_file_rd_ops&#125;,</span><br><span class="line">    &#123;<span class="string">"DRBL_bg"</span>,</span><br><span class="line">     <span class="string">"file read with a background writer"</span>,</span><br><span class="line">     &amp;n_file_rd_ops&#125;,</span><br><span class="line">    &#123;<span class="string">"DRBM"</span>,</span><br><span class="line">     <span class="string">"shared file read: each process reads its private region of the shared file"</span>,</span><br><span class="line">     &amp;n_shfile_rd_ops&#125;,</span><br><span class="line">    &#123;<span class="string">"DRBM_bg"</span>,</span><br><span class="line">     <span class="string">"shared file read with a background writer"</span>,</span><br><span class="line">     &amp;n_shfile_rd_bg_ops&#125;,</span><br><span class="line">    &#123;<span class="string">"DRBH"</span>,</span><br><span class="line">     <span class="string">"shared blk read: each process reads the same page of the shared file"</span>,</span><br><span class="line">     &amp;n_shblk_rd_ops&#125;,</span><br><span class="line">    &#123;<span class="string">"DRBH_bg"</span>,</span><br><span class="line">     <span class="string">"shared blk read with a background writer"</span>,</span><br><span class="line">     &amp;n_shblk_rd_bg_ops&#125;,</span><br><span class="line">    &#123;<span class="string">"MRDL"</span>,</span><br><span class="line">     <span class="string">"directory read: each process reads entries of its private directory"</span>,</span><br><span class="line">     &amp;n_dir_rd_ops&#125;,</span><br><span class="line">    &#123;<span class="string">"MRDL_bg"</span>,</span><br><span class="line">     <span class="string">"directory read with a background writer"</span>,</span><br><span class="line">     &amp;n_dir_rd_bg_ops&#125;,</span><br><span class="line">    &#123;<span class="string">"MRDM"</span>,</span><br><span class="line">     <span class="string">"shared directory read: each process reads entries of the shared directory"</span>,</span><br><span class="line">     &amp;n_shdir_rd_ops&#125;,</span><br><span class="line">    &#123;<span class="string">"MRDM_bg"</span>,</span><br><span class="line">     <span class="string">"shared directory read with a background writer"</span>,</span><br><span class="line">     &amp;n_shdir_rd_bg_ops&#125;,</span><br><span class="line">    &#123;<span class="string">"MRPL"</span>,</span><br><span class="line">     <span class="string">"path resolution for a private file"</span>,</span><br><span class="line">     &amp;n_priv_path_rsl_ops&#125;,</span><br><span class="line">    &#123;<span class="string">"MRPM"</span>,</span><br><span class="line">     <span class="string">"path resolution: each process does stat() at random files in 8-level directories with 8-branching-out factor"</span>,</span><br><span class="line">     &amp;n_path_rsl_ops&#125;,</span><br><span class="line">    &#123;<span class="string">"MRPM_bg"</span>,</span><br><span class="line">     <span class="string">"path resolution  with a background writer"</span>,</span><br><span class="line">     &amp;n_path_rsl_bg_ops&#125;,</span><br><span class="line">    &#123;<span class="string">"MRPH"</span>,</span><br><span class="line">     <span class="string">"path resolution at the same level directory"</span>,</span><br><span class="line">     &amp;n_spath_rsl_ops&#125;,</span><br><span class="line">    &#123;<span class="string">"MWCM"</span>,</span><br><span class="line">     <span class="string">"each process creates files in their private directory"</span>,</span><br><span class="line">     &amp;u_file_cr_ops&#125;,</span><br><span class="line">    &#123;<span class="string">"MWUM"</span>,</span><br><span class="line">     <span class="string">"each process deletes files in their private directory"</span>,</span><br><span class="line">     &amp;u_file_rm_ops&#125;,</span><br><span class="line">    &#123;<span class="string">"MWUL"</span>,</span><br><span class="line">     <span class="string">"each process deletes files at the test root directory"</span>,</span><br><span class="line">     &amp;u_sh_file_rm_ops&#125;,</span><br><span class="line">    &#123;<span class="string">"DWTL"</span>,</span><br><span class="line">     <span class="string">"each process truncates its private file at the test root directory"</span>,</span><br><span class="line">     &amp;u_file_tr_ops&#125;,</span><br><span class="line">    &#123;<span class="literal">NULL</span>, <span class="literal">NULL</span>, <span class="literal">NULL</span>&#125;,</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+<p>以<code>MWCL</code>为例，操作的结构地址为<code>n_inode_alloc_ops</code>，这个结构实例在<code>MWCL.c</code>文件中：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">bench_operations</span> <span class="title">n_inode_alloc_ops</span> = &#123;</span></span><br><span class="line">    .pre_work  = pre_work, </span><br><span class="line">    .main_work = main_work,</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+<p>下面是<code>pre_work()</code>和<code>main_work()</code>：</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">static</span> <span class="keyword">void</span> <span class="title">set_test_root</span><span class="params">(struct worker *worker, <span class="keyword">char</span> *test_root)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">fx_opt</span> *<span class="title">fx_opt</span> = <span class="title">fx_opt_worker</span>(<span class="title">worker</span>);</span></span><br><span class="line">    <span class="built_in">sprintf</span>(test_root, <span class="string">"%s/%d"</span>, fx_opt-&gt;root, worker-&gt;id);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">static</span> <span class="keyword">int</span> <span class="title">pre_work</span><span class="params">(struct worker *worker)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">    <span class="keyword">char</span> test_root[PATH_MAX];</span><br><span class="line">    set_test_root(worker, test_root);</span><br><span class="line">    <span class="keyword">return</span> mkdir_p(test_root);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">static</span> <span class="keyword">int</span> <span class="title">main_work</span><span class="params">(struct worker *worker)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">    <span class="keyword">char</span> test_root[PATH_MAX];</span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">bench</span> *<span class="title">bench</span> = <span class="title">worker</span>-&gt;<span class="title">bench</span>;</span></span><br><span class="line">    <span class="keyword">uint64_t</span> iter;</span><br><span class="line">    <span class="keyword">int</span> rc = <span class="number">0</span>;</span><br><span class="line"></span><br><span class="line">    set_test_root(worker, test_root);</span><br><span class="line">    <span class="keyword">for</span> (iter = <span class="number">0</span>; !bench-&gt;stop; ++iter) &#123;</span><br><span class="line">        <span class="keyword">char</span> file[PATH_MAX];</span><br><span class="line">        <span class="keyword">int</span> fd;</span><br><span class="line">        <span class="comment">/* create and close */</span></span><br><span class="line">        <span class="built_in">snprintf</span>(file, PATH_MAX, <span class="string">"%s/n_inode_alloc-%"</span> PRIu64 <span class="string">".dat"</span>, </span><br><span class="line">             test_root, iter);</span><br><span class="line">        <span class="keyword">if</span> ((fd = open(file, O_CREAT | O_RDWR, S_IRWXU)) == <span class="number">-1</span>)</span><br><span class="line">            <span class="keyword">goto</span> err_out;</span><br><span class="line">        close(fd);</span><br><span class="line">    &#125;</span><br><span class="line">out:</span><br><span class="line">    worker-&gt;works = (<span class="keyword">double</span>)iter;</span><br><span class="line">    <span class="keyword">return</span> rc;</span><br><span class="line">err_out:</span><br><span class="line">    bench-&gt;stop = <span class="number">1</span>;</span><br><span class="line">    rc = errno;</span><br><span class="line">    <span class="keyword">goto</span> out;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p><code>pre_work()</code>根据workid在前面提到过的<code>root/</code>目录下创建测试目录，workid和cpuid有关（0,1,2,…）。<code>main_work()</code>函数在测试目录下循环创建关闭文件，因此<code>MWCL</code>测试每个进程在各自目录下创建文件的性能，即测试创建操作的多核可扩展性</p>
+<p><br></p>
+<h2 id="测试结果分析"><a href="#测试结果分析" class="headerlink" title="测试结果分析"></a>测试结果分析</h2><p>测试结果记录在<code>log/</code>目录下的一个日志文件中。README.md文档中介绍了如何使用日志文件画图。主要是使用gnuplot，也可以根据日志文件中的结果数据自己使用gnuplot进行绘制。下图为MWCL的一个测试结果。配置信息为：hdd，ext4，bufferio，分别在1，2，4，10，20核下进行了测试：</p>
+<div align="center"> <img src="/img/in-post/post-benchmark-fxmark/MWCL.png" width="35%" height="25%"> </div>
+
+<p>从图中可以看出，文件创建操作并不能表现出良好扩展性，因为操作完成数并没有随核数增加而线性增长。这是因为文件创建会分配inode，同时需要修改全局的inode链表，这个链表被锁保护。另外，ext4的日志处理过程中也存在锁竞争，这一系列因素使得文件创建操作不具备良好的扩展性</p>
+<p>除此之外，fxmark也记录了测试过程中的CPU利用率，可以通过同样的方法画出CPU利用率图</p>
+<p>最后，在我们最开始提到的配置信息中，可以指定<code>PerfMon.LEVEL_LOW</code>，<code>PerfMon.LEVEL_PERF_RECORD</code>，<code>PerfMon.LEVEL_PERF_PROBE_SLEEP_LOCK</code>等信息。通过指定这个信息，可以使用perf工具观察测试过程中的热点代码（前提是已经安装了perf），进行更细致的分析，下图是10核下的火焰图：</p>
+<div align="center"> <img src="/img/in-post/post-benchmark-fxmark/flame.png" width="50%" height="50%"> </div>
+      
+    </div>
+    
+  </div>
+  
+    
+    <div class="copyright">
+        <p><span>本文标题:</span><a href="/2018/12/08/2018-12-08-linux-benchmark-fxmark/">使用FXMARK测试文件系统的多核可扩展性</a></p>
+        <p><span>文章作者:</span><a href="/" title="回到主页">Arking</a></p>
+        <p><span>发布时间:</span>2018-12-08, 16:35:00</p>
+        <p><span>最后更新:</span>2018-12-08, 17:33:00</p>
+        <p>
+            <span>原始链接:</span><a class="post-url" href="/2018/12/08/2018-12-08-linux-benchmark-fxmark/" title="使用FXMARK测试文件系统的多核可扩展性">http://yoursite.com/2018/12/08/2018-12-08-linux-benchmark-fxmark/</a>
+            <span class="copy-path" data-clipboard-text="原文: http://yoursite.com/2018/12/08/2018-12-08-linux-benchmark-fxmark/　　作者: Arking" title="点击复制文章链接"><i class="fa fa-clipboard"></i></span>
+            <script> var clipboard = new Clipboard('.copy-path'); </script>
+        </p>
+        <p>
+            <span>许可协议:</span><i class="fa fa-creative-commons"></i> <a rel="license" href="http://creativecommons.org/licenses/by-nc-sa/4.0/" title="CC BY-NC-SA 4.0 International" target="_blank">"署名-非商用-相同方式共享 4.0"</a> 转载请保留原文链接及作者。
+        </p>
+    </div>
+
+
+
+    <nav id="article-nav">
+        
+        
+            <div id="article-nav-older" class="article-nav-title">
+                <a href="/2018/09/05/2018-09-05-linux-kernel/">
+                    Ubuntu下内核与内核模块的编译过程
+                </a>
+            </div>
+        
+    </nav>
+
+  
+</article>
+
+    <div id="toc" class="toc-article">
+        <strong class="toc-title">文章目录</strong>
+        
+            <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#主程序"><span class="toc-number">1.</span> <span class="toc-text">主程序</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#run-fxmark-py"><span class="toc-number">1.1.</span> <span class="toc-text">run-fxmark.py</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#fxmark"><span class="toc-number">1.2.</span> <span class="toc-text">fxmark</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#microbench"><span class="toc-number">2.</span> <span class="toc-text">microbench</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#测试结果分析"><span class="toc-number">3.</span> <span class="toc-text">测试结果分析</span></a></li></ol>
+        
+    </div>
+    <style>
+        .left-col .switch-btn,
+        .left-col .switch-area {
+            display: none;
+        }
+        .toc-level-3 i,
+        .toc-level-3 ol {
+            display: none !important;
+        }
+    </style>
+
+    <input type="button" id="tocButton" value="隐藏目录" title="点击按钮隐藏或者显示文章目录">
+
+    <script>
+        yiliaConfig.toc = ["隐藏目录", "显示目录", !!"false"];
+    </script>
+
+
+
+    
+<div class="share">
+    
+        <div class="bdsharebuttonbox">
+            <a href="#" class="fa fa-twitter bds_twi" data-cmd="twi" title="分享到推特"></a>
+            <a href="#" class="fa fa-weibo bds_tsina" data-cmd="tsina" title="分享到新浪微博"></a>
+            <a href="#" class="fa fa-qq bds_sqq" data-cmd="sqq" title="分享给 QQ 好友"></a>
+            <a href="#" class="fa fa-files-o bds_copy" data-cmd="copy" title="复制网址"></a>
+            <a href="#" class="fa fa fa-envelope-o bds_mail" data-cmd="mail" title="通过邮件分享"></a>
+            <a href="#" class="fa fa-weixin bds_weixin" data-cmd="weixin" title="生成文章二维码"></a>
+            <a href="#" class="fa fa-share-alt bds_more" data-cmd="more"></a>
+        </div>
+        <script>
+            window._bd_share_config={
+                "common":{"bdSnsKey":{},"bdText":"使用FXMARK测试文件系统的多核可扩展性　| Arking　","bdMini":"2","bdMiniList":false,"bdPic":"","bdStyle":"0","bdSize":"24"},"share":{}};with(document)0[(getElementsByTagName('head')[0]||body).appendChild(createElement('script')).src='http://bdimg.share.baidu.com/static/api/js/share.js?v=89860593.js?cdnversion='+~(-new Date()/36e5)];
+        </script>
+    
+
+    
+</div>
+
+
+
+
+
+
+
+    
+
+
+
+
+    <div class="scroll" id="post-nav-button">
+        
+            <a href="/" title="回到主页"><i class="fa fa-home"></i></a>
+        
+
+        <a title="文章列表"><i class="fa fa-bars"></i><i class="fa fa-times"></i></a>
+
+        
+            <a href="/2018/09/05/2018-09-05-linux-kernel/" title="下一篇: Ubuntu下内核与内核模块的编译过程">
+                <i class="fa fa-angle-right"></i>
+            </a>
+        
+    </div>
+
+    <ul class="post-list"><li class="post-list-item"><a class="post-list-link" href="/2018/12/08/2018-12-08-linux-benchmark-fxmark/">使用FXMARK测试文件系统的多核可扩展性</a></li><li class="post-list-item"><a class="post-list-link" href="/2018/09/05/2018-09-05-linux-kernel/">Ubuntu下内核与内核模块的编译过程</a></li><li class="post-list-item"><a class="post-list-link" href="/2018/01/19/2018-01-19-docker-imagestore/"> Docker源码分析—镜像存储 </a></li><li class="post-list-item"><a class="post-list-link" href="/2018/01/15/2018-01-15-docker-storage-overlay2/"> Docker源码分析—存储驱动 </a></li><li class="post-list-item"><a class="post-list-link" href="/2018/01/14/2018-01-14-docker-layerstore/"> Docker源码分析—层存储 </a></li><li class="post-list-item"><a class="post-list-link" href="/2018/01/12/2018-01-10-c-stack_frame/"> C函数栈帧 </a></li><li class="post-list-item"><a class="post-list-link" href="/2017/12/26/2017-12-26-linux-code-overlayfs-read_write/">内核OverlayFS—文件读写</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/12/22/2017-12-22-linux-code-overlayfs-create_delete/">内核OverlayFS—创建与删除文件</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/11/30/2017-11-30-linux-du/"> Linux查看目录大小</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/11/10/2017-11-10-linux-code-overlayfs-dir-op1/">内核OverlayFS—目录搜索</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/10/12/2017-10-12-linux-code-overlayfs-mnt/">内核OverlayFS—注册与挂载</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/09/20/2017-09-20-linux-code-overlayfs-layerinfo/">内核OverlayFS—文件层次信息</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/08/18/2017-08-18-linux-code-vfs/">Linux虚拟文件系统(VFS)</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/05/05/2017-05-05-docker-filesystem-overlay/"> Docker存储驱动—Overlay/Overlay2「译」</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/04/13/2017-04-13-docker-filesystem-aufs/"> Docker存储驱动—Aufs </a></li><li class="post-list-item"><a class="post-list-link" href="/2017/04/09/2017-04-09-linux-uuid/"> Linux存储设备的UUID</a></li></ul>
+
+
+
+
+    <script>
+        
+    </script>
+</div>
+      <footer id="footer">
+    <div class="outer">
+        <div id="footer-info">
+            <div class="footer-left">
+                <i class="fa fa-copyright"></i> 
+                2017-2018 Arking
+            </div>
+            <div class="footer-right">
+                <a href="http://hexo.io/" target="_blank" title="快速、简洁且高效的博客框架">Hexo</a>  Theme <a href="https://github.com/MOxFIVE/hexo-theme-yelee" target="_blank" title="简而不减 Hexo 双栏博客主题  v3.5">Yelee</a> by MOxFIVE <i class="fa fa-heart animated infinite pulse"></i>
+            </div>
+        </div>
+        
+            <div class="visit">
+                
+                    <span id="busuanzi_container_site_pv" style="display:none">
+                        <span id="site-visit" title="本站到访数"><i class="fa fa-user" aria-hidden="true"></i><span id="busuanzi_value_site_uv"></span>
+                        </span>
+                    </span>
+                
+                
+                    <span>| </span>
+                
+                
+                    <span id="busuanzi_container_page_pv" style="display:none">
+                        <span id="page-visit" title="本页阅读量"><i class="fa fa-eye animated infinite pulse" aria-hidden="true"></i><span id="busuanzi_value_page_pv"></span>
+                        </span>
+                    </span>
+                
+            </div>
+        
+    </div>
+</footer>
+
+<script async src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js">
+</script>
+    </div>
+    
+<script data-main="/js/main.js" src="//cdn.bootcss.com/require.js/2.2.0/require.min.js"></script>
+
+    <script>
+        $(document).ready(function() {
+            var iPad = window.navigator.userAgent.indexOf('iPad');
+            if (iPad > -1 || $(".left-col").css("display") === "none") {
+                var bgColorList = ["#9db3f4", "#414141", "#e5a859", "#f5dfc6", "#c084a0", "#847e72", "#cd8390", "#996731"];
+                var bgColor = Math.ceil(Math.random() * (bgColorList.length - 1));
+                $("body").css({"background-color": bgColorList[bgColor], "background-size": "cover"});
+            }
+            else {
+                var backgroundnum = 5;
+                var backgroundimg = "url(/background/bg-x.jpg)".replace(/x/gi, Math.ceil(Math.random() * backgroundnum));
+                $("body").css({"background": backgroundimg, "background-attachment": "fixed", "background-size": "cover"});
+            }
+        })
+    </script>
+
+
+
+<!-- Google Analytics -->
+<script type="text/javascript">
+(function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+(i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+})(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+ga('create', 'UA-130420706-1', 'auto');
+ga('send', 'pageview');
+
+</script>
+<!-- End Google Analytics -->
+
+
+
+<div class="scroll" id="scroll">
+    <a href="#" title="返回顶部"><i class="fa fa-arrow-up"></i></a>
+    <a href="#comments" onclick="load$hide();" title="查看评论"><i class="fa fa-comments-o"></i></a>
+    <a href="#footer" title="转到底部"><i class="fa fa-arrow-down"></i></a>
+</div>
+<script>
+    // Open in New Window
+    
+        var oOpenInNew = {
+            
+            
+            
+            
+            
+            
+             archives: ".archive-article-title", 
+             miniArchives: "a.post-list-link", 
+            
+             friends: "#js-friends a", 
+             socail: ".social a" 
+        }
+        for (var x in oOpenInNew) {
+            $(oOpenInNew[x]).attr("target", "_blank");
+        }
+    
+</script>
+
+<script async src="https://dn-lbstatics.qbox.me/busuanzi/2.3/busuanzi.pure.mini.js">
+</script>
+  </div>
+</body>
+</html>

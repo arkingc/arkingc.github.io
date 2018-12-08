@@ -276,6 +276,74 @@
 </nav>
       <div class="body-wrap">
   
+    <article id="post-2018-12-08-linux-benchmark-fxmark" class="article article-type-post" itemscope="" itemprop="blogPost">
+  
+    <div class="article-meta">
+      <a href="/2018/12/08/2018-12-08-linux-benchmark-fxmark/" class="article-date">
+      <time datetime="2018-12-08T08:35:00.000Z" itemprop="datePublished">2018-12-08</time>
+</a>
+
+
+    </div>
+  
+  <div class="article-inner">
+    
+      <input type="hidden" class="isFancy">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 itemprop="name">
+      <a class="article-title" href="/2018/12/08/2018-12-08-linux-benchmark-fxmark/">使用FXMARK测试文件系统的多核可扩展性</a>
+    </h1>
+  
+
+      </header>
+      
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+          
+              <p>并行I/O技术是一项用于提升应用性能的技术。随着NVMe设备的出现与发展，并发I/O能力增强。同时，CPU核数呈现增长的趋势。这使得很多高性能数据库开始利用多核来加速核心操作。但是，由于文件系统中存在诸如锁竞争、引用计数、cache-line竞争等扩展性瓶颈，因此文件系统操作的处理能力并不能随着核数的增加呈现出线性增长的关系。<a href="https://github.com/sslab-gatech/fxmark" target="_blank" rel="noopener">FxMark</a>就是 USENIX Annual Technical Conference(ATC’16) 中文章 “Understanding Manycore Scalability of File Systems” 的作者开源的一套microbench套件，可以测试文件系统创建、删除、读/写等操作的多核扩展性。这篇文章从源码的角度分析FxMark的使用</p>
+          
+      
+    </div>
+    
+    <div class="article-info article-info-index">
+      
+      
+    <div class="article-category tagcloud">
+    <a class="article-category-link" href="/categories/性能调优/">性能调优</a>
+    </div>
+
+
+      
+    <div class="article-tag tagcloud">
+        <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/linux/">linux</a></li></ul>
+    </div>
+
+      
+        <p class="article-more-link">
+          <a href="/2018/12/08/2018-12-08-linux-benchmark-fxmark/#more">more >></a>
+        </p>
+      
+      <div class="clearfix"></div>
+    </div>
+    
+  </div>
+  
+</article>
+
+
+
+
+
+
+
+
+
+  
     <article id="post-2018-09-05-linux-kernel" class="article article-type-post" itemscope="" itemprop="blogPost">
   
     <div class="article-meta">
@@ -912,79 +980,6 @@
       
         <p class="article-more-link">
           <a href="/2017/11/10/2017-11-10-linux-code-overlayfs-dir-op1/#more">more >></a>
-        </p>
-      
-      <div class="clearfix"></div>
-    </div>
-    
-  </div>
-  
-</article>
-
-
-
-
-
-
-
-
-
-  
-    <article id="post-2017-10-12-linux-code-overlayfs-mnt" class="article article-type-post" itemscope="" itemprop="blogPost">
-  
-    <div class="article-meta">
-      <a href="/2017/10/12/2017-10-12-linux-code-overlayfs-mnt/" class="article-date">
-      <time datetime="2017-10-11T18:51:00.000Z" itemprop="datePublished">2017-10-12</time>
-</a>
-
-
-    </div>
-  
-  <div class="article-inner">
-    
-      <input type="hidden" class="isFancy">
-    
-    
-      <header class="article-header">
-        
-  
-    <h1 itemprop="name">
-      <a class="article-title" href="/2017/10/12/2017-10-12-linux-code-overlayfs-mnt/">内核OverlayFS—注册与挂载</a>
-    </h1>
-  
-
-      </header>
-      
-    
-    <div class="article-entry" itemprop="articleBody">
-      
-          
-              <blockquote>
-<p><strong>内核版本为4.4.68</strong></p>
-</blockquote>
-<p>这篇文章通过内核源码分析OverlayFS的注册与挂载过程</p>
-<p>假设你对OverlayFS的层次关系已经有一个基本的了解。如果对OverlayFS的层以及联合挂载没有概念，建议先补充下相关知识，因为挂载OverlayFS时会使用到层</p>
-<p>分析会尽可能避开公有部分(每种文件系统注册和挂载过程中都会涉及的内容)，而更多的关注OverlayFS独有部分</p>
-          
-      
-    </div>
-    
-    <div class="article-info article-info-index">
-      
-      
-    <div class="article-category tagcloud">
-    <a class="article-category-link" href="/categories/Linux内核/">Linux内核</a>
-    </div>
-
-
-      
-    <div class="article-tag tagcloud">
-        <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/filesystem/">filesystem</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/overlayfs/">overlayfs</a></li></ul>
-    </div>
-
-      
-        <p class="article-more-link">
-          <a href="/2017/10/12/2017-10-12-linux-code-overlayfs-mnt/#more">more >></a>
         </p>
       
       <div class="clearfix"></div>
