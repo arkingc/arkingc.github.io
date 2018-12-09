@@ -19,30 +19,30 @@
 <meta name="keywords" content="filesystem">
 <meta property="og:type" content="article">
 <meta property="og:title" content="Linux虚拟文件系统(VFS)">
-<meta property="og:url" content="http://arkingc.github.io/2017/08/18/2017-08-18-linux-code-vfs/index.html">
+<meta property="og:url" content="http://arkingc.coding.me/2017/08/18/2017-08-18-linux-code-vfs/index.html">
 <meta property="og:site_name" content="Arking">
 <meta property="og:description" content="在Linux中，VFS为上层应用提供了访问下层文件系统的统一接口，它将文件相关的概念进行了抽象，同时提供了对这些抽象概念的操作接口">
 <meta property="og:locale" content="default">
-<meta property="og:image" content="http://arkingc.github.io/img/in-post/post-linux-vfs/vfs.png">
-<meta property="og:image" content="http://arkingc.github.io/img/in-post/post-linux-vfs/relation.png">
-<meta property="og:image" content="http://arkingc.github.io/img/in-post/post-linux-vfs/list.png">
-<meta property="og:image" content="http://arkingc.github.io/img/in-post/post-linux-vfs/super_block-1.png">
-<meta property="og:image" content="http://arkingc.github.io/img/in-post/post-linux-vfs/super_block-2.png">
-<meta property="og:image" content="http://arkingc.github.io/img/in-post/post-linux-vfs/dentry-tree.png">
+<meta property="og:image" content="http://arkingc.coding.me/img/in-post/post-linux-vfs/vfs.png">
+<meta property="og:image" content="http://arkingc.coding.me/img/in-post/post-linux-vfs/relation.png">
+<meta property="og:image" content="http://arkingc.coding.me/img/in-post/post-linux-vfs/list.png">
+<meta property="og:image" content="http://arkingc.coding.me/img/in-post/post-linux-vfs/super_block-1.png">
+<meta property="og:image" content="http://arkingc.coding.me/img/in-post/post-linux-vfs/super_block-2.png">
+<meta property="og:image" content="http://arkingc.coding.me/img/in-post/post-linux-vfs/dentry-tree.png">
 <meta property="og:updated_time" content="2018-12-04T10:03:44.000Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="Linux虚拟文件系统(VFS)">
 <meta name="twitter:description" content="在Linux中，VFS为上层应用提供了访问下层文件系统的统一接口，它将文件相关的概念进行了抽象，同时提供了对这些抽象概念的操作接口">
-<meta name="twitter:image" content="http://arkingc.github.io/img/in-post/post-linux-vfs/vfs.png">
+<meta name="twitter:image" content="http://arkingc.coding.me/img/in-post/post-linux-vfs/vfs.png">
 
-<link rel="apple-touch-icon" href="http://arkingc.github.io/apple-touch-icon.png">
+<link rel="apple-touch-icon" href="http://arkingc.coding.me/apple-touch-icon.png">
 
 
     <link rel="alternate" href="/atom.xml" title="Arking" type="application/atom+xml">
 
 
 
-    <link rel="shortcut icon" href="http://arkingc.github.io/favicon.png">
+    <link rel="shortcut icon" href="http://arkingc.coding.me/favicon.png">
 
 
 
@@ -90,7 +90,7 @@
 
 
 
-    <script> yiliaConfig.rootUrl = http://arkingc.github.io; </script>
+    <script> yiliaConfig.rootUrl = http://arkingc.coding.me; </script>
 
 
 
@@ -115,7 +115,7 @@
 <div class="intrude-less">
     <header id="header" class="inner">
         <a href="/" class="profilepic">
-            <img src="http://arkingc.github.io/img/avatar.png" class="animated zoomIn">
+            <img src="http://arkingc.coding.me/img/avatar.png" class="animated zoomIn">
         </a>
         <hgroup>
           <h1 class="header-author"><a href="/">Arking</a></h1>
@@ -174,15 +174,15 @@
                     <nav class="header-menu">
                         <ul>
                         
-                            <li><a href="http://arkingc.github.io/">主页</a></li>
+                            <li><a href="http://arkingc.coding.me/">主页</a></li>
                         
-                            <li><a href="http://arkingc.github.io/archives/">归档</a></li>
+                            <li><a href="http://arkingc.coding.me/archives/">归档</a></li>
                         
-                            <li><a href="http://arkingc.github.io/tags/">标签</a></li>
+                            <li><a href="http://arkingc.coding.me/tags/">标签</a></li>
                         
-                            <li><a href="http://arkingc.github.io/link/">链接</a></li>
+                            <li><a href="http://arkingc.coding.me/link/">链接</a></li>
                         
-                            <li><a href="http://arkingc.github.io/about/">关于我</a></li>
+                            <li><a href="http://arkingc.coding.me/about/">关于我</a></li>
                         
                         </ul>
                     </nav>
@@ -246,7 +246,7 @@
     <div class="intrude-less">
         <header id="header" class="inner">
             <a href="/" class="profilepic">
-                <img src="http://arkingc.github.io/img/avatar.png" class="animated zoomIn">
+                <img src="http://arkingc.coding.me/img/avatar.png" class="animated zoomIn">
             </a>
             <hgroup>
               <h1 class="header-author"><a href="/" title="回到主页">Arking</a></h1>
@@ -742,8 +742,8 @@
         <p><span>发布时间:</span>2017-08-18, 02:51:00</p>
         <p><span>最后更新:</span>2018-12-04, 18:03:44</p>
         <p>
-            <span>原始链接:</span><a class="post-url" href="/2017/08/18/2017-08-18-linux-code-vfs/" title="Linux虚拟文件系统(VFS)">http://arkingc.github.io/2017/08/18/2017-08-18-linux-code-vfs/</a>
-            <span class="copy-path" data-clipboard-text="原文: http://arkingc.github.io/2017/08/18/2017-08-18-linux-code-vfs/　　作者: Arking" title="点击复制文章链接"><i class="fa fa-clipboard"></i></span>
+            <span>原始链接:</span><a class="post-url" href="/2017/08/18/2017-08-18-linux-code-vfs/" title="Linux虚拟文件系统(VFS)">http://arkingc.coding.me/2017/08/18/2017-08-18-linux-code-vfs/</a>
+            <span class="copy-path" data-clipboard-text="原文: http://arkingc.coding.me/2017/08/18/2017-08-18-linux-code-vfs/　　作者: Arking" title="点击复制文章链接"><i class="fa fa-clipboard"></i></span>
             <script> var clipboard = new Clipboard('.copy-path'); </script>
         </p>
         <p>
@@ -904,7 +904,7 @@
             }
             else {
                 var backgroundnum = 5;
-                var backgroundimg = "url(http://arkingc.github.io/background/bg-x.jpg)".replace(/x/gi, Math.ceil(Math.random() * backgroundnum));
+                var backgroundimg = "url(http://arkingc.coding.me/background/bg-x.jpg)".replace(/x/gi, Math.ceil(Math.random() * backgroundnum));
                 $("body").css({"background": backgroundimg, "background-attachment": "fixed", "background-size": "cover"});
             }
         })
