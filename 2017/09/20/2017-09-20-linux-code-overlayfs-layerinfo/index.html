@@ -19,26 +19,26 @@
 <meta name="keywords" content="filesystem,overlayfs">
 <meta property="og:type" content="article">
 <meta property="og:title" content="内核OverlayFS—文件层次信息">
-<meta property="og:url" content="http://arkingc.coding.me/2017/09/20/2017-09-20-linux-code-overlayfs-layerinfo/index.html">
+<meta property="og:url" content="http://arkingc.github.io/2017/09/20/2017-09-20-linux-code-overlayfs-layerinfo/index.html">
 <meta property="og:site_name" content="Arking">
 <meta property="og:description" content="内核版本为4.4.68  我们知道，在OverlayFS中，读写操作和文件所在的层息息相关。尤其是写一个只读层的文件时，由于只读层不能修改，因此会触发copy-up操作。那么内核怎么知道一个文件到底是一个upper层（读写层）的文件还是一个lower（只读层）的文件？也就是说，在OverlayFS中如何记录文件的层次信息？">
 <meta property="og:locale" content="default">
-<meta property="og:image" content="http://arkingc.coding.me/img/in-post/post-kernel-overlayfs/file_layer_info.png">
-<meta property="og:image" content="http://arkingc.coding.me/img/in-post/post-kernel-overlayfs/mount_tree.png">
+<meta property="og:image" content="http://arkingc.github.io/img/in-post/post-kernel-overlayfs/file_layer_info.png">
+<meta property="og:image" content="http://arkingc.github.io/img/in-post/post-kernel-overlayfs/mount_tree.png">
 <meta property="og:updated_time" content="2018-12-04T09:54:06.000Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="内核OverlayFS—文件层次信息">
 <meta name="twitter:description" content="内核版本为4.4.68  我们知道，在OverlayFS中，读写操作和文件所在的层息息相关。尤其是写一个只读层的文件时，由于只读层不能修改，因此会触发copy-up操作。那么内核怎么知道一个文件到底是一个upper层（读写层）的文件还是一个lower（只读层）的文件？也就是说，在OverlayFS中如何记录文件的层次信息？">
-<meta name="twitter:image" content="http://arkingc.coding.me/img/in-post/post-kernel-overlayfs/file_layer_info.png">
+<meta name="twitter:image" content="http://arkingc.github.io/img/in-post/post-kernel-overlayfs/file_layer_info.png">
 
-<link rel="apple-touch-icon" href="http://arkingc.coding.me/apple-touch-icon.png">
+<link rel="apple-touch-icon" href="http://arkingc.github.io/apple-touch-icon.png">
 
 
     <link rel="alternate" href="/atom.xml" title="Arking" type="application/atom+xml">
 
 
 
-    <link rel="shortcut icon" href="http://arkingc.coding.me/favicon.png">
+    <link rel="shortcut icon" href="http://arkingc.github.io/favicon.png">
 
 
 
@@ -86,7 +86,7 @@
 
 
 
-    <script> yiliaConfig.rootUrl = http://arkingc.coding.me; </script>
+    <script> yiliaConfig.rootUrl = http://arkingc.github.io; </script>
 
 
 
@@ -111,7 +111,7 @@
 <div class="intrude-less">
     <header id="header" class="inner">
         <a href="/" class="profilepic">
-            <img src="http://arkingc.coding.me/img/avatar.png" class="animated zoomIn">
+            <img src="http://arkingc.github.io/img/avatar.png" class="animated zoomIn">
         </a>
         <hgroup>
           <h1 class="header-author"><a href="/">Arking</a></h1>
@@ -170,15 +170,15 @@
                     <nav class="header-menu">
                         <ul>
                         
-                            <li><a href="http://arkingc.coding.me/">主页</a></li>
+                            <li><a href="http://arkingc.github.io/">主页</a></li>
                         
-                            <li><a href="http://arkingc.coding.me/archives/">归档</a></li>
+                            <li><a href="http://arkingc.github.io/archives/">归档</a></li>
                         
-                            <li><a href="http://arkingc.coding.me/tags/">标签</a></li>
+                            <li><a href="http://arkingc.github.io/tags/">标签</a></li>
                         
-                            <li><a href="http://arkingc.coding.me/link/">链接</a></li>
+                            <li><a href="http://arkingc.github.io/link/">链接</a></li>
                         
-                            <li><a href="http://arkingc.coding.me/about/">关于我</a></li>
+                            <li><a href="http://arkingc.github.io/about/">关于我</a></li>
                         
                         </ul>
                     </nav>
@@ -242,7 +242,7 @@
     <div class="intrude-less">
         <header id="header" class="inner">
             <a href="/" class="profilepic">
-                <img src="http://arkingc.coding.me/img/avatar.png" class="animated zoomIn">
+                <img src="http://arkingc.github.io/img/avatar.png" class="animated zoomIn">
             </a>
             <hgroup>
               <h1 class="header-author"><a href="/" title="回到主页">Arking</a></h1>
@@ -411,8 +411,8 @@
         <p><span>发布时间:</span>2017-09-20, 02:51:00</p>
         <p><span>最后更新:</span>2018-12-04, 17:54:06</p>
         <p>
-            <span>原始链接:</span><a class="post-url" href="/2017/09/20/2017-09-20-linux-code-overlayfs-layerinfo/" title="内核OverlayFS—文件层次信息">http://arkingc.coding.me/2017/09/20/2017-09-20-linux-code-overlayfs-layerinfo/</a>
-            <span class="copy-path" data-clipboard-text="原文: http://arkingc.coding.me/2017/09/20/2017-09-20-linux-code-overlayfs-layerinfo/　　作者: Arking" title="点击复制文章链接"><i class="fa fa-clipboard"></i></span>
+            <span>原始链接:</span><a class="post-url" href="/2017/09/20/2017-09-20-linux-code-overlayfs-layerinfo/" title="内核OverlayFS—文件层次信息">http://arkingc.github.io/2017/09/20/2017-09-20-linux-code-overlayfs-layerinfo/</a>
+            <span class="copy-path" data-clipboard-text="原文: http://arkingc.github.io/2017/09/20/2017-09-20-linux-code-overlayfs-layerinfo/　　作者: Arking" title="点击复制文章链接"><i class="fa fa-clipboard"></i></span>
             <script> var clipboard = new Clipboard('.copy-path'); </script>
         </p>
         <p>
@@ -573,7 +573,7 @@
             }
             else {
                 var backgroundnum = 5;
-                var backgroundimg = "url(http://arkingc.coding.me/background/bg-x.jpg)".replace(/x/gi, Math.ceil(Math.random() * backgroundnum));
+                var backgroundimg = "url(http://arkingc.github.io/background/bg-x.jpg)".replace(/x/gi, Math.ceil(Math.random() * backgroundnum));
                 $("body").css({"background": backgroundimg, "background-attachment": "fixed", "background-size": "cover"});
             }
         })

@@ -19,29 +19,29 @@
 <meta name="keywords" content="filesystem,overlayfs">
 <meta property="og:type" content="article">
 <meta property="og:title" content="内核OverlayFS—注册与挂载">
-<meta property="og:url" content="http://arkingc.coding.me/2017/10/12/2017-10-12-linux-code-overlayfs-mnt/index.html">
+<meta property="og:url" content="http://arkingc.github.io/2017/10/12/2017-10-12-linux-code-overlayfs-mnt/index.html">
 <meta property="og:site_name" content="Arking">
 <meta property="og:description" content="内核版本为4.4.68  这篇文章通过内核源码分析OverlayFS的注册与挂载过程 假设你对OverlayFS的层次关系已经有一个基本的了解。如果对OverlayFS的层以及联合挂载没有概念，建议先补充下相关知识，因为挂载OverlayFS时会使用到层 分析会尽可能避开公有部分(每种文件系统注册和挂载过程中都会涉及的内容)，而更多的关注OverlayFS独有部分">
 <meta property="og:locale" content="default">
-<meta property="og:image" content="http://arkingc.coding.me/img/in-post/post-linux-vfs/filesystem_list.png">
-<meta property="og:image" content="http://arkingc.coding.me/img/in-post/post-kernel-overlayfs/df.png">
-<meta property="og:image" content="http://arkingc.coding.me/img/in-post/post-kernel-overlayfs/dir-op1-dir_tree.png">
-<meta property="og:image" content="http://arkingc.coding.me/img/in-post/post-kernel-overlayfs/fill_1.png">
-<meta property="og:image" content="http://arkingc.coding.me/img/in-post/post-kernel-overlayfs/fill_2.png">
+<meta property="og:image" content="http://arkingc.github.io/img/in-post/post-linux-vfs/filesystem_list.png">
+<meta property="og:image" content="http://arkingc.github.io/img/in-post/post-kernel-overlayfs/df.png">
+<meta property="og:image" content="http://arkingc.github.io/img/in-post/post-kernel-overlayfs/dir-op1-dir_tree.png">
+<meta property="og:image" content="http://arkingc.github.io/img/in-post/post-kernel-overlayfs/fill_1.png">
+<meta property="og:image" content="http://arkingc.github.io/img/in-post/post-kernel-overlayfs/fill_2.png">
 <meta property="og:updated_time" content="2018-12-04T09:50:11.000Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="内核OverlayFS—注册与挂载">
 <meta name="twitter:description" content="内核版本为4.4.68  这篇文章通过内核源码分析OverlayFS的注册与挂载过程 假设你对OverlayFS的层次关系已经有一个基本的了解。如果对OverlayFS的层以及联合挂载没有概念，建议先补充下相关知识，因为挂载OverlayFS时会使用到层 分析会尽可能避开公有部分(每种文件系统注册和挂载过程中都会涉及的内容)，而更多的关注OverlayFS独有部分">
-<meta name="twitter:image" content="http://arkingc.coding.me/img/in-post/post-linux-vfs/filesystem_list.png">
+<meta name="twitter:image" content="http://arkingc.github.io/img/in-post/post-linux-vfs/filesystem_list.png">
 
-<link rel="apple-touch-icon" href="http://arkingc.coding.me/apple-touch-icon.png">
+<link rel="apple-touch-icon" href="http://arkingc.github.io/apple-touch-icon.png">
 
 
     <link rel="alternate" href="/atom.xml" title="Arking" type="application/atom+xml">
 
 
 
-    <link rel="shortcut icon" href="http://arkingc.coding.me/favicon.png">
+    <link rel="shortcut icon" href="http://arkingc.github.io/favicon.png">
 
 
 
@@ -89,7 +89,7 @@
 
 
 
-    <script> yiliaConfig.rootUrl = http://arkingc.coding.me; </script>
+    <script> yiliaConfig.rootUrl = http://arkingc.github.io; </script>
 
 
 
@@ -114,7 +114,7 @@
 <div class="intrude-less">
     <header id="header" class="inner">
         <a href="/" class="profilepic">
-            <img src="http://arkingc.coding.me/img/avatar.png" class="animated zoomIn">
+            <img src="http://arkingc.github.io/img/avatar.png" class="animated zoomIn">
         </a>
         <hgroup>
           <h1 class="header-author"><a href="/">Arking</a></h1>
@@ -173,15 +173,15 @@
                     <nav class="header-menu">
                         <ul>
                         
-                            <li><a href="http://arkingc.coding.me/">主页</a></li>
+                            <li><a href="http://arkingc.github.io/">主页</a></li>
                         
-                            <li><a href="http://arkingc.coding.me/archives/">归档</a></li>
+                            <li><a href="http://arkingc.github.io/archives/">归档</a></li>
                         
-                            <li><a href="http://arkingc.coding.me/tags/">标签</a></li>
+                            <li><a href="http://arkingc.github.io/tags/">标签</a></li>
                         
-                            <li><a href="http://arkingc.coding.me/link/">链接</a></li>
+                            <li><a href="http://arkingc.github.io/link/">链接</a></li>
                         
-                            <li><a href="http://arkingc.coding.me/about/">关于我</a></li>
+                            <li><a href="http://arkingc.github.io/about/">关于我</a></li>
                         
                         </ul>
                     </nav>
@@ -245,7 +245,7 @@
     <div class="intrude-less">
         <header id="header" class="inner">
             <a href="/" class="profilepic">
-                <img src="http://arkingc.coding.me/img/avatar.png" class="animated zoomIn">
+                <img src="http://arkingc.github.io/img/avatar.png" class="animated zoomIn">
             </a>
             <hgroup>
               <h1 class="header-author"><a href="/" title="回到主页">Arking</a></h1>
@@ -428,8 +428,8 @@
         <p><span>发布时间:</span>2017-10-12, 02:51:00</p>
         <p><span>最后更新:</span>2018-12-04, 17:50:11</p>
         <p>
-            <span>原始链接:</span><a class="post-url" href="/2017/10/12/2017-10-12-linux-code-overlayfs-mnt/" title="内核OverlayFS—注册与挂载">http://arkingc.coding.me/2017/10/12/2017-10-12-linux-code-overlayfs-mnt/</a>
-            <span class="copy-path" data-clipboard-text="原文: http://arkingc.coding.me/2017/10/12/2017-10-12-linux-code-overlayfs-mnt/　　作者: Arking" title="点击复制文章链接"><i class="fa fa-clipboard"></i></span>
+            <span>原始链接:</span><a class="post-url" href="/2017/10/12/2017-10-12-linux-code-overlayfs-mnt/" title="内核OverlayFS—注册与挂载">http://arkingc.github.io/2017/10/12/2017-10-12-linux-code-overlayfs-mnt/</a>
+            <span class="copy-path" data-clipboard-text="原文: http://arkingc.github.io/2017/10/12/2017-10-12-linux-code-overlayfs-mnt/　　作者: Arking" title="点击复制文章链接"><i class="fa fa-clipboard"></i></span>
             <script> var clipboard = new Clipboard('.copy-path'); </script>
         </p>
         <p>
@@ -590,7 +590,7 @@
             }
             else {
                 var backgroundnum = 5;
-                var backgroundimg = "url(http://arkingc.coding.me/background/bg-x.jpg)".replace(/x/gi, Math.ceil(Math.random() * backgroundnum));
+                var backgroundimg = "url(http://arkingc.github.io/background/bg-x.jpg)".replace(/x/gi, Math.ceil(Math.random() * backgroundnum));
                 $("body").css({"background": backgroundimg, "background-attachment": "fixed", "background-size": "cover"});
             }
         })
