@@ -3012,3 +3012,42 @@ pre .javascript .function {
   height: 100%;
   overflow: hidden;
 }
+body {
+  background: #d3d3d3;
+}
+#container .left-col {
+  background: #fff;
+}
+.article {
+  background: #fff;
+}
+.article .article-inner {
+  margin-bottom: 1em;
+}
+.article .article-more-link a {
+  opacity: 0.9;
+}
+.tagcloud a {
+  opacity: 0.9;
+}
+#header .header-nav .social li {
+  opacity: 0.8;
+}
+.archives-wrap {
+  background: #fff;
+}
+.scroll a .fa {
+  color: #fff;
+}
+.post-nav-button {
+  background: #ececec;
+}
+#post-nav-button a {
+  background: rgba(215,216,215,0.5);
+}
+.post-list {
+  background: #fff;
+}
+#article-nav {
+  background: rgba(158,188,226,0.9);
+}
