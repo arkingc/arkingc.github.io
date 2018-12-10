@@ -19,18 +19,18 @@
 <meta name="keywords" content="filesystem,overlayfs">
 <meta property="og:type" content="article">
 <meta property="og:title" content="内核OverlayFS—创建与删除文件">
-<meta property="og:url" content="http://arkingc.github.io/2017/12/22/2017-12-22-linux-code-overlayfs-create_delete/index.html">
+<meta property="og:url" content="https://arkingc.github.io/2017/12/22/2017-12-22-linux-code-overlayfs-create_delete/index.html">
 <meta property="og:site_name" content="Arking">
 <meta property="og:description" content="内核版本4.4.68  在OverlayFS中，创建和删除一个文件实际上并不是在OverlayFS的联合挂载目录下进行，而是在upper目录进行 举个例子，如果OverlayFS中存在/dir目录，而且这个目录是一个upper目录，那么执行命令touch /dir/file实际上会在upper目录下的dir目录中创建一个file文件。如果/dir目录下存在file文件，想要删除这个文件，也是到u">
 <meta property="og:locale" content="default">
-<meta property="og:image" content="http://arkingc.github.io/img/in-post/post-kernel-overlayfs/create_file.png">
-<meta property="og:image" content="http://arkingc.github.io/img/in-post/post-kernel-overlayfs/callstack_create.png">
-<meta property="og:image" content="http://arkingc.github.io/img/in-post/post-kernel-overlayfs/callstack_delete.png">
+<meta property="og:image" content="https://arkingc.github.io/img/in-post/post-kernel-overlayfs/create_file.png">
+<meta property="og:image" content="https://arkingc.github.io/img/in-post/post-kernel-overlayfs/callstack_create.png">
+<meta property="og:image" content="https://arkingc.github.io/img/in-post/post-kernel-overlayfs/callstack_delete.png">
 <meta property="og:updated_time" content="2018-12-04T09:40:43.000Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="内核OverlayFS—创建与删除文件">
 <meta name="twitter:description" content="内核版本4.4.68  在OverlayFS中，创建和删除一个文件实际上并不是在OverlayFS的联合挂载目录下进行，而是在upper目录进行 举个例子，如果OverlayFS中存在/dir目录，而且这个目录是一个upper目录，那么执行命令touch /dir/file实际上会在upper目录下的dir目录中创建一个file文件。如果/dir目录下存在file文件，想要删除这个文件，也是到u">
-<meta name="twitter:image" content="http://arkingc.github.io/img/in-post/post-kernel-overlayfs/create_file.png">
+<meta name="twitter:image" content="https://arkingc.github.io/img/in-post/post-kernel-overlayfs/create_file.png">
 
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 
@@ -414,8 +414,8 @@
         <p><span>发布时间:</span>2017-12-22, 02:51:00</p>
         <p><span>最后更新:</span>2018-12-04, 17:40:43</p>
         <p>
-            <span>原始链接:</span><a class="post-url" href="/2017/12/22/2017-12-22-linux-code-overlayfs-create_delete/" title="内核OverlayFS—创建与删除文件">http://arkingc.github.io/2017/12/22/2017-12-22-linux-code-overlayfs-create_delete/</a>
-            <span class="copy-path" data-clipboard-text="原文: http://arkingc.github.io/2017/12/22/2017-12-22-linux-code-overlayfs-create_delete/　　作者: Arking" title="点击复制文章链接"><i class="fa fa-clipboard"></i></span>
+            <span>原始链接:</span><a class="post-url" href="/2017/12/22/2017-12-22-linux-code-overlayfs-create_delete/" title="内核OverlayFS—创建与删除文件">https://arkingc.github.io/2017/12/22/2017-12-22-linux-code-overlayfs-create_delete/</a>
+            <span class="copy-path" data-clipboard-text="原文: https://arkingc.github.io/2017/12/22/2017-12-22-linux-code-overlayfs-create_delete/　　作者: Arking" title="点击复制文章链接"><i class="fa fa-clipboard"></i></span>
             <script> var clipboard = new Clipboard('.copy-path'); </script>
         </p>
         <p>

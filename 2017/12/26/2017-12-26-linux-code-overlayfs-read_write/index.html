@@ -19,16 +19,16 @@
 <meta name="keywords" content="filesystem,overlayfs">
 <meta property="og:type" content="article">
 <meta property="og:title" content="内核OverlayFS—文件读写">
-<meta property="og:url" content="http://arkingc.github.io/2017/12/26/2017-12-26-linux-code-overlayfs-read_write/index.html">
+<meta property="og:url" content="https://arkingc.github.io/2017/12/26/2017-12-26-linux-code-overlayfs-read_write/index.html">
 <meta property="og:site_name" content="Arking">
 <meta property="og:description" content="内核版本4.4.68  文件（一般文件或目录）的读写和文件的创建删除不同，文件的创建删除作用于inode结构，需要用到inode操作。而文件的读写则是作用于file结构，因此需要用到file操作 通常，读写文件之前需要先打开这个文件，通过open系统调用，传入表示文件的路径字符串，随后内核会根据路径字符串进行路径查找，最终得到一个表示文件的file结构，并使之与当前进程相关联，之后的读写便会根据">
 <meta property="og:locale" content="default">
-<meta property="og:image" content="http://arkingc.github.io/img/in-post/post-kernel-overlayfs/mount_tree_2.png">
+<meta property="og:image" content="https://arkingc.github.io/img/in-post/post-kernel-overlayfs/mount_tree_2.png">
 <meta property="og:updated_time" content="2018-12-04T09:36:03.000Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="内核OverlayFS—文件读写">
 <meta name="twitter:description" content="内核版本4.4.68  文件（一般文件或目录）的读写和文件的创建删除不同，文件的创建删除作用于inode结构，需要用到inode操作。而文件的读写则是作用于file结构，因此需要用到file操作 通常，读写文件之前需要先打开这个文件，通过open系统调用，传入表示文件的路径字符串，随后内核会根据路径字符串进行路径查找，最终得到一个表示文件的file结构，并使之与当前进程相关联，之后的读写便会根据">
-<meta name="twitter:image" content="http://arkingc.github.io/img/in-post/post-kernel-overlayfs/mount_tree_2.png">
+<meta name="twitter:image" content="https://arkingc.github.io/img/in-post/post-kernel-overlayfs/mount_tree_2.png">
 
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 
@@ -368,8 +368,8 @@
         <p><span>发布时间:</span>2017-12-26, 02:51:00</p>
         <p><span>最后更新:</span>2018-12-04, 17:36:03</p>
         <p>
-            <span>原始链接:</span><a class="post-url" href="/2017/12/26/2017-12-26-linux-code-overlayfs-read_write/" title="内核OverlayFS—文件读写">http://arkingc.github.io/2017/12/26/2017-12-26-linux-code-overlayfs-read_write/</a>
-            <span class="copy-path" data-clipboard-text="原文: http://arkingc.github.io/2017/12/26/2017-12-26-linux-code-overlayfs-read_write/　　作者: Arking" title="点击复制文章链接"><i class="fa fa-clipboard"></i></span>
+            <span>原始链接:</span><a class="post-url" href="/2017/12/26/2017-12-26-linux-code-overlayfs-read_write/" title="内核OverlayFS—文件读写">https://arkingc.github.io/2017/12/26/2017-12-26-linux-code-overlayfs-read_write/</a>
+            <span class="copy-path" data-clipboard-text="原文: https://arkingc.github.io/2017/12/26/2017-12-26-linux-code-overlayfs-read_write/　　作者: Arking" title="点击复制文章链接"><i class="fa fa-clipboard"></i></span>
             <script> var clipboard = new Clipboard('.copy-path'); </script>
         </p>
         <p>
