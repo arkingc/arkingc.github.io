@@ -39,14 +39,14 @@
 <meta name="twitter:description" content="一个可执行C程序由一系列二进制码组成，程序代码会被翻译成由二进制组成的机器指令。程序执行时，CPU取出程序指令执行，寄存器用于程序中变量数据的交换以及算术运算。由于寄存器数量等因素，程序执行过程中产生的数据（如变量）不会一直保存在寄存器中，变量和寄存器状态等会被保存在为函数分配的一个栈空间中，这个为函数分配的内存空间，就称为栈帧 栈帧可以加深对C中函数调用与返回的理解，了解函数的栈帧也有利于对C中">
 <meta name="twitter:image" content="http://arkingc.github.io/img/in-post/post-c-stackframe/stack_frame.png">
 
-<link rel="apple-touch-icon" href="http://arkingc.github.io/apple-touch-icon.png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
 
 
     <link rel="alternate" href="/atom.xml" title="Arking" type="application/atom+xml">
 
 
 
-    <link rel="shortcut icon" href="http://arkingc.github.io/favicon.png">
+    <link rel="shortcut icon" href="/favicon.png">
 
 
 
@@ -94,7 +94,7 @@
 
 
 
-    <script> yiliaConfig.rootUrl = http://arkingc.github.io; </script>
+    <script> yiliaConfig.rootUrl = "\/";</script>
 
 
 
@@ -119,7 +119,7 @@
 <div class="intrude-less">
     <header id="header" class="inner">
         <a href="/" class="profilepic">
-            <img src="http://arkingc.github.io/img/avatar.png" class="animated zoomIn">
+            <img src="/img/avatar.png" class="animated zoomIn">
         </a>
         <hgroup>
           <h1 class="header-author"><a href="/">Arking</a></h1>
@@ -178,15 +178,15 @@
                     <nav class="header-menu">
                         <ul>
                         
-                            <li><a href="http://arkingc.github.io/">主页</a></li>
+                            <li><a href="/">主页</a></li>
                         
-                            <li><a href="http://arkingc.github.io/archives/">归档</a></li>
+                            <li><a href="/archives/">归档</a></li>
                         
-                            <li><a href="http://arkingc.github.io/tags/">标签</a></li>
+                            <li><a href="/tags/">标签</a></li>
                         
-                            <li><a href="http://arkingc.github.io/link/">链接</a></li>
+                            <li><a href="/link/">链接</a></li>
                         
-                            <li><a href="http://arkingc.github.io/about/">关于我</a></li>
+                            <li><a href="/about/">关于我</a></li>
                         
                         </ul>
                     </nav>
@@ -250,7 +250,7 @@
     <div class="intrude-less">
         <header id="header" class="inner">
             <a href="/" class="profilepic">
-                <img src="http://arkingc.github.io/img/avatar.png" class="animated zoomIn">
+                <img src="/img/avatar.png" class="animated zoomIn">
             </a>
             <hgroup>
               <h1 class="header-author"><a href="/" title="回到主页">Arking</a></h1>
@@ -591,7 +591,7 @@
             }
             else {
                 var backgroundnum = 5;
-                var backgroundimg = "url(http://arkingc.github.io/background/bg-x.jpg)".replace(/x/gi, Math.ceil(Math.random() * backgroundnum));
+                var backgroundimg = "url(/background/bg-x.jpg)".replace(/x/gi, Math.ceil(Math.random() * backgroundnum));
                 $("body").css({"background": backgroundimg, "background-attachment": "fixed", "background-size": "cover"});
             }
         })
