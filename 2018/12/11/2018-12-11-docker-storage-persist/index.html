@@ -25,7 +25,7 @@
 <meta property="og:locale" content="default">
 <meta property="og:image" content="https://arkingc.github.io/img/in-post/post-docker-storage-persist/types-of-mounts.png">
 <meta property="og:image" content="https://arkingc.github.io/img/in-post/post-docker-storage-persist/volumes-shared-storage.svg">
-<meta property="og:updated_time" content="2018-12-11T03:30:27.000Z">
+<meta property="og:updated_time" content="2018-12-11T03:41:50.000Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content=" Docker容器数据持久化 ">
 <meta name="twitter:description" content="容器中的数据可以存储在容器层。但是将数据存放在容器层存在以下问题：  数据不是持久化。意思是如果容器删除了，这些数据也就没了 主机上的其它进程不方便访问这些数据 对这些数据的I/O会经过存储驱动，然后到达主机，引入了一层间接层，因此性能会有所下降  Docker提供了3种持久化数据的方式：  volumes：存于主机文件系统中的某个区域，由Docker管理（/var/lib/docker/volu">
@@ -532,6 +532,13 @@
 <figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">docker run -v /dbdata --name dbstore2 ubuntu /bin/bash</span><br></pre></td></tr></table></figure>
 <p>然后，在新创建的容器的卷中使用<code>tar</code>解包备份的数据：</p>
 <figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">docker run --rm --volumes-from dbstore2 -v $(<span class="built_in">pwd</span>):/backup ubuntu bash -c <span class="string">"cd /dbdata &amp;&amp; tar xvf /backup/backup.tar --strip 1"</span></span><br></pre></td></tr></table></figure>
+<p><br></p>
+<h2 id="参考"><a href="#参考" class="headerlink" title="参考"></a>参考</h2><ul>
+<li><a href="https://docs.docker.com/storage/" target="_blank" rel="noopener">Storage overview</a></li>
+<li><a href="https://docs.docker.com/storage/volumes/" target="_blank" rel="noopener">Volumes</a></li>
+<li><a href="https://docs.docker.com/storage/bind-mounts/" target="_blank" rel="noopener">Bind mounts</a></li>
+<li><a href="https://docs.docker.com/storage/tmpfs/" target="_blank" rel="noopener">tmpfs mounts</a></li>
+</ul>
 
       
     </div>
@@ -543,7 +550,7 @@
         <p><span>本文标题:</span><a href="/2018/12/11/2018-12-11-docker-storage-persist/"> Docker容器数据持久化 </a></p>
         <p><span>文章作者:</span><a href="/" title="回到主页">Arking</a></p>
         <p><span>发布时间:</span>2018-12-11, 10:51:00</p>
-        <p><span>最后更新:</span>2018-12-11, 11:30:27</p>
+        <p><span>最后更新:</span>2018-12-11, 11:41:50</p>
         <p>
             <span>原始链接:</span><a class="post-url" href="/2018/12/11/2018-12-11-docker-storage-persist/" title=" Docker容器数据持久化 ">https://arkingc.github.io/2018/12/11/2018-12-11-docker-storage-persist/</a>
             <span class="copy-path" data-clipboard-text="原文: https://arkingc.github.io/2018/12/11/2018-12-11-docker-storage-persist/　　作者: Arking" title="点击复制文章链接"><i class="fa fa-clipboard"></i></span>
@@ -573,7 +580,7 @@
     <div id="toc" class="toc-article">
         <strong class="toc-title">文章目录</strong>
         
-            <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#volumes"><span class="toc-number">1.</span> <span class="toc-text">volumes</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#使用"><span class="toc-number">1.1.</span> <span class="toc-text">使用</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#场景"><span class="toc-number">1.2.</span> <span class="toc-text">场景</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#bind-mount"><span class="toc-number">2.</span> <span class="toc-text">bind mount</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#使用-1"><span class="toc-number">2.1.</span> <span class="toc-text">使用</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#场景-1"><span class="toc-number">2.2.</span> <span class="toc-text">场景</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#bind-propagation"><span class="toc-number">2.3.</span> <span class="toc-text">bind propagation</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#selinux-label"><span class="toc-number">2.4.</span> <span class="toc-text">selinux label</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#tmpfs-mount"><span class="toc-number">3.</span> <span class="toc-text">tmpfs mount</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#使用-2"><span class="toc-number">3.1.</span> <span class="toc-text">使用</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#场景-2"><span class="toc-number">3.2.</span> <span class="toc-text">场景</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#volume-drivers"><span class="toc-number">4.</span> <span class="toc-text">volume drivers</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#使用-3"><span class="toc-number">4.1.</span> <span class="toc-text">使用</span></a></li></ol></li></ol>
+            <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#volumes"><span class="toc-number">1.</span> <span class="toc-text">volumes</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#使用"><span class="toc-number">1.1.</span> <span class="toc-text">使用</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#场景"><span class="toc-number">1.2.</span> <span class="toc-text">场景</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#bind-mount"><span class="toc-number">2.</span> <span class="toc-text">bind mount</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#使用-1"><span class="toc-number">2.1.</span> <span class="toc-text">使用</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#场景-1"><span class="toc-number">2.2.</span> <span class="toc-text">场景</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#bind-propagation"><span class="toc-number">2.3.</span> <span class="toc-text">bind propagation</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#selinux-label"><span class="toc-number">2.4.</span> <span class="toc-text">selinux label</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#tmpfs-mount"><span class="toc-number">3.</span> <span class="toc-text">tmpfs mount</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#使用-2"><span class="toc-number">3.1.</span> <span class="toc-text">使用</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#场景-2"><span class="toc-number">3.2.</span> <span class="toc-text">场景</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#volume-drivers"><span class="toc-number">4.</span> <span class="toc-text">volume drivers</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#使用-3"><span class="toc-number">4.1.</span> <span class="toc-text">使用</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#参考"><span class="toc-number">5.</span> <span class="toc-text">参考</span></a></li></ol>
         
     </div>
     <style>
