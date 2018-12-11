@@ -278,6 +278,78 @@
 </nav>
       <div class="body-wrap">
   
+    <article id="post-2017-11-10-linux-code-overlayfs-dir-op1" class="article article-type-post" itemscope="" itemprop="blogPost">
+  
+    <div class="article-meta">
+      <a href="/2017/11/10/2017-11-10-linux-code-overlayfs-dir-op1/" class="article-date">
+      <time datetime="2017-11-09T18:51:00.000Z" itemprop="datePublished">2017-11-10</time>
+</a>
+
+
+    </div>
+  
+  <div class="article-inner">
+    
+      <input type="hidden" class="isFancy">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 itemprop="name">
+      <a class="article-title" href="/2017/11/10/2017-11-10-linux-code-overlayfs-dir-op1/">内核OverlayFS—目录搜索</a>
+    </h1>
+  
+
+      </header>
+      
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+          
+              <blockquote>
+<p><strong>内核版本4.4.68</strong></p>
+</blockquote>
+<p>在OverlayFS联合挂载目录下，使用命令<code>ls</code>看到的文件实际上来自联合挂载的upper层和lower层。前面的博文中有提到过，OverlayFS的本质在于实现操作转化，因此在对OverlayFS中的一个目录进行搜索时（使用命令<code>ls</code>时），实际上会搜索目录对应upper层和lower层的目录，然后对搜索结果进行处理、展示。最终得到我们在OverlayFS下<code>ls dir</code>看到的内容</p>
+<p>这篇文章就是以OverlayFS根目录为例，分析<code>ls merged</code>时，OverlayFS根目录搜索，处理的过程</p>
+          
+      
+    </div>
+    
+    <div class="article-info article-info-index">
+      
+      
+    <div class="article-category tagcloud">
+    <a class="article-category-link" href="/categories/Linux内核/">Linux内核</a>
+    </div>
+
+
+      
+    <div class="article-tag tagcloud">
+        <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/filesystem/">filesystem</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/overlayfs/">overlayfs</a></li></ul>
+    </div>
+
+      
+        <p class="article-more-link">
+          <a href="/2017/11/10/2017-11-10-linux-code-overlayfs-dir-op1/#more">more >></a>
+        </p>
+      
+      <div class="clearfix"></div>
+    </div>
+    
+  </div>
+  
+</article>
+
+
+
+
+
+
+
+
+
+  
     <article id="post-2017-10-12-linux-code-overlayfs-mnt" class="article article-type-post" itemscope="" itemprop="blogPost">
   
     <div class="article-meta">
@@ -530,7 +602,7 @@
       
       
     <div class="article-category tagcloud">
-    <a class="article-category-link" href="/categories/Docker/">Docker</a>
+    <a class="article-category-link" href="/categories/Docker使用/">Docker使用</a>
     </div>
 
 
@@ -601,7 +673,7 @@
       
       
     <div class="article-category tagcloud">
-    <a class="article-category-link" href="/categories/Docker/">Docker</a>
+    <a class="article-category-link" href="/categories/Docker使用/">Docker使用</a>
     </div>
 
 

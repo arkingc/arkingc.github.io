@@ -2,6 +2,48 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   
   <url>
+    <loc>https://arkingc.github.io/2018/01/19/2018-01-19-docker-imagestore/</loc>
+    
+    <lastmod>2018-12-11T03:31:32.000Z</lastmod>
+    
+  </url>
+  
+  <url>
+    <loc>https://arkingc.github.io/2018/01/15/2018-01-15-docker-storage-overlay2/</loc>
+    
+    <lastmod>2018-12-11T03:31:28.000Z</lastmod>
+    
+  </url>
+  
+  <url>
+    <loc>https://arkingc.github.io/2018/01/14/2018-01-14-docker-layerstore/</loc>
+    
+    <lastmod>2018-12-11T03:31:23.000Z</lastmod>
+    
+  </url>
+  
+  <url>
+    <loc>https://arkingc.github.io/2017/04/13/2017-04-13-docker-filesystem-aufs/</loc>
+    
+    <lastmod>2018-12-11T03:31:02.000Z</lastmod>
+    
+  </url>
+  
+  <url>
+    <loc>https://arkingc.github.io/2017/05/05/2017-05-05-docker-filesystem-overlay/</loc>
+    
+    <lastmod>2018-12-11T03:31:00.000Z</lastmod>
+    
+  </url>
+  
+  <url>
+    <loc>https://arkingc.github.io/2018/12/11/2018-12-11-docker-storage-persist/</loc>
+    
+    <lastmod>2018-12-11T03:30:27.000Z</lastmod>
+    
+  </url>
+  
+  <url>
     <loc>https://arkingc.github.io/2018/12/08/2018-12-08-linux-benchmark-fxmark/</loc>
     
     <lastmod>2018-12-10T03:02:08.000Z</lastmod>
@@ -33,27 +75,6 @@
     <loc>https://arkingc.github.io//link/index.html</loc>
     
     <lastmod>2018-12-04T16:12:54.000Z</lastmod>
-    
-  </url>
-  
-  <url>
-    <loc>https://arkingc.github.io/2018/01/14/2018-01-14-docker-layerstore/</loc>
-    
-    <lastmod>2018-12-04T12:22:46.000Z</lastmod>
-    
-  </url>
-  
-  <url>
-    <loc>https://arkingc.github.io/2018/01/19/2018-01-19-docker-imagestore/</loc>
-    
-    <lastmod>2018-12-04T12:22:10.000Z</lastmod>
-    
-  </url>
-  
-  <url>
-    <loc>https://arkingc.github.io/2018/01/15/2018-01-15-docker-storage-overlay2/</loc>
-    
-    <lastmod>2018-12-04T12:22:05.000Z</lastmod>
     
   </url>
   
@@ -107,23 +128,9 @@
   </url>
   
   <url>
-    <loc>https://arkingc.github.io/2017/04/13/2017-04-13-docker-filesystem-aufs/</loc>
-    
-    <lastmod>2018-12-04T09:07:42.000Z</lastmod>
-    
-  </url>
-  
-  <url>
     <loc>https://arkingc.github.io/2017/04/09/2017-04-09-linux-uuid/</loc>
     
     <lastmod>2018-12-04T09:07:39.000Z</lastmod>
-    
-  </url>
-  
-  <url>
-    <loc>https://arkingc.github.io/2017/05/05/2017-05-05-docker-filesystem-overlay/</loc>
-    
-    <lastmod>2018-12-04T09:05:31.000Z</lastmod>
     
   </url>
   

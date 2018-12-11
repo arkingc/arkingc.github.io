@@ -1,0 +1,740 @@
+<!DOCTYPE html>
+<html>
+<head><meta name="generator" content="Hexo 3.8.0">
+
+    <!--[if lt IE 9]>
+        <style>body {display: none; background: none !important} </style>
+        <meta http-equiv="Refresh" Content="0; url=//outdatedbrowser.com/" />
+    <![endif]-->
+
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge, chrome=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="format-detection" content="telephone=no">
+<meta name="author" content="Arking">
+
+
+
+<meta name="description" content="容器中的数据可以存储在容器层。但是将数据存放在容器层存在以下问题：  数据不是持久化。意思是如果容器删除了，这些数据也就没了 主机上的其它进程不方便访问这些数据 对这些数据的I/O会经过存储驱动，然后到达主机，引入了一层间接层，因此性能会有所下降  Docker提供了3种持久化数据的方式：  volumes：存于主机文件系统中的某个区域，由Docker管理（/var/lib/docker/volu">
+<meta name="keywords" content="storage">
+<meta property="og:type" content="article">
+<meta property="og:title" content=" Docker容器数据持久化 ">
+<meta property="og:url" content="https://arkingc.github.io/2018/12/11/2018-12-11-docker-storage-persist/index.html">
+<meta property="og:site_name" content="Arking">
+<meta property="og:description" content="容器中的数据可以存储在容器层。但是将数据存放在容器层存在以下问题：  数据不是持久化。意思是如果容器删除了，这些数据也就没了 主机上的其它进程不方便访问这些数据 对这些数据的I/O会经过存储驱动，然后到达主机，引入了一层间接层，因此性能会有所下降  Docker提供了3种持久化数据的方式：  volumes：存于主机文件系统中的某个区域，由Docker管理（/var/lib/docker/volu">
+<meta property="og:locale" content="default">
+<meta property="og:image" content="https://arkingc.github.io/img/in-post/post-docker-storage-persist/types-of-mounts.png">
+<meta property="og:image" content="https://arkingc.github.io/img/in-post/post-docker-storage-persist/volumes-shared-storage.svg">
+<meta property="og:updated_time" content="2018-12-11T03:30:27.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content=" Docker容器数据持久化 ">
+<meta name="twitter:description" content="容器中的数据可以存储在容器层。但是将数据存放在容器层存在以下问题：  数据不是持久化。意思是如果容器删除了，这些数据也就没了 主机上的其它进程不方便访问这些数据 对这些数据的I/O会经过存储驱动，然后到达主机，引入了一层间接层，因此性能会有所下降  Docker提供了3种持久化数据的方式：  volumes：存于主机文件系统中的某个区域，由Docker管理（/var/lib/docker/volu">
+<meta name="twitter:image" content="https://arkingc.github.io/img/in-post/post-docker-storage-persist/types-of-mounts.png">
+
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+
+
+    <link rel="alternate" href="/atom.xml" title="Arking" type="application/atom+xml">
+
+
+
+    <link rel="shortcut icon" href="/favicon.png">
+
+
+
+    <link href="//cdn.bootcss.com/animate.css/3.5.1/animate.min.css" rel="stylesheet">
+
+
+
+    <link href="//cdn.bootcss.com/fancybox/2.1.5/jquery.fancybox.min.css" rel="stylesheet">
+
+
+
+    <script src="//cdn.bootcss.com/pace/1.0.2/pace.min.js"></script>
+    <link href="//cdn.bootcss.com/pace/1.0.2/themes/blue/pace-theme-minimal.css" rel="stylesheet">
+
+
+<link rel="stylesheet" href="/css/style.css">
+
+
+
+<link href="//cdn.bootcss.com/font-awesome/4.6.3/css/font-awesome.min.css" rel="stylesheet">
+
+
+<title> Docker容器数据持久化  | Arking</title>
+
+<script src="//cdn.bootcss.com/jquery/2.2.4/jquery.min.js"></script>
+<script src="//cdn.bootcss.com/clipboard.js/1.5.10/clipboard.min.js"></script>
+
+<script>
+    var yiliaConfig = {
+        fancybox: true,
+        animate: true,
+        isHome: false,
+        isPost: true,
+        isArchive: false,
+        isTag: false,
+        isCategory: false,
+        fancybox_js: "//cdn.bootcss.com/fancybox/2.1.5/jquery.fancybox.min.js",
+        scrollreveal: "//cdn.bootcss.com/scrollReveal.js/3.1.4/scrollreveal.min.js",
+        search: false
+    }
+</script>
+
+
+    <script> yiliaConfig.jquery_ui = [false]; </script>
+
+
+
+    <script> yiliaConfig.rootUrl = "\/";</script>
+
+
+
+
+
+    <script>
+        var _hmt = _hmt || [];
+        (function() {
+            var hm = document.createElement("script");
+            hm.src = "//hm.baidu.com/hm.js?95fde47c8eb7fd8f64bddfc637e05427";
+            var s = document.getElementsByTagName("script")[0]; 
+            s.parentNode.insertBefore(hm, s);
+        })();
+    </script>
+
+
+</head></html>
+<body>
+  <div id="container">
+    <div class="left-col">
+    <div class="overlay"></div>
+<div class="intrude-less">
+    <header id="header" class="inner">
+        <a href="/" class="profilepic">
+            <img src="/img/avatar.png" class="animated zoomIn">
+        </a>
+        <hgroup>
+          <h1 class="header-author"><a href="/">Arking</a></h1>
+        </hgroup>
+
+        
+
+        
+
+
+        
+            <div id="switch-btn" class="switch-btn">
+                <div class="icon">
+                    <div class="icon-ctn">
+                        <div class="icon-wrap icon-house" data-idx="0">
+                            <div class="birdhouse"></div>
+                            <div class="birdhouse_holes"></div>
+                        </div>
+                        <div class="icon-wrap icon-ribbon hide" data-idx="1">
+                            <div class="ribbon"></div>
+                        </div>
+                        
+                        <div class="icon-wrap icon-link hide" data-idx="2">
+                            <div class="loopback_l"></div>
+                            <div class="loopback_r"></div>
+                        </div>
+                        
+                        
+                        <div class="icon-wrap icon-me hide" data-idx="3">
+                            <div class="user"></div>
+                            <div class="shoulder"></div>
+                        </div>
+                        
+                    </div>
+                    
+                </div>
+                <div class="tips-box hide">
+                    <div class="tips-arrow"></div>
+                    <ul class="tips-inner">
+                        <li>菜单</li>
+                        <li>标签</li>
+                        
+                        <li>友情链接</li>
+                        
+                        
+                        <li>关于我</li>
+                        
+                    </ul>
+                </div>
+            </div>
+        
+
+        <div id="switch-area" class="switch-area">
+            <div class="switch-wrap">
+                <section class="switch-part switch-part1">
+                    <nav class="header-menu">
+                        <ul>
+                        
+                            <li><a href="/">主页</a></li>
+                        
+                            <li><a href="/archives/">归档</a></li>
+                        
+                            <li><a href="/tags/">标签</a></li>
+                        
+                            <li><a href="/link/">链接</a></li>
+                        
+                            <li><a href="/about/">关于我</a></li>
+                        
+                        </ul>
+                    </nav>
+                    <nav class="header-nav">
+                        <ul class="social">
+                            
+                                <a class="fa Email" href="mailto:ximingchenhust@foxmail.com" title="Email"></a>
+                            
+                                <a class="fa GitHub" href="https://github.com/arkingc" title="GitHub"></a>
+                            
+                        </ul>
+                    </nav>
+                </section>
+                
+                
+                <section class="switch-part switch-part2">
+                    <div class="widget tagcloud" id="js-tagcloud">
+                        <ul class="tag-list"><li class="tag-list-item"><a class="tag-list-link" href="/tags/c/">c</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/docker/">docker</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/filesystem/">filesystem</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/linux/">linux</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/overlayfs/">overlayfs</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/storage/">storage</a></li></ul>
+                    </div>
+                </section>
+                
+                
+                
+                <section class="switch-part switch-part3">
+                    <div id="js-friends">
+                    
+                      <a class="main-nav-link switch-friends-link" href="http://xiaohuazheng.github.io/">华仔</a>
+                    
+                      <a class="main-nav-link switch-friends-link" href="https://guanjunjian.github.io/">健哥</a>
+                    
+                      <a class="main-nav-link switch-friends-link" href="http://blog.xbblfz.site/">波波</a>
+                    
+                      <a class="main-nav-link switch-friends-link" href="https://starrymoon.github.io/">扛把子</a>
+                    
+                      <a class="main-nav-link switch-friends-link" href="https://hexo.io">Hexo</a>
+                    
+                      <a class="main-nav-link switch-friends-link" href="https://github.com/MOxFIVE/hexo-theme-yelee">yelle</a>
+                    
+                    </div>
+                </section>
+                
+
+                
+                
+                <section class="switch-part switch-part4">
+                
+                    <div id="js-aboutme">专注于后台</div>
+                </section>
+                
+            </div>
+        </div>
+    </header>                
+</div>
+    </div>
+    <div class="mid-col">
+      <nav id="mobile-nav">
+      <div class="overlay">
+          <div class="slider-trigger"></div>
+          <h1 class="header-author js-mobile-header hide"><a href="/" title="回到主页">Arking</a></h1>
+      </div>
+    <div class="intrude-less">
+        <header id="header" class="inner">
+            <a href="/" class="profilepic">
+                <img src="/img/avatar.png" class="animated zoomIn">
+            </a>
+            <hgroup>
+              <h1 class="header-author"><a href="/" title="回到主页">Arking</a></h1>
+            </hgroup>
+            
+            <nav class="header-menu">
+                <ul>
+                
+                    <li><a href="/">主页</a></li>
+                
+                    <li><a href="/archives/">归档</a></li>
+                
+                    <li><a href="/tags/">标签</a></li>
+                
+                    <li><a href="/link/">链接</a></li>
+                
+                    <li><a href="/about/">关于我</a></li>
+                
+                <div class="clearfix"></div>
+                </ul>
+            </nav>
+            <nav class="header-nav">
+                        <ul class="social">
+                            
+                                <a class="fa Email" target="_blank" href="mailto:ximingchenhust@foxmail.com" title="Email"></a>
+                            
+                                <a class="fa GitHub" target="_blank" href="https://github.com/arkingc" title="GitHub"></a>
+                            
+                        </ul>
+            </nav>
+        </header>                
+    </div>
+    <link class="menu-list" tags="标签" friends="友情链接" about="关于我">
+</nav>
+      <div class="body-wrap"><article id="post-2018-12-11-docker-storage-persist" class="article article-type-post" itemscope="" itemprop="blogPost">
+  
+    <div class="article-meta">
+      <a href="/2018/12/11/2018-12-11-docker-storage-persist/" class="article-date">
+      <time datetime="2018-12-11T02:51:00.000Z" itemprop="datePublished">2018-12-11</time>
+</a>
+
+
+    </div>
+  
+  <div class="article-inner">
+    
+      <input type="hidden" class="isFancy">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="article-title" itemprop="name">
+       Docker容器数据持久化 
+    </h1>
+  
+
+      </header>
+      
+      <div class="article-info article-info-post">
+        
+    <div class="article-category tagcloud">
+    <a class="article-category-link" href="/categories/Docker使用/">Docker使用</a>
+    </div>
+
+
+        
+    <div class="article-tag tagcloud">
+        <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/storage/">storage</a></li></ul>
+    </div>
+
+        <div class="clearfix"></div>
+      </div>
+      
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+          
+        <p>容器中的数据可以存储在容器层。但是将数据存放在容器层存在以下问题：</p>
+<ul>
+<li>数据不是持久化。意思是如果容器删除了，这些数据也就没了</li>
+<li>主机上的其它进程不方便访问这些数据</li>
+<li>对这些数据的I/O会经过存储驱动，然后到达主机，引入了一层间接层，因此性能会有所下降</li>
+</ul>
+<p>Docker提供了3种持久化数据的方式：</p>
+<ol>
+<li><strong><em>volumes</em></strong>：存于主机文件系统中的某个区域，由Docker管理（<code>/var/lib/docker/volumes/</code> on linux）。非Docker进程不应该修改这些数据。<strong>卷是Docker中持久化数据的最好方式</strong></li>
+<li><strong><em>bind mount</em></strong>：存于主机文件系统中的任意位置。非Docker进程可以修改这些数据</li>
+<li><strong><em>tmpfs mount</em></strong>（Linux中）：存于内存中（注意，并不是持久化到磁盘）。在容器的生命周期中，它能被容器用来存放非持久化的状态或敏感信息</li>
+</ol>
+<a id="more"></a>
+<div align="center"> <img src="/img/in-post/post-docker-storage-persist/types-of-mounts.png" width="40%" height="40%"> </div>
+
+<p><br></p>
+<h2 id="volumes"><a href="#volumes" class="headerlink" title="volumes"></a>volumes</h2><p>如果没有显式创建，一个卷会在最开始挂载时被创建。当容器停止时，卷仍然存在。多个容器可以通过read-write或read-only的方式使用同一个卷。只有在显式删除时，卷才会被删除。<strong>如果将一个空卷挂载到容器中一个存有文件或目录的目录中，这些文件或目录会被拷贝到空卷中；如果将一个非空卷挂载到容器中一个存有文件或目录的目录中，这些文件或目录会被隐藏</strong></p>
+<h3 id="使用"><a href="#使用" class="headerlink" title="使用"></a>使用</h3><ul>
+<li>创建：<code>docker volume create</code></li>
+<li>删除某个卷：<code>docker volume rm 卷名</code></li>
+<li>删除所有未使用的卷：<code>docker volume prune</code></li>
+<li>列出所有卷：<code>docker volume ls</code></li>
+<li>查看某个卷的信息：<code>docker volume inspect 卷名</code></li>
+<li>挂载到容器：<code>-v</code>或<code>--volume</code>。如果是Docker17.06或更高：推荐使用<code>--mount</code>。（同 <strong><em>bind mount</em></strong>）<ul>
+<li><code>-v</code>或<code>--volume</code>：由3个域组成，<code>&#39;:&#39;</code>分隔<ul>
+<li>第一个域：对于命名卷，为卷名；匿名卷，则忽略，此时会创建匿名卷</li>
+<li>第二个域：容器中的挂载点</li>
+<li>第三个域：可选参数，由<code>&#39;,&#39;</code>隔开，如<code>ro</code></li>
+</ul>
+</li>
+<li><code>--mount</code>：由多个<code>&#39;,&#39;</code>隔开的键值对&lt;key>=&lt;value>组成：<ul>
+<li>挂载类型：key为<code>type</code>，value为<code>bind</code>、<code>volume</code>或<code>tmpfs</code></li>
+<li>挂载源：key为<code>source</code>或<code>src</code>，对于命名卷，value为卷名，对于匿名卷，则忽略</li>
+<li>容器中的挂载点：key为<code>destination</code>、<code>dst</code>或<code>target</code>，value为容器中的路径</li>
+<li>读写类型：value为<code>readonly</code>，没有key</li>
+<li>读写类型：value为<code>readonly</code>，没有key</li>
+<li>volume-opt选项，可以出现多次。比如<code>volume-driver=local,volume-opt=type=nfs,...</code></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<blockquote>
+<p>当使用<code>docker service create</code> 启动Docker服务时，只支持<code>--mount</code>，不支持<code>-v</code>和<code>--volume</code>。并且每个服务容器使用它们各自的本地卷，因此如果使用本地(local)卷驱动，容器无法通过卷共享数据，但是一些卷驱动支持共享存储。Docker for AWS和Doocker for Azure都使用Cloundstor plugin支持持久存储</p>
+</blockquote>
+<h3 id="场景"><a href="#场景" class="headerlink" title="场景"></a>场景</h3><ul>
+<li>多个运行容器间共享数据</li>
+<li>当Docker主机不确保具有给定的目录或文件时。卷可以将容器运行时与Docker主机的配置解耦合</li>
+<li>备份、恢复、或将数据从一个Docker主机迁移到另一个Docker主机时</li>
+</ul>
+<p><br></p>
+<h2 id="bind-mount"><a href="#bind-mount" class="headerlink" title="bind mount"></a>bind mount</h2><p>主机中的文件或目录通过<strong>全路径</strong>被引用。在使用绑定挂载时，这些目录或文件不一定要已经存在。<strong>如果使用这种方式将一个目录挂载到容器中一个存有文件或目录的目录中，这些文件或目录会被隐藏；如果主机中的文件或目录不存在，当使用<code>--mount</code>挂载时，Docker会报错，当使用<code>-v</code>或<code>--volume</code>时，会在主机上创建目录</strong></p>
+<h3 id="使用-1"><a href="#使用-1" class="headerlink" title="使用"></a>使用</h3><ul>
+<li>挂载到容器：<code>-v</code>或<code>--volume</code>。如果是Docker17.06或更高：推荐使用<code>--mount</code>。（同 <strong><em>volumes</em></strong>）<ul>
+<li><code>-v</code>或<code>--volume</code>：由3个域组成，<code>&#39;:&#39;</code>分隔<ul>
+<li>第一个域：主机上文件或目录的路径</li>
+<li>第二个域：容器中的挂载点</li>
+<li>第三个域：可选参数，由<code>&#39;,&#39;</code>隔开，如<code>ro</code>、<code>consistent</code>、<code>delegated</code>、<code>cached</code>、<code>z</code>和<code>Z</code></li>
+</ul>
+</li>
+<li><code>--mount</code>：由多个<code>&#39;,&#39;</code>隔开的键值对&lt;key>=&lt;value>组成：<ul>
+<li>挂载类型：key为<code>type</code>，value为<code>bind</code>、<code>volume</code>或<code>tmpfs</code></li>
+<li>挂载源：key为<code>source</code>或<code>src</code>，value为主机中文件或目录的路径</li>
+<li>容器中的挂载点：key为<code>destination</code>、<code>dst</code>或<code>target</code>，value为容器中的路径</li>
+<li>读写类型：value为<code>readonly</code>，没有key</li>
+<li>bind-propagation选项：key为<code>bind-propagation</code>，<code>value</code>为<code>rprivate</code>、<code>private</code>、<code>rshared</code>、<code>shared</code>、<code>rslave</code>或<code>slave</code></li>
+<li>一致性选项：value为<code>consistent</code>、<code>delegated</code>、<code>cached</code>。这个选项仅仅适用于Docker for Mac</li>
+<li><code>--mount</code>不支持<code>z</code>和<code>Z</code>（这个不同于<code>-v</code>和<code>--volume</code>）</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<h3 id="场景-1"><a href="#场景-1" class="headerlink" title="场景"></a>场景</h3><blockquote>
+<p>大体上来说，只要可能，最好使用<strong><em>volumes</em></strong></p>
+</blockquote>
+<ul>
+<li>主机与容器共享配置文件（Docker默认情况下通过这种方式为容器提供DNS解析，通过将<code>/etc/resolv.conf</code>挂载到容器中）</li>
+<li>共享源代码或build artifacts（比如将Maven的<code>target/</code>目录挂载到容器中，每次在Docker主机中build Maven工程时，容器能够访问到那些rebuilt artifacts）</li>
+<li>当Docker主机中的文件或目录结构和容器需要的一致时</li>
+</ul>
+<h3 id="bind-propagation"><a href="#bind-propagation" class="headerlink" title="bind propagation"></a>bind propagation</h3><blockquote>
+<p>对于<strong><em>bind mount</em></strong>和<strong><em>volumes</em></strong>，默认都是<code>rprivate</code>。只有在使用<strong><em>bind mount</em></strong>时可配置，且必须在linux下。bind propagation是个超前主题，对于大多数用户来说，并不需要配置</p>
+</blockquote>
+<p>对于一个挂载点<code>/mnt</code>，假设它同时也被挂载到<code>/tmp</code>。bind propagation控制 whether a mount on <code>/tmp/a</code> would also be available on <code>/mnt/a</code></p>
+<table>
+<thead>
+<tr>
+<th style="text-align:center">Propagation setting</th>
+<th style="text-align:center">Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:center"><code>shared</code></td>
+<td style="text-align:center">原挂载点(上面的<code>/mnt</code>)中的所有子挂载点对于副本挂载点(上面的<code>/tmp</code>)可见，副本挂载点中的所有子挂载点对于原挂载点也可见</td>
+</tr>
+<tr>
+<td style="text-align:center"><code>slave</code></td>
+<td style="text-align:center">和<code>shared</code>相似，但是只有1个方向：原挂载点中的所有子挂载点对于副本挂载点可见。反过来不行</td>
+</tr>
+<tr>
+<td style="text-align:center"><code>private</code></td>
+<td style="text-align:center">原挂载点和副本挂载点中的子挂载点对只有自己可见</td>
+</tr>
+<tr>
+<td style="text-align:center"><code>rshared</code></td>
+<td style="text-align:center">和<code>shared</code>相同，but the propagation also extends to and from mount points nested within any of the original or replica mount points</td>
+</tr>
+<tr>
+<td style="text-align:center"><code>rslave</code></td>
+<td style="text-align:center">和<code>slave</code>相同，but the propagation also extends to and from mount points nested within any of the original or replica mount points</td>
+</tr>
+<tr>
+<td style="text-align:center"><code>rprivate</code></td>
+<td style="text-align:center">默认值。和<code>private</code>相同</td>
+</tr>
+</tbody>
+</table>
+<p>在设置bind propagation之前，主机文件系统需要支持bind propagation</p>
+<p>下面的例子将主机中的<code>target/</code>挂载到容器中2次：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">docker run -d \</span><br><span class="line">  -it \</span><br><span class="line">  --name devtest \</span><br><span class="line">  --mount <span class="built_in">type</span>=<span class="built_in">bind</span>,<span class="built_in">source</span>=<span class="string">"<span class="variable">$(pwd)</span>"</span>/target,target=/app \</span><br><span class="line">  --mount <span class="built_in">type</span>=<span class="built_in">bind</span>,<span class="built_in">source</span>=<span class="string">"<span class="variable">$(pwd)</span>"</span>/target,target=/app2,<span class="built_in">readonly</span>,<span class="built_in">bind</span>-propagation=rslave \</span><br><span class="line">  nginx:latest</span><br></pre></td></tr></table></figure>
+<p>此时如果创建<code>/app/foo/</code>，<code>/app2/foo</code>也会存在</p>
+<h3 id="selinux-label"><a href="#selinux-label" class="headerlink" title="selinux label"></a>selinux label</h3><p>你能添加<code>z</code>或<code>Z</code>选项来修改挂载到容器中的主机文件或目录的selinux label：</p>
+<ul>
+<li><code>z</code>选项指明<strong><em>bind mount</em></strong>的内容在多个容器间是共享的</li>
+<li><code>Z</code>选项指明<strong><em>bind mount</em></strong>的内容是私有不共享的</li>
+</ul>
+<p>要特别小心的使用这两个选项。”Bind-mounting a system directory such as <code>/home</code> or <code>/usr</code> with the <code>Z</code> option renders your host machine inoperable and you may need to relabel the host machine files by hand”</p>
+<p><br></p>
+<h2 id="tmpfs-mount"><a href="#tmpfs-mount" class="headerlink" title="tmpfs mount"></a>tmpfs mount</h2><blockquote>
+<p>只在linux中支持</p>
+</blockquote>
+<p>相对于<strong><em>volumes</em></strong>和<strong><em>bind mount</em></strong>，<strong><em>tmpfs mount</em></strong>是临时的，只在主机内存中持久化。当容器停止，<strong><em>tmpfs mount</em></strong>会被移除。对于临时存放敏感文件很有用</p>
+<p>不同于<strong><em>volumes</em></strong>和<strong><em>bind mount</em></strong>，多个容器无法共享<strong><em>tmpfs mount</em></strong></p>
+<h3 id="使用-2"><a href="#使用-2" class="headerlink" title="使用"></a>使用</h3><ul>
+<li>挂载到容器：<code>--tmpfs</code>。如果是Docker17.06或更高：推荐使用<code>--mount</code><ul>
+<li><code>--tmpfs</code>：直接指定容器中的挂载点。不允许指定任何配置选项</li>
+<li><code>--mount</code>：由多个<code>&#39;,&#39;</code>隔开的键值对&lt;key>=&lt;value>组成：<ul>
+<li>挂载类型：key为<code>type</code>，value为<code>bind</code>、<code>volume</code>或<code>tmpfs</code></li>
+<li>容器中的挂载点：key为<code>destination</code>、<code>dst</code>或<code>target</code>，value为容器中的路径</li>
+<li><code>tmpfs-size</code>和<code>tmpfs-mode</code>选项</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th style="text-align:center">Option</th>
+<th style="text-align:center">Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:center"><code>tmpfs-size</code></td>
+<td style="text-align:center"><strong><em>tmpfs mount</em></strong>的大小，默认值为不受限制</td>
+</tr>
+<tr>
+<td style="text-align:center"><code>tmpfs-mode</code></td>
+<td style="text-align:center">八进制的文件模式。比如，<code>700</code>或<code>0700</code>。默认为<code>1777</code>或world-writable</td>
+</tr>
+</tbody>
+</table>
+<h3 id="场景-2"><a href="#场景-2" class="headerlink" title="场景"></a>场景</h3><ul>
+<li>最好的使用场景是你既不想将数据存于主机，又不想存于容器中时。这可以是出于安全的考虑，或当应用需要写大量非持久性的状态数据时为了保护容器的性能</li>
+</ul>
+<p><br></p>
+<h2 id="volume-drivers"><a href="#volume-drivers" class="headerlink" title="volume drivers"></a>volume drivers</h2><blockquote>
+<p>机器间共享数据</p>
+</blockquote>
+<p>当构建错误容忍应用时，可能需要配置同一个服务的多个副本来访问相同的文件：</p>
+<div align="center"> <img src="/img/in-post/post-docker-storage-persist/volumes-shared-storage.svg" width="70%" height="70%"> </div>
+
+<p>有多种方法来实现这个目的：</p>
+<ul>
+<li>为应用添加逻辑，将文件存储到一个云对象存储系统（如Amazon S3）中</li>
+<li>使用一个支持将文件写入外部存储系统（如NFS或Amazon S3）的driver来创建卷</li>
+</ul>
+<p><strong><em>volume drivers</em></strong>可以将底层存储系统从应用逻辑中抽象出来。比如，如果你的服务使用一个具有NFS driver的卷，你能更新你的服务使用不同的driver，作为在云中存储数据的示例，而不更改应用程序逻辑</p>
+<h3 id="使用-3"><a href="#使用-3" class="headerlink" title="使用"></a>使用</h3><p>在使用<code>docker volume create</code>或驱动容器创建匿名卷时，可以指定一个<strong><em>volume drivers</em></strong>。下面的例子使用<code>vieux/sshfs</code>作为<strong><em>volume drivers</em></strong></p>
+<blockquote>
+<p>假设有2个节点，第一个节点是Docker主机，它能SSH到第二个节点</p>
+</blockquote>
+<ol>
+<li><strong>在Docker主机中，安装<code>vieux/sshfs</code>插件</strong></li>
+</ol>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">docker plugin install --grant-all-permissions vieux/sshfs</span><br></pre></td></tr></table></figure>
+<ol start="2">
+<li><strong>使用卷驱动创建卷</strong></li>
+</ol>
+<p>1）创建命名卷</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">docker volume create --driver vieux/sshfs \</span><br><span class="line">  -o sshcmd=<span class="built_in">test</span>@node2:/home/<span class="built_in">test</span> \</span><br><span class="line">  -o password=testpassword \</span><br><span class="line">  sshvolume</span><br></pre></td></tr></table></figure>
+<p>2）启动容器时使用卷驱动创建匿名卷</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">docker run -d \</span><br><span class="line">  --name sshfs-container \</span><br><span class="line">  --volume-driver vieux/sshfs \</span><br><span class="line">  --mount src=sshvolume,target=/app,volume-opt=sshcmd=<span class="built_in">test</span>@node2:/home/<span class="built_in">test</span>,volume-opt=password=testpassword \</span><br><span class="line">  nginx:latest</span><br></pre></td></tr></table></figure>
+<ol start="3">
+<li><strong>备份、恢复、迁移数据卷</strong></li>
+</ol>
+<p>1）备份一个容器</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">docker run --rm --volumes-from dbstore -v $(<span class="built_in">pwd</span>):/backup ubuntu tar cvf /backup/backup.tar /dbdata</span><br></pre></td></tr></table></figure>
+<ul>
+<li>启动一个新容器，挂载<code>dbstore</code>容器中的卷</li>
+<li>挂载一个本地主机目录到容器<code>/backup</code></li>
+<li>使用<code>tar</code>将<code>dbdata</code>卷中的数据打包成<code>backup.tar</code></li>
+</ul>
+<p>2）用备份恢复容器</p>
+<p>使用刚刚创建的备份来恢复容器：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">docker run -v /dbdata --name dbstore2 ubuntu /bin/bash</span><br></pre></td></tr></table></figure>
+<p>然后，在新创建的容器的卷中使用<code>tar</code>解包备份的数据：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">docker run --rm --volumes-from dbstore2 -v $(<span class="built_in">pwd</span>):/backup ubuntu bash -c <span class="string">"cd /dbdata &amp;&amp; tar xvf /backup/backup.tar --strip 1"</span></span><br></pre></td></tr></table></figure>
+
+      
+    </div>
+    
+  </div>
+  
+    
+    <div class="copyright">
+        <p><span>本文标题:</span><a href="/2018/12/11/2018-12-11-docker-storage-persist/"> Docker容器数据持久化 </a></p>
+        <p><span>文章作者:</span><a href="/" title="回到主页">Arking</a></p>
+        <p><span>发布时间:</span>2018-12-11, 10:51:00</p>
+        <p><span>最后更新:</span>2018-12-11, 11:30:27</p>
+        <p>
+            <span>原始链接:</span><a class="post-url" href="/2018/12/11/2018-12-11-docker-storage-persist/" title=" Docker容器数据持久化 ">https://arkingc.github.io/2018/12/11/2018-12-11-docker-storage-persist/</a>
+            <span class="copy-path" data-clipboard-text="原文: https://arkingc.github.io/2018/12/11/2018-12-11-docker-storage-persist/　　作者: Arking" title="点击复制文章链接"><i class="fa fa-clipboard"></i></span>
+            <script> var clipboard = new Clipboard('.copy-path'); </script>
+        </p>
+        <p>
+            <span>许可协议:</span><i class="fa fa-creative-commons"></i> <a rel="license" href="http://creativecommons.org/licenses/by-nc-sa/4.0/" title="CC BY-NC-SA 4.0 International" target="_blank">"署名-非商用-相同方式共享 4.0"</a> 转载请保留原文链接及作者。
+        </p>
+    </div>
+
+
+
+    <nav id="article-nav">
+        
+        
+            <div id="article-nav-older" class="article-nav-title">
+                <a href="/2018/12/08/2018-12-08-linux-benchmark-fxmark/">
+                    使用FXMARK测试文件系统的多核可扩展性
+                </a>
+            </div>
+        
+    </nav>
+
+  
+</article>
+
+    <div id="toc" class="toc-article">
+        <strong class="toc-title">文章目录</strong>
+        
+            <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#volumes"><span class="toc-number">1.</span> <span class="toc-text">volumes</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#使用"><span class="toc-number">1.1.</span> <span class="toc-text">使用</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#场景"><span class="toc-number">1.2.</span> <span class="toc-text">场景</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#bind-mount"><span class="toc-number">2.</span> <span class="toc-text">bind mount</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#使用-1"><span class="toc-number">2.1.</span> <span class="toc-text">使用</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#场景-1"><span class="toc-number">2.2.</span> <span class="toc-text">场景</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#bind-propagation"><span class="toc-number">2.3.</span> <span class="toc-text">bind propagation</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#selinux-label"><span class="toc-number">2.4.</span> <span class="toc-text">selinux label</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#tmpfs-mount"><span class="toc-number">3.</span> <span class="toc-text">tmpfs mount</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#使用-2"><span class="toc-number">3.1.</span> <span class="toc-text">使用</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#场景-2"><span class="toc-number">3.2.</span> <span class="toc-text">场景</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#volume-drivers"><span class="toc-number">4.</span> <span class="toc-text">volume drivers</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#使用-3"><span class="toc-number">4.1.</span> <span class="toc-text">使用</span></a></li></ol></li></ol>
+        
+    </div>
+    <style>
+        .left-col .switch-btn,
+        .left-col .switch-area {
+            display: none;
+        }
+        .toc-level-3 i,
+        .toc-level-3 ol {
+            display: none !important;
+        }
+    </style>
+
+    <input type="button" id="tocButton" value="隐藏目录" title="点击按钮隐藏或者显示文章目录">
+
+    <script>
+        yiliaConfig.toc = ["隐藏目录", "显示目录", !!"false"];
+    </script>
+
+
+
+    
+<div class="share">
+    
+        <div class="bdsharebuttonbox">
+            <a href="#" class="fa fa-twitter bds_twi" data-cmd="twi" title="分享到推特"></a>
+            <a href="#" class="fa fa-weibo bds_tsina" data-cmd="tsina" title="分享到新浪微博"></a>
+            <a href="#" class="fa fa-qq bds_sqq" data-cmd="sqq" title="分享给 QQ 好友"></a>
+            <a href="#" class="fa fa-files-o bds_copy" data-cmd="copy" title="复制网址"></a>
+            <a href="#" class="fa fa fa-envelope-o bds_mail" data-cmd="mail" title="通过邮件分享"></a>
+            <a href="#" class="fa fa-weixin bds_weixin" data-cmd="weixin" title="生成文章二维码"></a>
+            <a href="#" class="fa fa-share-alt bds_more" data-cmd="more"></a>
+        </div>
+        <script>
+            window._bd_share_config={
+                "common":{"bdSnsKey":{},"bdText":" Docker容器数据持久化 　| Arking　","bdMini":"2","bdMiniList":false,"bdPic":"","bdStyle":"0","bdSize":"24"},"share":{}};with(document)0[(getElementsByTagName('head')[0]||body).appendChild(createElement('script')).src='http://bdimg.share.baidu.com/static/api/js/share.js?v=89860593.js?cdnversion='+~(-new Date()/36e5)];
+        </script>
+    
+
+    
+</div>
+
+
+
+
+
+
+
+    
+
+
+
+
+    <div class="scroll" id="post-nav-button">
+        
+            <a href="/" title="回到主页"><i class="fa fa-home"></i></a>
+        
+
+        <a title="文章列表"><i class="fa fa-bars"></i><i class="fa fa-times"></i></a>
+
+        
+            <a href="/2018/12/08/2018-12-08-linux-benchmark-fxmark/" title="下一篇: 使用FXMARK测试文件系统的多核可扩展性">
+                <i class="fa fa-angle-right"></i>
+            </a>
+        
+    </div>
+
+    <ul class="post-list"><li class="post-list-item"><a class="post-list-link" href="/2018/12/11/2018-12-11-docker-storage-persist/"> Docker容器数据持久化 </a></li><li class="post-list-item"><a class="post-list-link" href="/2018/12/08/2018-12-08-linux-benchmark-fxmark/">使用FXMARK测试文件系统的多核可扩展性</a></li><li class="post-list-item"><a class="post-list-link" href="/2018/09/05/2018-09-05-linux-kernel/">Ubuntu下内核与内核模块的编译过程</a></li><li class="post-list-item"><a class="post-list-link" href="/2018/01/19/2018-01-19-docker-imagestore/"> Docker源码分析—镜像存储 </a></li><li class="post-list-item"><a class="post-list-link" href="/2018/01/15/2018-01-15-docker-storage-overlay2/"> Docker源码分析—存储驱动 </a></li><li class="post-list-item"><a class="post-list-link" href="/2018/01/14/2018-01-14-docker-layerstore/"> Docker源码分析—层存储 </a></li><li class="post-list-item"><a class="post-list-link" href="/2018/01/12/2018-01-10-c-stack_frame/"> C函数栈帧 </a></li><li class="post-list-item"><a class="post-list-link" href="/2017/12/26/2017-12-26-linux-code-overlayfs-read_write/">内核OverlayFS—文件读写</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/12/22/2017-12-22-linux-code-overlayfs-create_delete/">内核OverlayFS—创建与删除文件</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/11/30/2017-11-30-linux-du/"> Linux查看目录大小</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/11/10/2017-11-10-linux-code-overlayfs-dir-op1/">内核OverlayFS—目录搜索</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/10/12/2017-10-12-linux-code-overlayfs-mnt/">内核OverlayFS—注册与挂载</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/09/20/2017-09-20-linux-code-overlayfs-layerinfo/">内核OverlayFS—文件层次信息</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/08/18/2017-08-18-linux-code-vfs/">Linux虚拟文件系统(VFS)</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/05/05/2017-05-05-docker-filesystem-overlay/"> Docker存储驱动—Overlay/Overlay2「译」</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/04/13/2017-04-13-docker-filesystem-aufs/"> Docker存储驱动—Aufs </a></li><li class="post-list-item"><a class="post-list-link" href="/2017/04/09/2017-04-09-linux-uuid/"> Linux存储设备的UUID</a></li></ul>
+
+
+
+
+    <script>
+        
+    </script>
+</div>
+      <footer id="footer">
+    <div class="outer">
+        <div id="footer-info">
+            <div class="footer-left">
+                <i class="fa fa-copyright"></i> 
+                2017-2018 Arking
+            </div>
+            <div class="footer-right">
+                <a href="http://hexo.io/" target="_blank" title="快速、简洁且高效的博客框架">Hexo</a>  Theme <a href="https://github.com/MOxFIVE/hexo-theme-yelee" target="_blank" title="简而不减 Hexo 双栏博客主题  v3.5">Yelee</a> by MOxFIVE <i class="fa fa-heart animated infinite pulse"></i>
+            </div>
+        </div>
+        
+            <div class="visit">
+                
+                    <span id="busuanzi_container_site_pv" style="display:none">
+                        <span id="site-visit" title="本站到访数"><i class="fa fa-user" aria-hidden="true"></i><span id="busuanzi_value_site_uv"></span>
+                        </span>
+                    </span>
+                
+                
+                    <span>| </span>
+                
+                
+                    <span id="busuanzi_container_page_pv" style="display:none">
+                        <span id="page-visit" title="本页阅读量"><i class="fa fa-eye animated infinite pulse" aria-hidden="true"></i><span id="busuanzi_value_page_pv"></span>
+                        </span>
+                    </span>
+                
+            </div>
+        
+    </div>
+</footer>
+
+<script async src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js">
+</script>
+    </div>
+    
+<script data-main="/js/main.js" src="//cdn.bootcss.com/require.js/2.2.0/require.min.js"></script>
+
+
+
+<!-- Google Analytics -->
+<script type="text/javascript">
+(function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+(i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+})(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+ga('create', 'UA-130420706-1', 'auto');
+ga('send', 'pageview');
+
+</script>
+<!-- End Google Analytics -->
+
+
+
+<div class="scroll" id="scroll">
+    <a href="#" title="返回顶部"><i class="fa fa-arrow-up"></i></a>
+    <a href="#comments" onclick="load$hide();" title="查看评论"><i class="fa fa-comments-o"></i></a>
+    <a href="#footer" title="转到底部"><i class="fa fa-arrow-down"></i></a>
+</div>
+<script>
+    // Open in New Window
+    
+        var oOpenInNew = {
+            
+            
+            
+            
+            
+            
+             archives: ".archive-article-title", 
+             miniArchives: "a.post-list-link", 
+            
+             friends: "#js-friends a", 
+             socail: ".social a" 
+        }
+        for (var x in oOpenInNew) {
+            $(oOpenInNew[x]).attr("target", "_blank");
+        }
+    
+</script>
+
+<script async src="https://dn-lbstatics.qbox.me/busuanzi/2.3/busuanzi.pure.mini.js">
+</script>
+  </div>
+</body>
+</html>
