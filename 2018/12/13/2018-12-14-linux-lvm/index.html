@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html>
+<head><meta name="generator" content="Hexo 3.8.0">
+
+    <!--[if lt IE 9]>
+        <style>body {display: none; background: none !important} </style>
+        <meta http-equiv="Refresh" Content="0; url=//outdatedbrowser.com/" />
+    <![endif]-->
+
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge, chrome=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="format-detection" content="telephone=no">
+<meta name="author" content="Arking">
+
+
+
+<meta name="description" content="Device Mapper 是 Linux2.6 内核中支持逻辑卷管理的通用设备映射机制，它为实现用于存储资源管理的块设备驱动提供了一个高度模块化的内核架构">
+<meta name="keywords" content="linux,storage">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Linux Device Mapper">
+<meta property="og:url" content="https://arkingc.github.io/2018/12/13/2018-12-14-linux-lvm/index.html">
+<meta property="og:site_name" content="Arking">
+<meta property="og:description" content="Device Mapper 是 Linux2.6 内核中支持逻辑卷管理的通用设备映射机制，它为实现用于存储资源管理的块设备驱动提供了一个高度模块化的内核架构">
+<meta property="og:locale" content="default">
+<meta property="og:image" content="https://arkingc.github.io/img/in-post/post-linux-lvm/architecture.png">
+<meta property="og:image" content="https://arkingc.github.io/img/in-post/post-linux-lvm/dm.png">
+<meta property="og:image" content="https://arkingc.github.io/img/in-post/post-linux-lvm/struct.png">
+<meta property="og:image" content="https://arkingc.github.io/img/in-post/post-linux-lvm/stack.png">
+<meta property="og:image" content="https://arkingc.github.io/img/in-post/post-linux-lvm/example.png">
+<meta property="og:image" content="https://arkingc.github.io/img/in-post/post-linux-lvm/relation.png">
+<meta property="og:image" content="https://arkingc.github.io/img/in-post/post-linux-lvm/step.png">
+<meta property="og:image" content="https://arkingc.github.io/img/in-post/post-linux-lvm/snapshot.png">
+<meta property="og:updated_time" content="2018-12-13T13:48:33.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Linux Device Mapper">
+<meta name="twitter:description" content="Device Mapper 是 Linux2.6 内核中支持逻辑卷管理的通用设备映射机制，它为实现用于存储资源管理的块设备驱动提供了一个高度模块化的内核架构">
+<meta name="twitter:image" content="https://arkingc.github.io/img/in-post/post-linux-lvm/architecture.png">
+
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+
+
+    <link rel="alternate" href="/atom.xml" title="Arking" type="application/atom+xml">
+
+
+
+    <link rel="shortcut icon" href="/favicon.png">
+
+
+
+    <link href="//cdn.bootcss.com/animate.css/3.5.1/animate.min.css" rel="stylesheet">
+
+
+
+    <link href="//cdn.bootcss.com/fancybox/2.1.5/jquery.fancybox.min.css" rel="stylesheet">
+
+
+
+    <script src="//cdn.bootcss.com/pace/1.0.2/pace.min.js"></script>
+    <link href="//cdn.bootcss.com/pace/1.0.2/themes/blue/pace-theme-minimal.css" rel="stylesheet">
+
+
+<link rel="stylesheet" href="/css/style.css">
+
+
+
+<link href="//cdn.bootcss.com/font-awesome/4.6.3/css/font-awesome.min.css" rel="stylesheet">
+
+
+<title>Linux Device Mapper | Arking</title>
+
+<script src="//cdn.bootcss.com/jquery/2.2.4/jquery.min.js"></script>
+<script src="//cdn.bootcss.com/clipboard.js/1.5.10/clipboard.min.js"></script>
+
+<script>
+    var yiliaConfig = {
+        fancybox: true,
+        animate: true,
+        isHome: false,
+        isPost: true,
+        isArchive: false,
+        isTag: false,
+        isCategory: false,
+        fancybox_js: "//cdn.bootcss.com/fancybox/2.1.5/jquery.fancybox.min.js",
+        scrollreveal: "//cdn.bootcss.com/scrollReveal.js/3.1.4/scrollreveal.min.js",
+        search: false
+    }
+</script>
+
+
+    <script> yiliaConfig.jquery_ui = [false]; </script>
+
+
+
+    <script> yiliaConfig.rootUrl = "\/";</script>
+
+
+
+
+
+    <script>
+        var _hmt = _hmt || [];
+        (function() {
+            var hm = document.createElement("script");
+            hm.src = "//hm.baidu.com/hm.js?95fde47c8eb7fd8f64bddfc637e05427";
+            var s = document.getElementsByTagName("script")[0]; 
+            s.parentNode.insertBefore(hm, s);
+        })();
+    </script>
+
+
+</head></html>
+<body>
+  <div id="container">
+    <div class="left-col">
+    <div class="overlay"></div>
+<div class="intrude-less">
+    <header id="header" class="inner">
+        <a href="/" class="profilepic">
+            <img src="/img/avatar.png" class="animated zoomIn">
+        </a>
+        <hgroup>
+          <h1 class="header-author"><a href="/">Arking</a></h1>
+        </hgroup>
+
+        
+
+        
+
+
+        
+            <div id="switch-btn" class="switch-btn">
+                <div class="icon">
+                    <div class="icon-ctn">
+                        <div class="icon-wrap icon-house" data-idx="0">
+                            <div class="birdhouse"></div>
+                            <div class="birdhouse_holes"></div>
+                        </div>
+                        <div class="icon-wrap icon-ribbon hide" data-idx="1">
+                            <div class="ribbon"></div>
+                        </div>
+                        
+                        <div class="icon-wrap icon-link hide" data-idx="2">
+                            <div class="loopback_l"></div>
+                            <div class="loopback_r"></div>
+                        </div>
+                        
+                        
+                        <div class="icon-wrap icon-me hide" data-idx="3">
+                            <div class="user"></div>
+                            <div class="shoulder"></div>
+                        </div>
+                        
+                    </div>
+                    
+                </div>
+                <div class="tips-box hide">
+                    <div class="tips-arrow"></div>
+                    <ul class="tips-inner">
+                        <li>菜单</li>
+                        <li>标签</li>
+                        
+                        <li>友情链接</li>
+                        
+                        
+                        <li>关于我</li>
+                        
+                    </ul>
+                </div>
+            </div>
+        
+
+        <div id="switch-area" class="switch-area">
+            <div class="switch-wrap">
+                <section class="switch-part switch-part1">
+                    <nav class="header-menu">
+                        <ul>
+                        
+                            <li><a href="/">主页</a></li>
+                        
+                            <li><a href="/archives/">归档</a></li>
+                        
+                            <li><a href="/tags/">标签</a></li>
+                        
+                            <li><a href="/link/">链接</a></li>
+                        
+                            <li><a href="/about/">关于我</a></li>
+                        
+                        </ul>
+                    </nav>
+                    <nav class="header-nav">
+                        <ul class="social">
+                            
+                                <a class="fa Email" href="mailto:ximingchenhust@foxmail.com" title="Email"></a>
+                            
+                                <a class="fa GitHub" href="https://github.com/arkingc" title="GitHub"></a>
+                            
+                        </ul>
+                    </nav>
+                </section>
+                
+                
+                <section class="switch-part switch-part2">
+                    <div class="widget tagcloud" id="js-tagcloud">
+                        <ul class="tag-list"><li class="tag-list-item"><a class="tag-list-link" href="/tags/c/">c</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/docker/">docker</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/filesystem/">filesystem</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/linux/">linux</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/overlayfs/">overlayfs</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/storage/">storage</a></li></ul>
+                    </div>
+                </section>
+                
+                
+                
+                <section class="switch-part switch-part3">
+                    <div id="js-friends">
+                    
+                      <a class="main-nav-link switch-friends-link" href="http://xiaohuazheng.github.io/">华仔</a>
+                    
+                      <a class="main-nav-link switch-friends-link" href="https://guanjunjian.github.io/">健哥</a>
+                    
+                      <a class="main-nav-link switch-friends-link" href="http://blog.xbblfz.site/">波波</a>
+                    
+                      <a class="main-nav-link switch-friends-link" href="https://starrymoon.github.io/">扛把子</a>
+                    
+                      <a class="main-nav-link switch-friends-link" href="https://hexo.io">Hexo</a>
+                    
+                      <a class="main-nav-link switch-friends-link" href="https://github.com/MOxFIVE/hexo-theme-yelee">yelle</a>
+                    
+                    </div>
+                </section>
+                
+
+                
+                
+                <section class="switch-part switch-part4">
+                
+                    <div id="js-aboutme">专注于后台</div>
+                </section>
+                
+            </div>
+        </div>
+    </header>                
+</div>
+    </div>
+    <div class="mid-col">
+      <nav id="mobile-nav">
+      <div class="overlay">
+          <div class="slider-trigger"></div>
+          <h1 class="header-author js-mobile-header hide"><a href="/" title="回到主页">Arking</a></h1>
+      </div>
+    <div class="intrude-less">
+        <header id="header" class="inner">
+            <a href="/" class="profilepic">
+                <img src="/img/avatar.png" class="animated zoomIn">
+            </a>
+            <hgroup>
+              <h1 class="header-author"><a href="/" title="回到主页">Arking</a></h1>
+            </hgroup>
+            
+            <nav class="header-menu">
+                <ul>
+                
+                    <li><a href="/">主页</a></li>
+                
+                    <li><a href="/archives/">归档</a></li>
+                
+                    <li><a href="/tags/">标签</a></li>
+                
+                    <li><a href="/link/">链接</a></li>
+                
+                    <li><a href="/about/">关于我</a></li>
+                
+                <div class="clearfix"></div>
+                </ul>
+            </nav>
+            <nav class="header-nav">
+                        <ul class="social">
+                            
+                                <a class="fa Email" target="_blank" href="mailto:ximingchenhust@foxmail.com" title="Email"></a>
+                            
+                                <a class="fa GitHub" target="_blank" href="https://github.com/arkingc" title="GitHub"></a>
+                            
+                        </ul>
+            </nav>
+        </header>                
+    </div>
+    <link class="menu-list" tags="标签" friends="友情链接" about="关于我">
+</nav>
+      <div class="body-wrap"><article id="post-2018-12-14-linux-lvm" class="article article-type-post" itemscope="" itemprop="blogPost">
+  
+    <div class="article-meta">
+      <a href="/2018/12/13/2018-12-14-linux-lvm/" class="article-date">
+      <time datetime="2018-12-13T12:51:00.000Z" itemprop="datePublished">2018-12-13</time>
+</a>
+
+
+    </div>
+  
+  <div class="article-inner">
+    
+      <input type="hidden" class="isFancy">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="article-title" itemprop="name">
+      Linux Device Mapper
+    </h1>
+  
+
+      </header>
+      
+      <div class="article-info article-info-post">
+        
+    <div class="article-category tagcloud">
+    <a class="article-category-link" href="/categories/Linux内核/">Linux内核</a>
+    </div>
+
+
+        
+    <div class="article-tag tagcloud">
+        <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/linux/">linux</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/storage/">storage</a></li></ul>
+    </div>
+
+        <div class="clearfix"></div>
+      </div>
+      
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+          
+        <p>Device Mapper 是 Linux2.6 内核中支持逻辑卷管理的通用设备映射机制，它为实现用于存储资源管理的块设备驱动提供了一个高度模块化的内核架构</p>
+<a id="more"></a>
+<div align="center"> <img src="/img/in-post/post-linux-lvm/architecture.png" width="50%" height="50%"> </div>
+
+<p>模块化的 target drivers 插件实现对 I/O 请求的过滤或者重新定向等工作。 target drivers 插件包括软 raid、软加密、逻辑卷条带、多路径、镜像、快照等</p>
+<p>Device mapper 用户空间相关部分主要负责配置具体的策略和控制逻辑，比如逻辑设备和哪些物理设备建立映射，怎么建立这些映射关系等等，而具体过滤和重定向 I/O 请求的工作由内核中相关代码完成。Device mapper以ioctl的方式向外提供接口，用户通过用户空间的device mapper库，向device mapper的字符设备发送ioctl命令，完成向内的通信。它还通过ioctl提供向往的事件通知机制，允许target driver将I/O相关的某些事件传送到用户空间</p>
+<p>这篇文章对一些 device mapper 的资料进行整理，相关资料在<a href="#参考">参考</a>部分</p>
+<p><br></p>
+<h2 id="内核部分"><a href="#内核部分" class="headerlink" title="内核部分"></a>内核部分</h2><blockquote>
+<p>相关代码在<code>driver/md/</code>中。后面图片中的代码对应的内核版本为4.4.68</p>
+</blockquote>
+<h3 id="相关结构"><a href="#相关结构" class="headerlink" title="相关结构"></a>相关结构</h3><p>Device mapper包含3个重要的对象概念：</p>
+<ol>
+<li><strong>mapped device</strong>：一个逻辑抽象，<strong>可以理解成内核对外提供的逻辑设备</strong>。它通过映射表描述的映射关系与target device建立映射</li>
+<li><strong>映射表</strong>：由一个多元组表示，表示 mapped device 逻辑的起始地址、范围、和表示在 target device 所在物理设备的地址偏移量以及target 类型等变量组成（这些地址和偏移量都是以磁盘的扇区为单位的，即 512 个字节大小）</li>
+<li><strong>target device</strong>：表示的是 mapped device 所映射的物理空间段，对 mapped device 所表示的逻辑设备来说，就是该逻辑设备映射到的一个物理设备</li>
+</ol>
+<p>Device mapper 中这三个对象和 target driver 插件一起构成了一个可迭代的设备树。在该树型结构中的顶层根节点是最终作为逻辑设备向外提供的 mapped device，叶子节点是 target device 所表示的底层物理设备。最小的设备树由单个 mapped device 和 target device 组成。一个 mapped device 可以映射到一个或者多个 target device 上，而一个 mapped device 又可以作为它上层 mapped device的 target device 被使用，该层次在理论上可以在 device mapper 架构下无限迭代下去</p>
+<div align="center"> <img src="/img/in-post/post-linux-lvm/dm.png" width="30%" height="30%"> </div>
+
+<ul>
+<li>在内核中，mapped device由mapped_device结构表示</li>
+<li>对应的映射表由dm_table结构表示。该结构中包含一个 dm_target结构数组，dm_target 结构具体描述了 mapped_device 到它某个 target device 的映射关系。在 dm_table 结构中将这些 dm_target 按照 B 树的方式组织起来方便 I/O 请求映射时的查找操作‘</li>
+<li>dm_target 结构具体记录该结构对应 target device 所映射的 mapped device 逻辑区域的开始地址和范围，同时还包含指向具体 target device 相关操作的 target_type 结构的指针。dm_target中的private域指向mapped device所映射的具体target device对应的结构，表示target device的具体结构因不同的target 类型而不同，比如最简单的线性映射target类型对应的target device结构是linear_c</li>
+<li>target_type 结构主要包含了 target device 对应的 target driver 插件的名字、定义的构建和删除该类型target device的方法、该类target device对应的I/O请求重映射和结束I/O的方法等</li>
+</ul>
+<div align="center"> <img src="/img/in-post/post-linux-lvm/struct.png" width="40%" height="40%"> </div>
+
+<h3 id="I-O流"><a href="#I-O流" class="headerlink" title="I/O流"></a>I/O流</h3><p>Device mapper本质功能就是根据映射关系和target driver描述的I/O处理规则，将I/O请求从逻辑设备mapped device转发相应的target device上</p>
+<p>Device mapper处理所有从内核中块级I/O子系统的generic_make_request和submit_bio接口中定向到mapped device的所有块读写I/O请求。I/O请求在device mapper的设备树中通过请求转发从上到下地进行处理</p>
+<div align="center"> <img src="/img/in-post/post-linux-lvm/stack.png" width="25%" height="25%"> </div>
+
+<p><strong>向下转发</strong>：当一个bio请求在设备树中的mapped deivce向下层转发时，一个或者多个bio的克隆被创建并发送给下层target device。然后相同的过程在设备树的每一个层次上重复，只要设备树足够大理论上这种转发过程可以无限进行下去</p>
+<p><strong>向上返回事件</strong>：在设备树上某个层次中，target driver结束某个bio请求后，将表示结束该bio请求的事件上报给它上层的mapped device，该过程在各个层次上进行直到该事件最终上传到根mapped device的为止，然后device mapper结束根mapped device上原始bio请求，结束整个I/O请求过程</p>
+<p>Bio在device mapper的设备树进行逐层的转发时，最终转发到一个或多个叶子target节点终止。因为一个bio请求不可以跨多个target device(亦即物理空间段)， 因此在每一个层次上，device mapper根据用户预先告知的mapped device 的target映射信息克隆一个或者多个bio，将bio进行拆分后转发到对应的target device上。这些克隆的bio先交给mapped device上对应的target driver上进行处理，根据target driver中定义的I/O处理规则进行I/O请求的过滤等处理，然后再提交给target device完成</p>
+<p><br></p>
+<h2 id="用户空间部分"><a href="#用户空间部分" class="headerlink" title="用户空间部分"></a>用户空间部分</h2><p>Device mapper在用户空间相对简单，<strong>主要包括device mapper库（如LVM2和dmraid等）和dmsetup工具</strong>。Device mapper库就是对ioctl、用户空间创建删除device mapper逻辑设备所需必要操作的封装，dmsetup是一个提供给用户直接可用的创建删除device mapper设备的命令行工具。用户空间主要负责如下工作：</p>
+<ol>
+<li>发现每个mapped device相关的target device；</li>
+<li>根据配置信息创建映射表；</li>
+<li>将用户空间构建好的映射表传入内核，让内核构建该mapped device对应的dm_table结构；</li>
+<li>保存当前的映射信息，以便未来重新构建。</li>
+</ol>
+<p>比如下面的映射表例子将逻辑设备0~1023扇区、1024~1535扇区以及1536~1663三个地址范围分别以线形映射的方式映射到/dev/sda设备第204号扇区、/dev/sdb设备第766号扇区和/dev/sdc设备的第0号扇区开始的区域</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">0    1024 linear /dev/sda 204</span><br><span class="line">1024 512  linear /dev/sdb 766</span><br><span class="line">1536 128  linear /dev/sdc 0</span><br></pre></td></tr></table></figure>
+<p>画图表示如下：</p>
+<div align="center"> <img src="/img/in-post/post-linux-lvm/example.png" width="50%" height="50%"> </div>
+
+<p><br></p>
+<p><strong>下面以 LVM（逻辑卷管理）为例子，介绍用户空间的device mapper库</strong></p>
+<p>LVM（逻辑卷管理）可以弹性调整文件系统的容量。LVM可以整合多个物理分区，让这些分区看起来就像是一个磁盘一样。除此之外，还可以在将来新增新的分区到这个LVM管理的磁盘中或从中移除分区</p>
+<h3 id="LVM中的概念"><a href="#LVM中的概念" class="headerlink" title="LVM中的概念"></a>LVM中的概念</h3><ul>
+<li><strong>PV（物理卷）</strong>：<strong>LVM最底层的物理卷</strong>。实际的分区需要使用<code>fdisk</code>命令调整系统标识符（system ID）成为8e（LVM的标识符），然后再使用<code>pvcreate</code>命令将它转成PV后才能加以利用（标识符可以使用<code>fdisk -l查看</code>）</li>
+<li><strong>PE（物理扩展块）</strong>：<strong>整个LVM最小的存储块</strong>。我们的文件数据都是由写入PE来处理的。简单地说，这个PE有点像文件系统中的block大小。LVM默认使用4MB的PE块</li>
+<li><strong>VG（卷组）</strong>：<strong>就是将很多PV整合成的LVM大磁盘</strong>。每个VG最大仅能包含65534个PE，如果使用LVM默认的PE值，则一个VG最大可达到256GB</li>
+<li><strong>LV（逻辑卷）</strong>：<strong>VG还会被切成LV，这个LV就是最后可以被格式化使用的类似分区的东西，也可以称为逻辑设备</strong>。LV可以被格式化成某种文件系统</li>
+</ul>
+<div align="center"> <img src="/img/in-post/post-linux-lvm/relation.png" width="25%" height="25%"> </div>
+
+<p><strong>LVM弹性更改文件系统的容量，实际上就是通过交换PE来进行数据转换，将原本LV内的PE转移到其它设备中以降低LV容量，或将其它设备的PE加到此LV中以加大容量</strong></p>
+<h3 id="模式"><a href="#模式" class="headerlink" title="模式"></a>模式</h3><ul>
+<li><strong>线性模式（linear）</strong>：如果VG包含多个设备（分区）。线性模式就是当一个设备用完后，才使用其他设备</li>
+<li><strong>条带模式（striped）</strong>：条带模式就是将一条数据拆成多个部分，分别写入多个设备。理论上，读写性能会比较好</li>
+</ul>
+<p>LVM最主要的用处是在实现一个可以弹性调整容量的文件系统上，而不是在新建一个性能为主的磁盘上，所以，我们应该利用的是LVM可以弹性管理整个分区大小的用途上，而不是着眼在性能上。因此，LVM默认的读写模式是线性模式。如果使用条带模式，当任何一个设备（分区）”归天“时，所有的数据都会”损坏“</p>
+<h3 id="流程与命令"><a href="#流程与命令" class="headerlink" title="流程与命令"></a>流程与命令</h3><blockquote>
+<p>LVM必须要有内核支持（device mapper），且需要安装lvm2</p>
+</blockquote>
+<p>LVM各组件的实现流程如下：</p>
+<div align="center"> <img src="/img/in-post/post-linux-lvm/step.png" width="40%" height="40%"> </div>
+
+<p>相关的命令：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:center">任务</th>
+<th style="text-align:center">PV</th>
+<th style="text-align:center">VG</th>
+<th style="text-align:center">LV</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:center">搜索（scan）</td>
+<td style="text-align:center">pvscan</td>
+<td style="text-align:center">vgscan</td>
+<td style="text-align:center">lvscan</td>
+</tr>
+<tr>
+<td style="text-align:center">建立（create）</td>
+<td style="text-align:center">pvcreate</td>
+<td style="text-align:center">vgcreate</td>
+<td style="text-align:center">lvcreate</td>
+</tr>
+<tr>
+<td style="text-align:center">列出（display）</td>
+<td style="text-align:center">pvdisplay</td>
+<td style="text-align:center">vgdisplay</td>
+<td style="text-align:center">lvdisplay</td>
+</tr>
+<tr>
+<td style="text-align:center">增加（extend）</td>
+<td style="text-align:center"></td>
+<td style="text-align:center">vgextend</td>
+<td style="text-align:center">lvextend</td>
+</tr>
+<tr>
+<td style="text-align:center">减少（reduce）</td>
+<td style="text-align:center"></td>
+<td style="text-align:center">vgreduce</td>
+<td style="text-align:center">lvreduce</td>
+</tr>
+<tr>
+<td style="text-align:center">删除（remove）</td>
+<td style="text-align:center">pvremove</td>
+<td style="text-align:center">vgremove</td>
+<td style="text-align:center">lvremove</td>
+</tr>
+<tr>
+<td style="text-align:center">改变容量（resize）</td>
+<td style="text-align:center"></td>
+<td style="text-align:center"></td>
+<td style="text-align:center">lvresize</td>
+</tr>
+</tbody>
+</table>
+<h3 id="快照"><a href="#快照" class="headerlink" title="快照"></a>快照</h3><p>下图左为最初建立系统快照区的状况，LVM会预留一个区域作为数据存放处。此时快照区内并没有任何数据，而快照区与系统区共享所有的PE数据</p>
+<ul>
+<li><strong>修改原LV</strong>：如果原LV中的数据发生改动，如下图右中的数据A，改动前系统会将该区域的数据移动到快照区。所以快照区被占用了一块PE成为A</li>
+<li><strong>修改快照区</strong>：如果在快照区中修改共享的数据，则数据会被拷贝到快照区，然后修改</li>
+</ul>
+<p>快照可以用于数据恢复，但是恢复的数据量不能高于快照区所能负载的实际容量。由于原始数据会被移到快照区，如果快照区不够大，若原始数据被改动的实际数据量比快照区大，那么快照区就容纳不了，此时快照功能会失效</p>
+<div align="center"> <img src="/img/in-post/post-linux-lvm/snapshot.png" width="40%" height="40%"> </div>
+
+<p><br></p>
+<h2 id="参考"><a href="#参考" class="headerlink" title="参考"></a>参考</h2><ul>
+<li><a href="https://www.ibm.com/developerworks/cn/linux/l-devmapper/index.html" target="_blank" rel="noopener">Linux 内核中的 Device Mapper 机制</a></li>
+<li>《鸟哥的Linux私房菜》（第3版）</li>
+<li><a href="https://www.linuxidc.com/Linux/2016-09/135484.htm" target="_blank" rel="noopener">基于LVM的快照实现原理分析</a></li>
+</ul>
+
+      
+    </div>
+    
+  </div>
+  
+    
+    <div class="copyright">
+        <p><span>本文标题:</span><a href="/2018/12/13/2018-12-14-linux-lvm/">Linux Device Mapper</a></p>
+        <p><span>文章作者:</span><a href="/" title="回到主页">Arking</a></p>
+        <p><span>发布时间:</span>2018-12-13, 20:51:00</p>
+        <p><span>最后更新:</span>2018-12-13, 21:48:33</p>
+        <p>
+            <span>原始链接:</span><a class="post-url" href="/2018/12/13/2018-12-14-linux-lvm/" title="Linux Device Mapper">https://arkingc.github.io/2018/12/13/2018-12-14-linux-lvm/</a>
+            <span class="copy-path" data-clipboard-text="原文: https://arkingc.github.io/2018/12/13/2018-12-14-linux-lvm/　　作者: Arking" title="点击复制文章链接"><i class="fa fa-clipboard"></i></span>
+            <script> var clipboard = new Clipboard('.copy-path'); </script>
+        </p>
+        <p>
+            <span>许可协议:</span><i class="fa fa-creative-commons"></i> <a rel="license" href="http://creativecommons.org/licenses/by-nc-sa/4.0/" title="CC BY-NC-SA 4.0 International" target="_blank">"署名-非商用-相同方式共享 4.0"</a> 转载请保留原文链接及作者。
+        </p>
+    </div>
+
+
+
+    <nav id="article-nav">
+        
+        
+            <div id="article-nav-older" class="article-nav-title">
+                <a href="/2018/12/11/2018-12-11-docker-storage-persist/">
+                     Docker容器数据持久化 
+                </a>
+            </div>
+        
+    </nav>
+
+  
+</article>
+
+    <div id="toc" class="toc-article">
+        <strong class="toc-title">文章目录</strong>
+        
+            <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#内核部分"><span class="toc-number">1.</span> <span class="toc-text">内核部分</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#相关结构"><span class="toc-number">1.1.</span> <span class="toc-text">相关结构</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#I-O流"><span class="toc-number">1.2.</span> <span class="toc-text">I/O流</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#用户空间部分"><span class="toc-number">2.</span> <span class="toc-text">用户空间部分</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#LVM中的概念"><span class="toc-number">2.1.</span> <span class="toc-text">LVM中的概念</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#模式"><span class="toc-number">2.2.</span> <span class="toc-text">模式</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#流程与命令"><span class="toc-number">2.3.</span> <span class="toc-text">流程与命令</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#快照"><span class="toc-number">2.4.</span> <span class="toc-text">快照</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#参考"><span class="toc-number">3.</span> <span class="toc-text">参考</span></a></li></ol>
+        
+    </div>
+    <style>
+        .left-col .switch-btn,
+        .left-col .switch-area {
+            display: none;
+        }
+        .toc-level-3 i,
+        .toc-level-3 ol {
+            display: none !important;
+        }
+    </style>
+
+    <input type="button" id="tocButton" value="隐藏目录" title="点击按钮隐藏或者显示文章目录">
+
+    <script>
+        yiliaConfig.toc = ["隐藏目录", "显示目录", !!"false"];
+    </script>
+
+
+
+    
+<div class="share">
+    
+        <div class="bdsharebuttonbox">
+            <a href="#" class="fa fa-twitter bds_twi" data-cmd="twi" title="分享到推特"></a>
+            <a href="#" class="fa fa-weibo bds_tsina" data-cmd="tsina" title="分享到新浪微博"></a>
+            <a href="#" class="fa fa-qq bds_sqq" data-cmd="sqq" title="分享给 QQ 好友"></a>
+            <a href="#" class="fa fa-files-o bds_copy" data-cmd="copy" title="复制网址"></a>
+            <a href="#" class="fa fa fa-envelope-o bds_mail" data-cmd="mail" title="通过邮件分享"></a>
+            <a href="#" class="fa fa-weixin bds_weixin" data-cmd="weixin" title="生成文章二维码"></a>
+            <a href="#" class="fa fa-share-alt bds_more" data-cmd="more"></a>
+        </div>
+        <script>
+            window._bd_share_config={
+                "common":{"bdSnsKey":{},"bdText":"Linux Device Mapper　| Arking　","bdMini":"2","bdMiniList":false,"bdPic":"","bdStyle":"0","bdSize":"24"},"share":{}};with(document)0[(getElementsByTagName('head')[0]||body).appendChild(createElement('script')).src='http://bdimg.share.baidu.com/static/api/js/share.js?v=89860593.js?cdnversion='+~(-new Date()/36e5)];
+        </script>
+    
+
+    
+</div>
+
+
+
+
+
+
+
+    
+
+
+
+
+    <div class="scroll" id="post-nav-button">
+        
+            <a href="/" title="回到主页"><i class="fa fa-home"></i></a>
+        
+
+        <a title="文章列表"><i class="fa fa-bars"></i><i class="fa fa-times"></i></a>
+
+        
+            <a href="/2018/12/11/2018-12-11-docker-storage-persist/" title="下一篇:  Docker容器数据持久化 ">
+                <i class="fa fa-angle-right"></i>
+            </a>
+        
+    </div>
+
+    <ul class="post-list"><li class="post-list-item"><a class="post-list-link" href="/2018/12/13/2018-12-14-linux-lvm/">Linux Device Mapper</a></li><li class="post-list-item"><a class="post-list-link" href="/2018/12/11/2018-12-11-docker-storage-persist/"> Docker容器数据持久化 </a></li><li class="post-list-item"><a class="post-list-link" href="/2018/12/08/2018-12-08-linux-benchmark-fxmark/">使用FXMARK测试文件系统的多核可扩展性</a></li><li class="post-list-item"><a class="post-list-link" href="/2018/09/05/2018-09-05-linux-kernel/">Ubuntu下内核与内核模块的编译过程</a></li><li class="post-list-item"><a class="post-list-link" href="/2018/01/19/2018-01-19-docker-imagestore/"> Docker源码分析—镜像存储 </a></li><li class="post-list-item"><a class="post-list-link" href="/2018/01/15/2018-01-15-docker-storage-overlay2/"> Docker源码分析—存储驱动 </a></li><li class="post-list-item"><a class="post-list-link" href="/2018/01/14/2018-01-14-docker-layerstore/"> Docker源码分析—层存储 </a></li><li class="post-list-item"><a class="post-list-link" href="/2018/01/12/2018-01-10-c-stack_frame/"> C函数栈帧 </a></li><li class="post-list-item"><a class="post-list-link" href="/2017/12/26/2017-12-26-linux-code-overlayfs-read_write/">内核OverlayFS—文件读写</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/12/22/2017-12-22-linux-code-overlayfs-create_delete/">内核OverlayFS—创建与删除文件</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/11/30/2017-11-30-linux-du/"> Linux查看目录大小</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/11/10/2017-11-10-linux-code-overlayfs-dir-op1/">内核OverlayFS—目录搜索</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/10/12/2017-10-12-linux-code-overlayfs-mnt/">内核OverlayFS—注册与挂载</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/09/20/2017-09-20-linux-code-overlayfs-layerinfo/">内核OverlayFS—文件层次信息</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/08/18/2017-08-18-linux-code-vfs/">Linux虚拟文件系统(VFS)</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/05/05/2017-05-05-docker-filesystem-overlay/"> Docker存储驱动—Overlay/Overlay2「译」</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/04/13/2017-04-13-docker-filesystem-aufs/"> Docker存储驱动—Aufs </a></li><li class="post-list-item"><a class="post-list-link" href="/2017/04/09/2017-04-09-linux-uuid/"> Linux存储设备的UUID</a></li></ul>
+
+
+
+
+    <script>
+        
+    </script>
+</div>
+      <footer id="footer">
+    <div class="outer">
+        <div id="footer-info">
+            <div class="footer-left">
+                <i class="fa fa-copyright"></i> 
+                2017-2018 Arking
+            </div>
+            <div class="footer-right">
+                <a href="http://hexo.io/" target="_blank" title="快速、简洁且高效的博客框架">Hexo</a>  Theme <a href="https://github.com/MOxFIVE/hexo-theme-yelee" target="_blank" title="简而不减 Hexo 双栏博客主题  v3.5">Yelee</a> by MOxFIVE <i class="fa fa-heart animated infinite pulse"></i>
+            </div>
+        </div>
+        
+            <div class="visit">
+                
+                    <span id="busuanzi_container_site_pv" style="display:none">
+                        <span id="site-visit" title="本站到访数"><i class="fa fa-user" aria-hidden="true"></i><span id="busuanzi_value_site_uv"></span>
+                        </span>
+                    </span>
+                
+                
+                    <span>| </span>
+                
+                
+                    <span id="busuanzi_container_page_pv" style="display:none">
+                        <span id="page-visit" title="本页阅读量"><i class="fa fa-eye animated infinite pulse" aria-hidden="true"></i><span id="busuanzi_value_page_pv"></span>
+                        </span>
+                    </span>
+                
+            </div>
+        
+    </div>
+</footer>
+
+<script async src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js">
+</script>
+    </div>
+    
+<script data-main="/js/main.js" src="//cdn.bootcss.com/require.js/2.2.0/require.min.js"></script>
+
+
+
+<!-- Google Analytics -->
+<script type="text/javascript">
+(function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+(i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+})(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+ga('create', 'UA-130420706-1', 'auto');
+ga('send', 'pageview');
+
+</script>
+<!-- End Google Analytics -->
+
+
+
+<div class="scroll" id="scroll">
+    <a href="#" title="返回顶部"><i class="fa fa-arrow-up"></i></a>
+    <a href="#comments" onclick="load$hide();" title="查看评论"><i class="fa fa-comments-o"></i></a>
+    <a href="#footer" title="转到底部"><i class="fa fa-arrow-down"></i></a>
+</div>
+<script>
+    // Open in New Window
+    
+        var oOpenInNew = {
+            
+            
+            
+            
+            
+            
+             archives: ".archive-article-title", 
+             miniArchives: "a.post-list-link", 
+            
+             friends: "#js-friends a", 
+             socail: ".social a" 
+        }
+        for (var x in oOpenInNew) {
+            $(oOpenInNew[x]).attr("target", "_blank");
+        }
+    
+</script>
+
+<script async src="https://dn-lbstatics.qbox.me/busuanzi/2.3/busuanzi.pure.mini.js">
+</script>
+  </div>
+</body>
+</html>

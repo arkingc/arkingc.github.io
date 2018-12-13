@@ -278,6 +278,77 @@
 </nav>
       <div class="body-wrap">
   
+    <article id="post-2017-11-30-linux-du" class="article article-type-post" itemscope="" itemprop="blogPost">
+  
+    <div class="article-meta">
+      <a href="/2017/11/30/2017-11-30-linux-du/" class="article-date">
+      <time datetime="2017-11-30T02:51:00.000Z" itemprop="datePublished">2017-11-30</time>
+</a>
+
+
+    </div>
+  
+  <div class="article-inner">
+    
+      <input type="hidden" class="isFancy">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 itemprop="name">
+      <a class="article-title" href="/2017/11/30/2017-11-30-linux-du/"> Linux查看目录大小</a>
+    </h1>
+  
+
+      </header>
+      
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+          
+              <p>在Linux上，如果你想查看一个文件的大小，可以使用命令<code>ls -l</code>，但是如果你想查看一个目录的大小(包含目录下的文件)，ls无法做到，基本上用ls命令查看到的目录大小都是4K（假设块大小为4K）:</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line">chenximing@chenximing-MS-7823:~$ ls -lh</span><br><span class="line">...</span><br><span class="line">...</span><br><span class="line">-rw-rw-r--  1 chenximing chenximing  16K  9月 27 16:38 sysstat-8.0.4.1.tar.gz</span><br><span class="line">-rwxrwxr-x  1 chenximing chenximing  492  5月  2  2017 tmp_lat.sh</span><br><span class="line">drwxr-xr-x  2 chenximing chenximing 4.0K  4月  5  2017 公共的</span><br><span class="line">drwxr-xr-x  2 chenximing chenximing 4.0K  4月  5  2017 模板</span><br><span class="line">drwxr-xr-x  2 chenximing chenximing 4.0K  4月  5  2017 视频</span><br><span class="line">drwxr-xr-x  2 chenximing chenximing 4.0K 10月  9 11:39 图片</span><br><span class="line">drwxr-xr-x  5 chenximing chenximing 4.0K 10月 11 10:15 文档</span><br><span class="line">drwxr-xr-x  2 root       root       4.0K  4月  6  2017 下载</span><br><span class="line">drwxr-xr-x  2 chenximing chenximing 4.0K  4月  5  2017 音乐</span><br><span class="line">drwxr-xr-x  2 chenximing chenximing 4.0K  8月 20 17:53 桌面</span><br></pre></td></tr></table></figure>
+<p>这是由于linux下目录和一般文件在磁盘上都是通过元数据和数据进行记录，在创建一个目录时，分配一个元数据(inode)，并为其分配一个数据块(block)。目录的数据区，也就是目录的block中，记录的是目录下文件inode和文件名的条目列表。当目录下的文件数量较少时，一个块已经足够记录，因此ls命令查看到的目录大小实际上是目录占用的block大小。当目录下文件较多时，需要更多的block来记录，此时ls命令看到的目录大小会变成8K，12K…但是对于一般文件来说ls命令能反映出其实际大小，而不是占用的block大小</p>
+<p>所以，在Linux上，如果想要查看目录总大小时，就需要用到du命令</p>
+          
+      
+    </div>
+    
+    <div class="article-info article-info-index">
+      
+      
+    <div class="article-category tagcloud">
+    <a class="article-category-link" href="/categories/Linux管理/">Linux管理</a>
+    </div>
+
+
+      
+    <div class="article-tag tagcloud">
+        <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/linux/">linux</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/storage/">storage</a></li></ul>
+    </div>
+
+      
+        <p class="article-more-link">
+          <a href="/2017/11/30/2017-11-30-linux-du/#more">more >></a>
+        </p>
+      
+      <div class="clearfix"></div>
+    </div>
+    
+  </div>
+  
+</article>
+
+
+
+
+
+
+
+
+
+  
     <article id="post-2017-11-10-linux-code-overlayfs-dir-op1" class="article article-type-post" itemscope="" itemprop="blogPost">
   
     <div class="article-meta">
