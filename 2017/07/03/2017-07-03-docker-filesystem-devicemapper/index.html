@@ -1,0 +1,764 @@
+<!DOCTYPE html>
+<html>
+<head><meta name="generator" content="Hexo 3.8.0">
+
+    <!--[if lt IE 9]>
+        <style>body {display: none; background: none !important} </style>
+        <meta http-equiv="Refresh" Content="0; url=//outdatedbrowser.com/" />
+    <![endif]-->
+
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge, chrome=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="format-detection" content="telephone=no">
+<meta name="author" content="Arking">
+
+
+
+<meta name="description" content="Docker 的 devicemapper 存储驱动利用了内核 device mapper 的 thin provisioning（自动精简配置）和 snapshotting（快照）的能力来管理镜像和容器 devicemapper使用Docker专用的块设备，操作为块级而不是文件级。可以通过为Docker主机添加物理存储来扩充这些设备 这篇文章是对Docker官网中 devicemapper 存储">
+<meta name="keywords" content="docker,storage">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Docker存储驱动—Device Mapper「译」">
+<meta property="og:url" content="https://arkingc.github.io/2017/07/03/2017-07-03-docker-filesystem-devicemapper/index.html">
+<meta property="og:site_name" content="Arking">
+<meta property="og:description" content="Docker 的 devicemapper 存储驱动利用了内核 device mapper 的 thin provisioning（自动精简配置）和 snapshotting（快照）的能力来管理镜像和容器 devicemapper使用Docker专用的块设备，操作为块级而不是文件级。可以通过为Docker主机添加物理存储来扩充这些设备 这篇文章是对Docker官网中 devicemapper 存储">
+<meta property="og:locale" content="default">
+<meta property="og:image" content="https://arkingc.github.io/img/in-post/post-docker-filesystem/two_dm_container.jpg">
+<meta property="og:image" content="https://arkingc.github.io/img/in-post/post-docker-filesystem/dm_container.jpg">
+<meta property="og:updated_time" content="2018-12-14T10:07:40.000Z">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Docker存储驱动—Device Mapper「译」">
+<meta name="twitter:description" content="Docker 的 devicemapper 存储驱动利用了内核 device mapper 的 thin provisioning（自动精简配置）和 snapshotting（快照）的能力来管理镜像和容器 devicemapper使用Docker专用的块设备，操作为块级而不是文件级。可以通过为Docker主机添加物理存储来扩充这些设备 这篇文章是对Docker官网中 devicemapper 存储">
+<meta name="twitter:image" content="https://arkingc.github.io/img/in-post/post-docker-filesystem/two_dm_container.jpg">
+
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+
+
+    <link rel="alternate" href="/atom.xml" title="Arking" type="application/atom+xml">
+
+
+
+    <link rel="shortcut icon" href="/favicon.png">
+
+
+
+    <link href="//cdn.bootcss.com/animate.css/3.5.1/animate.min.css" rel="stylesheet">
+
+
+
+    <link href="//cdn.bootcss.com/fancybox/2.1.5/jquery.fancybox.min.css" rel="stylesheet">
+
+
+
+    <script src="//cdn.bootcss.com/pace/1.0.2/pace.min.js"></script>
+    <link href="//cdn.bootcss.com/pace/1.0.2/themes/blue/pace-theme-minimal.css" rel="stylesheet">
+
+
+<link rel="stylesheet" href="/css/style.css">
+
+
+
+<link href="//cdn.bootcss.com/font-awesome/4.6.3/css/font-awesome.min.css" rel="stylesheet">
+
+
+<title>Docker存储驱动—Device Mapper「译」 | Arking</title>
+
+<script src="//cdn.bootcss.com/jquery/2.2.4/jquery.min.js"></script>
+<script src="//cdn.bootcss.com/clipboard.js/1.5.10/clipboard.min.js"></script>
+
+<script>
+    var yiliaConfig = {
+        fancybox: true,
+        animate: true,
+        isHome: false,
+        isPost: true,
+        isArchive: false,
+        isTag: false,
+        isCategory: false,
+        fancybox_js: "//cdn.bootcss.com/fancybox/2.1.5/jquery.fancybox.min.js",
+        scrollreveal: "//cdn.bootcss.com/scrollReveal.js/3.1.4/scrollreveal.min.js",
+        search: false
+    }
+</script>
+
+
+    <script> yiliaConfig.jquery_ui = [false]; </script>
+
+
+
+    <script> yiliaConfig.rootUrl = "\/";</script>
+
+
+
+
+
+    <script>
+        var _hmt = _hmt || [];
+        (function() {
+            var hm = document.createElement("script");
+            hm.src = "//hm.baidu.com/hm.js?95fde47c8eb7fd8f64bddfc637e05427";
+            var s = document.getElementsByTagName("script")[0]; 
+            s.parentNode.insertBefore(hm, s);
+        })();
+    </script>
+
+
+</head></html>
+<body>
+  <div id="container">
+    <div class="left-col">
+    <div class="overlay"></div>
+<div class="intrude-less">
+    <header id="header" class="inner">
+        <a href="/" class="profilepic">
+            <img src="/img/avatar.png" class="animated zoomIn">
+        </a>
+        <hgroup>
+          <h1 class="header-author"><a href="/">Arking</a></h1>
+        </hgroup>
+
+        
+
+        
+
+
+        
+            <div id="switch-btn" class="switch-btn">
+                <div class="icon">
+                    <div class="icon-ctn">
+                        <div class="icon-wrap icon-house" data-idx="0">
+                            <div class="birdhouse"></div>
+                            <div class="birdhouse_holes"></div>
+                        </div>
+                        <div class="icon-wrap icon-ribbon hide" data-idx="1">
+                            <div class="ribbon"></div>
+                        </div>
+                        
+                        <div class="icon-wrap icon-link hide" data-idx="2">
+                            <div class="loopback_l"></div>
+                            <div class="loopback_r"></div>
+                        </div>
+                        
+                        
+                        <div class="icon-wrap icon-me hide" data-idx="3">
+                            <div class="user"></div>
+                            <div class="shoulder"></div>
+                        </div>
+                        
+                    </div>
+                    
+                </div>
+                <div class="tips-box hide">
+                    <div class="tips-arrow"></div>
+                    <ul class="tips-inner">
+                        <li>菜单</li>
+                        <li>标签</li>
+                        
+                        <li>友情链接</li>
+                        
+                        
+                        <li>关于我</li>
+                        
+                    </ul>
+                </div>
+            </div>
+        
+
+        <div id="switch-area" class="switch-area">
+            <div class="switch-wrap">
+                <section class="switch-part switch-part1">
+                    <nav class="header-menu">
+                        <ul>
+                        
+                            <li><a href="/">主页</a></li>
+                        
+                            <li><a href="/archives/">归档</a></li>
+                        
+                            <li><a href="/tags/">标签</a></li>
+                        
+                            <li><a href="/link/">链接</a></li>
+                        
+                            <li><a href="/about/">关于我</a></li>
+                        
+                        </ul>
+                    </nav>
+                    <nav class="header-nav">
+                        <ul class="social">
+                            
+                                <a class="fa Email" href="mailto:ximingchenhust@foxmail.com" title="Email"></a>
+                            
+                                <a class="fa GitHub" href="https://github.com/arkingc" title="GitHub"></a>
+                            
+                        </ul>
+                    </nav>
+                </section>
+                
+                
+                <section class="switch-part switch-part2">
+                    <div class="widget tagcloud" id="js-tagcloud">
+                        <ul class="tag-list"><li class="tag-list-item"><a class="tag-list-link" href="/tags/c/">c</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/docker/">docker</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/filesystem/">filesystem</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/linux/">linux</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/overlayfs/">overlayfs</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/storage/">storage</a></li></ul>
+                    </div>
+                </section>
+                
+                
+                
+                <section class="switch-part switch-part3">
+                    <div id="js-friends">
+                    
+                      <a class="main-nav-link switch-friends-link" href="http://xiaohuazheng.github.io/">华仔</a>
+                    
+                      <a class="main-nav-link switch-friends-link" href="https://guanjunjian.github.io/">健哥</a>
+                    
+                      <a class="main-nav-link switch-friends-link" href="http://blog.xbblfz.site/">波波</a>
+                    
+                      <a class="main-nav-link switch-friends-link" href="https://starrymoon.github.io/">扛把子</a>
+                    
+                      <a class="main-nav-link switch-friends-link" href="https://hexo.io">Hexo</a>
+                    
+                      <a class="main-nav-link switch-friends-link" href="https://github.com/MOxFIVE/hexo-theme-yelee">yelle</a>
+                    
+                    </div>
+                </section>
+                
+
+                
+                
+                <section class="switch-part switch-part4">
+                
+                    <div id="js-aboutme">专注于后台</div>
+                </section>
+                
+            </div>
+        </div>
+    </header>                
+</div>
+    </div>
+    <div class="mid-col">
+      <nav id="mobile-nav">
+      <div class="overlay">
+          <div class="slider-trigger"></div>
+          <h1 class="header-author js-mobile-header hide"><a href="/" title="回到主页">Arking</a></h1>
+      </div>
+    <div class="intrude-less">
+        <header id="header" class="inner">
+            <a href="/" class="profilepic">
+                <img src="/img/avatar.png" class="animated zoomIn">
+            </a>
+            <hgroup>
+              <h1 class="header-author"><a href="/" title="回到主页">Arking</a></h1>
+            </hgroup>
+            
+            <nav class="header-menu">
+                <ul>
+                
+                    <li><a href="/">主页</a></li>
+                
+                    <li><a href="/archives/">归档</a></li>
+                
+                    <li><a href="/tags/">标签</a></li>
+                
+                    <li><a href="/link/">链接</a></li>
+                
+                    <li><a href="/about/">关于我</a></li>
+                
+                <div class="clearfix"></div>
+                </ul>
+            </nav>
+            <nav class="header-nav">
+                        <ul class="social">
+                            
+                                <a class="fa Email" target="_blank" href="mailto:ximingchenhust@foxmail.com" title="Email"></a>
+                            
+                                <a class="fa GitHub" target="_blank" href="https://github.com/arkingc" title="GitHub"></a>
+                            
+                        </ul>
+            </nav>
+        </header>                
+    </div>
+    <link class="menu-list" tags="标签" friends="友情链接" about="关于我">
+</nav>
+      <div class="body-wrap"><article id="post-2017-07-03-docker-filesystem-devicemapper" class="article article-type-post" itemscope="" itemprop="blogPost">
+  
+    <div class="article-meta">
+      <a href="/2017/07/03/2017-07-03-docker-filesystem-devicemapper/" class="article-date">
+      <time datetime="2017-07-03T04:57:00.000Z" itemprop="datePublished">2017-07-03</time>
+</a>
+
+
+    </div>
+  
+  <div class="article-inner">
+    
+      <input type="hidden" class="isFancy">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="article-title" itemprop="name">
+      Docker存储驱动—Device Mapper「译」
+    </h1>
+  
+
+      </header>
+      
+      <div class="article-info article-info-post">
+        
+    <div class="article-category tagcloud">
+    <a class="article-category-link" href="/categories/Docker使用/">Docker使用</a>
+    </div>
+
+
+        
+    <div class="article-tag tagcloud">
+        <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/docker/">docker</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/storage/">storage</a></li></ul>
+    </div>
+
+        <div class="clearfix"></div>
+      </div>
+      
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+          
+        <p>Docker 的 devicemapper 存储驱动利用了内核 device mapper 的 <a href="https://baike.baidu.com/item/%E8%87%AA%E5%8A%A8%E7%B2%BE%E7%AE%80%E9%85%8D%E7%BD%AE" target="_blank" rel="noopener">thin provisioning（自动精简配置）</a>和 snapshotting（快照）的能力来管理镜像和容器</p>
+<p>devicemapper使用Docker专用的块设备，操作为块级而不是文件级。可以通过为Docker主机添加物理存储来扩充这些设备</p>
+<p>这篇文章是对<a href="https://docs.docker.com/storage/storagedriver/device-mapper-driver/#device-mapper-and-docker-performance" target="_blank" rel="noopener">Docker官网中 devicemapper 存储驱动使用文档</a>的翻译</p>
+<a id="more"></a>
+<p><br></p>
+<h2 id="配置使用devicemapper"><a href="#配置使用devicemapper" class="headerlink" title="配置使用devicemapper"></a>配置使用devicemapper</h2><h3 id="loop-lvm-模式"><a href="#loop-lvm-模式" class="headerlink" title="loop-lvm 模式"></a>loop-lvm 模式</h3><p>这个模式仅仅适用于测试。loopback（回路）设备非常慢并且资源敏感，他们在磁盘中创建的文件需要有固定大小，他们还会引入竞争。配置这种模式的步骤十分简单：</p>
+<ol>
+<li>停止Docker服务</li>
+</ol>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">sudo service docker stop</span><br></pre></td></tr></table></figure>
+<ol start="2">
+<li>编辑<code>/etc/docker/daemon.json</code></li>
+</ol>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">&#123;</span><br><span class="line">  <span class="string">"storage-driver"</span>: <span class="string">"devicemapper"</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<ol start="3">
+<li>开启Docker服务</li>
+</ol>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">sudo service docker start</span><br></pre></td></tr></table></figure>
+<ol start="4">
+<li><code>docker info</code>进行确认</li>
+</ol>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br></pre></td><td class="code"><pre><span class="line">$ docker info</span><br><span class="line"></span><br><span class="line">Containers: 0</span><br><span class="line">    Running: 0</span><br><span class="line">    Paused: 0</span><br><span class="line">    Stopped: 0</span><br><span class="line">  Images: 0</span><br><span class="line">  Server Version: 17.03.1-ce</span><br><span class="line">  Storage Driver: devicemapper</span><br><span class="line">  Pool Name: docker-202:1-8413957-pool</span><br><span class="line">  Pool Blocksize: 65.54 kB</span><br><span class="line">  Base Device Size: 10.74 GB</span><br><span class="line">  Backing Filesystem: xfs</span><br><span class="line">  Data file: /dev/loop0</span><br><span class="line">  Metadata file: /dev/loop1</span><br><span class="line">  Data Space Used: 11.8 MB</span><br><span class="line">  Data Space Total: 107.4 GB</span><br><span class="line">  Data Space Available: 7.44 GB</span><br><span class="line">  Metadata Space Used: 581.6 kB</span><br><span class="line">  Metadata Space Total: 2.147 GB</span><br><span class="line">  Metadata Space Available: 2.147 GB</span><br><span class="line">  Thin Pool Minimum Free Space: 10.74 GB</span><br><span class="line">  Udev Sync Supported: <span class="literal">true</span></span><br><span class="line">  Deferred Removal Enabled: <span class="literal">false</span></span><br><span class="line">  Deferred Deletion Enabled: <span class="literal">false</span></span><br><span class="line">  Deferred Deleted Device Count: 0</span><br><span class="line">  Data loop file: /var/lib/docker/devicemapper/data</span><br><span class="line">  Metadata loop file: /var/lib/docker/devicemapper/metadata</span><br><span class="line">  Library Version: 1.02.135-RHEL7 (2016-11-16)</span><br><span class="line">&lt;output truncated&gt;</span><br></pre></td></tr></table></figure>
+<p><code>Data loop file</code>和<code>Metadata loop file</code>文件位于<code>/var/lib/docker/devicemapper</code>目录下，表明当前已经运行在<code>loop-lvm</code>模式下</p>
+<h3 id="direct-lvm-模式"><a href="#direct-lvm-模式" class="headerlink" title="direct-lvm 模式"></a>direct-lvm 模式</h3><p>生产环境中需要使用这种模式。这种模式使用块设备来创建 thin pool，这比 loopback（回环）设备更快、资源利用更有效，并且块设备能按需增长。但是配置也相对更复杂一些</p>
+<h4 id="1）让Docker来配置-direct-lvm-模式"><a href="#1）让Docker来配置-direct-lvm-模式" class="headerlink" title="1）让Docker来配置 direct-lvm 模式"></a>1）让Docker来配置 direct-lvm 模式</h4><p>如果使用Docker 17.06或者更高版本，Docker能够为我们管理块设备。这种方式适用于简单地配置，只能使用一个块设备。如果需要使用多个块设备，参考后面的<a href="#2）手动配置-direct-lvm-模式">手动配置</a>部分</p>
+<p>配置选项如下表：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align:center">Option</th>
+<th style="text-align:center">Description</th>
+<th style="text-align:center">Required?</th>
+<th style="text-align:center">Default</th>
+<th style="text-align:center">Example</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:center"><code>dm.directlvm_device</code></td>
+<td style="text-align:center">块设备的路径</td>
+<td style="text-align:center">Yes</td>
+<td style="text-align:center"></td>
+<td style="text-align:center"><code>dm.directlvm_device=&quot;/dev/xvdf&quot;</code></td>
+</tr>
+<tr>
+<td style="text-align:center"><code>dm.thinp_percent</code></td>
+<td style="text-align:center">用于数据存储的空间百分比</td>
+<td style="text-align:center">No</td>
+<td style="text-align:center">95</td>
+<td style="text-align:center"><code>dm.thinp_percent=95</code></td>
+</tr>
+<tr>
+<td style="text-align:center"><code>dm.thinp_metapercent</code></td>
+<td style="text-align:center">用于元数据存储的空间百分比</td>
+<td style="text-align:center">No</td>
+<td style="text-align:center">1</td>
+<td style="text-align:center"><code>dm.thinp_metapercent=1</code></td>
+</tr>
+<tr>
+<td style="text-align:center"><code>dm.thinp_autoextend_threshold</code></td>
+<td style="text-align:center">lvm自动扩充thin pool的阈值百分比</td>
+<td style="text-align:center">No</td>
+<td style="text-align:center">80</td>
+<td style="text-align:center"><code>dm.thinp_autoextend_threshold=80</code></td>
+</tr>
+<tr>
+<td style="text-align:center"><code>dm.thinp_autoextend_percent</code></td>
+<td style="text-align:center">当发生自动扩充时，增加thin pool的存储空间的百分比</td>
+<td style="text-align:center">No</td>
+<td style="text-align:center">20</td>
+<td style="text-align:center"><code>dm.thinp_autoextend_percent=20</code></td>
+</tr>
+<tr>
+<td style="text-align:center"><code>dm.directlvm_device_force</code></td>
+<td style="text-align:center">是否格式化块设备，即使块设备上已经存在文件系统。如果设为<code>false</code>并且文件系统存在，将会报错</td>
+<td style="text-align:center">No</td>
+<td style="text-align:center">false</td>
+<td style="text-align:center"><code>dm.directlvm_device_force=true</code></td>
+</tr>
+</tbody>
+</table>
+<p>使用上面的选项来设置<code>/etc/docker/daemon.json</code>，然后重启Docker服务：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">&#123;</span><br><span class="line">  <span class="string">"storage-driver"</span>: <span class="string">"devicemapper"</span>,</span><br><span class="line">  <span class="string">"storage-opts"</span>: [</span><br><span class="line">    <span class="string">"dm.directlvm_device=/dev/xdf"</span>,</span><br><span class="line">    <span class="string">"dm.thinp_percent=95"</span>,</span><br><span class="line">    <span class="string">"dm.thinp_metapercent=1"</span>,</span><br><span class="line">    <span class="string">"dm.thinp_autoextend_threshold=80"</span>,</span><br><span class="line">    <span class="string">"dm.thinp_autoextend_percent=20"</span>,</span><br><span class="line">    <span class="string">"dm.directlvm_device_force=false"</span></span><br><span class="line">  ]</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h4 id="2）手动配置-direct-lvm-模式"><a href="#2）手动配置-direct-lvm-模式" class="headerlink" title="2）手动配置 direct-lvm 模式"></a>2）手动配置 direct-lvm 模式</h4><ol>
+<li>选择一个大小足够的块设备</li>
+<li>停止Docker服务</li>
+</ol>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">sudo service docker stop</span><br></pre></td></tr></table></figure>
+<ol start="3">
+<li><p>安装下列包</p>
+<ul>
+<li><strong>RHEL/CentOS</strong>：<code>device-mapper-persistent-data</code>，<code>lvm2</code>和所有依赖</li>
+<li><strong>Ubuntu/Debian</strong>：<code>thin-provisioning-tools</code>，<code>lvm2</code>和所有依赖</li>
+</ul>
+</li>
+<li><p>使用<code>pvcreate</code>命令创建PV（物理卷）</p>
+</li>
+</ol>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">$ sudo pvcreate /dev/xvdf</span><br><span class="line"></span><br><span class="line">Physical volume <span class="string">"/dev/xvdf"</span> successfully created.</span><br></pre></td></tr></table></figure>
+<ol start="5">
+<li>使用<code>vgcreate</code>命令创建一个名为<code>docker</code>的VG（卷组）</li>
+</ol>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">$ sudo vgcreate docker /dev/xvdf</span><br><span class="line"></span><br><span class="line">Volume group <span class="string">"docker"</span> successfully created</span><br></pre></td></tr></table></figure>
+<ol start="6">
+<li>使用<code>lvcreate</code>命令创建2个名为<code>thinpool</code>和<code>thinpoolmeta</code>的LV（逻辑卷），这2个卷都使用<code>docker</code>卷组。最后一个参数指定了可用于自动扩充的空闲空间占VG的百分比</li>
+</ol>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">$ sudo lvcreate --wipesignatures y -n thinpool docker -l 95%VG</span><br><span class="line"></span><br><span class="line">Logical volume <span class="string">"thinpool"</span> created.</span><br><span class="line"></span><br><span class="line">$ sudo lvcreate --wipesignatures y -n thinpoolmeta docker -l 1%VG</span><br><span class="line"></span><br><span class="line">Logical volume <span class="string">"thinpoolmeta"</span> created.</span><br></pre></td></tr></table></figure>
+<ol start="7">
+<li>使用<a href="https://linux.die.net/man/8/lvconvert" target="_blank" rel="noopener">lvconvert</a>将逻辑卷<code>thinpool</code>转换为一个 thin pool，将逻辑卷<code>thinpoolmeta</code>指定为 thin pool 的元数据逻辑卷</li>
+</ol>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">$ sudo lvconvert -y \</span><br><span class="line">--zero n \</span><br><span class="line">-c 512K \</span><br><span class="line">--thinpool docker/thinpool \</span><br><span class="line">--poolmetadata docker/thinpoolmeta</span><br><span class="line"></span><br><span class="line">WARNING: Converting logical volume docker/thinpool and docker/thinpoolmeta to</span><br><span class="line">thin pool<span class="string">'s data and metadata volumes with metadata wiping.</span></span><br><span class="line"><span class="string">THIS WILL DESTROY CONTENT OF LOGICAL VOLUME (filesystem etc.)</span></span><br><span class="line"><span class="string">Converted docker/thinpool to thin pool.</span></span><br></pre></td></tr></table></figure>
+<ol start="8">
+<li>编辑lvm profile文件配置thin pool的自动扩展。然后使用<code>lvchange</code>命令使配置文件中的配置生效：</li>
+</ol>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">$ sudo vim /etc/lvm/profile/docker-thinpool.profile</span><br><span class="line"></span><br><span class="line">activation &#123;</span><br><span class="line">  thin_pool_autoextend_threshold=80</span><br><span class="line">  thin_pool_autoextend_percent=20</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">$ sudo lvchange --metadataprofile docker-thinpool docker/thinpool</span><br><span class="line"></span><br><span class="line">Logical volume docker/thinpool changed.</span><br></pre></td></tr></table></figure>
+<ol start="9">
+<li>开启逻辑卷监视。没有这一步的话即使编辑好了profile配置文件也无法触发自动扩充</li>
+</ol>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">$ sudo lvs -o+seg_monitor</span><br><span class="line"></span><br><span class="line">LV       VG     Attr       LSize  Pool Origin Data%  Meta%  Move Log Cpy%Sync Convert Monitor</span><br><span class="line">thinpool docker twi<span class="_">-a</span>-t--- 95.00g             0.00   0.01                             monitored</span><br></pre></td></tr></table></figure>
+<ol start="10">
+<li>备份Dokcer根目录中的数据，然后使用新创建的 LVM pool 来存储镜像和容器</li>
+</ol>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">$ mkdir /var/lib/docker.bk</span><br><span class="line">$ mv /var/lib/docker/* /var/lib/docker.bk</span><br></pre></td></tr></table></figure>
+<ol start="11">
+<li>编辑<code>/etc/docker/daemon.json</code>，并配置devicemapper需要的选项</li>
+</ol>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">&#123;</span><br><span class="line">    <span class="string">"storage-driver"</span>: <span class="string">"devicemapper"</span>,</span><br><span class="line">    <span class="string">"storage-opts"</span>: [</span><br><span class="line">    <span class="string">"dm.thinpooldev=/dev/mapper/docker-thinpool"</span>,</span><br><span class="line">    <span class="string">"dm.use_deferred_removal=true"</span>,</span><br><span class="line">    <span class="string">"dm.use_deferred_deletion=true"</span></span><br><span class="line">    ]</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<ol start="12">
+<li>开启Docker服务</li>
+</ol>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">sudo service docker start</span><br></pre></td></tr></table></figure>
+<ol start="13">
+<li>使用<code>docker info</code>进行确认：</li>
+</ol>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br></pre></td><td class="code"><pre><span class="line">$ docker info</span><br><span class="line"></span><br><span class="line">Containers: 0</span><br><span class="line"> Running: 0</span><br><span class="line"> Paused: 0</span><br><span class="line"> Stopped: 0</span><br><span class="line">Images: 0</span><br><span class="line">Server Version: 17.03.1-ce</span><br><span class="line">Storage Driver: devicemapper</span><br><span class="line"> Pool Name: docker-thinpool</span><br><span class="line"> Pool Blocksize: 524.3 kB</span><br><span class="line"> Base Device Size: 10.74 GB</span><br><span class="line"> Backing Filesystem: xfs</span><br><span class="line"> Data file:</span><br><span class="line"> Metadata file:</span><br><span class="line"> Data Space Used: 19.92 MB</span><br><span class="line"> Data Space Total: 102 GB</span><br><span class="line"> Data Space Available: 102 GB</span><br><span class="line"> Metadata Space Used: 147.5 kB</span><br><span class="line"> Metadata Space Total: 1.07 GB</span><br><span class="line"> Metadata Space Available: 1.069 GB</span><br><span class="line"> Thin Pool Minimum Free Space: 10.2 GB</span><br><span class="line"> Udev Sync Supported: <span class="literal">true</span></span><br><span class="line"> Deferred Removal Enabled: <span class="literal">true</span></span><br><span class="line"> Deferred Deletion Enabled: <span class="literal">true</span></span><br><span class="line"> Deferred Deleted Device Count: 0</span><br><span class="line"> Library Version: 1.02.135-RHEL7 (2016-11-16)</span><br><span class="line">&lt;output truncated&gt;</span><br></pre></td></tr></table></figure>
+<p>如果配置正确的话，<code>Data file</code>和<code>Metadata file</code>会是空，并且<code>Pool Name</code>是<code>docker-thinpool</code></p>
+<p><br></p>
+<h2 id="为运行中的设备扩容"><a href="#为运行中的设备扩容" class="headerlink" title="为运行中的设备扩容"></a>为运行中的设备扩容</h2><p>不要仅仅依赖于LVM的自动扩容机制。VG自动扩容，但是LV可能还是满的。可以使用<code>lvs</code>或<code>lvs -a</code>查看LV的空闲空间</p>
+<p>可以使用<code>journalctl</code>查看LVM的日志：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ journalctl -fu dm-event.service</span><br></pre></td></tr></table></figure>
+<p>如果重复遇到某个问题，可以在<code>/etc/docker.daemon.json</code>中设置<code>dm.min_free_space</code>选项，比如设置成10（表示百分比），从而确保当空闲空间不足10%时操作会失败并返回提示信息</p>
+<h3 id="改变-loop-lvm-模式设备的大小"><a href="#改变-loop-lvm-模式设备的大小" class="headerlink" title="改变 loop-lvm 模式设备的大小"></a>改变 loop-lvm 模式设备的大小</h3><p>有下列2种方法：</p>
+<p><strong>1. 使用社区共享的<code>device_tool.go</code>脚本（<a href="https://github.com/moby/moby/tree/master/contrib/docker-device-tool" target="_blank" rel="noopener">链接</a>）。使用这个工具最为方便，但不一定奏效</strong></p>
+<p>1）首先将链接中的仓库克隆，然后重命名为<code>contrib/docker-device-tool</code>。接着按照README.md中的说明编译工具</p>
+<p>2）使用类似<code>$ ./device_tool resize 200GB</code>这样的指令扩容</p>
+<p><strong>2. 使用操作系统工具</strong></p>
+<p>在 loop-lvm 模式下，一个 loopback（回环）设备被用于存储数据，另一个 loopback（回环）设备被用于存储元数据。这种模式仅适合测试，因为性能和稳定性都不好</p>
+<p>假设原来的 loopback（回环）设备大小为100GB，现在要扩容到200GB</p>
+<p>1）查看2个 loopback（回环）设备：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">$ sudo ls -lh /var/lib/docker/devicemapper/</span><br><span class="line"></span><br><span class="line">total 1175492</span><br><span class="line">-rw------- 1 root root 100G Mar 30 05:22 data</span><br><span class="line">-rw------- 1 root root 2.0G Mar 31 11:17 metadata</span><br></pre></td></tr></table></figure>
+<p>2）使用<code>truncate</code>命令将数据文件的大小修改成200G</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ sudo truncate -s 200G /var/lib/docker/devicemapper/data</span><br></pre></td></tr></table></figure>
+<p>3）再次查看2个 loopback（回环）设备：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">$ sudo ls -lh /var/lib/docker/devicemapper/</span><br><span class="line"></span><br><span class="line">total 1.2G</span><br><span class="line">-rw------- 1 root root 200G Apr 14 08:47 data</span><br><span class="line">-rw------- 1 root root 2.0G Apr 19 13:27 metadata</span><br></pre></td></tr></table></figure>
+<p>4）loopback 文件已经在磁盘上发生了改变，但是内存中没有。列出内存中 loopback 设备的大小，重载，然后再次列出它的大小，此时内存中的大小也得到更新：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">$ <span class="built_in">echo</span> $[ $(sudo blockdev --getsize64 /dev/loop0) / 1024 / 1024 / 1024 ]</span><br><span class="line"></span><br><span class="line">100</span><br><span class="line"></span><br><span class="line">$ sudo losetup -c /dev/loop0</span><br><span class="line"></span><br><span class="line">$ <span class="built_in">echo</span> $[ $(sudo blockdev --getsize64 /dev/loop0) / 1024 / 1024 / 1024 ]</span><br><span class="line"></span><br><span class="line">200</span><br></pre></td></tr></table></figure>
+<p>5）重载 devicemapper thin pool</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># a）首先得到 thin pool 的名字</span></span><br><span class="line">$ sudo dmsetup status | grep <span class="string">' thin-pool '</span> | awk -F <span class="string">': '</span> &#123;<span class="string">'print $1'</span>&#125;</span><br><span class="line"></span><br><span class="line">docker-8:1-123141-pool</span><br><span class="line"></span><br><span class="line"><span class="comment"># b）dump device mapper table for the thin pool</span></span><br><span class="line">$ sudo dmsetup table docker-8:1-123141-pool</span><br><span class="line"></span><br><span class="line">0 209715200 thin-pool 7:1 7:0 128 32768 1 skip_block_zeroing</span><br><span class="line"></span><br><span class="line"><span class="comment"># c）使用上一步输出中的第2个域计算 thin pool 所有的扇区。如果扩容为200G，即原来的2倍，那么扇区数也变成原来的2倍，即419430400</span></span><br><span class="line"></span><br><span class="line"><span class="comment"># d）使用新的扇区数重载 thin pool</span></span><br><span class="line">$ sudo dmsetup <span class="built_in">suspend</span> docker-8:1-123141-pool</span><br><span class="line"></span><br><span class="line">$ sudo dmsetup reload docker-8:1-123141-pool --table <span class="string">'0 419430400 thin-pool 7:1 7:0 128 32768 1 skip_block_zeroing'</span></span><br><span class="line"></span><br><span class="line">$ sudo dmsetup resume docker-8:1-123141-pool</span><br></pre></td></tr></table></figure>
+<h3 id="改变-direct-lvm-模式设备的大小"><a href="#改变-direct-lvm-模式设备的大小" class="headerlink" title="改变 direct-lvm 模式设备的大小"></a>改变 direct-lvm 模式设备的大小</h3><p>首先要附加一块新的块设备，假设这块新的设备为<code>/dev/xvdg</code></p>
+<ol>
+<li>使用<code>pvdisplay</code>找到当前被 thin pool 使用的PV和VG：</li>
+</ol>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">$ sudo pvdisplay |grep <span class="string">'VG Name'</span></span><br><span class="line"></span><br><span class="line">PV Name               /dev/xvdf</span><br><span class="line">VG Name               docker</span><br></pre></td></tr></table></figure>
+<ol start="2">
+<li>执行<code>vgextend</code>命令使用新的设备<code>/dev/xvdg</code>来扩充VG：</li>
+</ol>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">$ sudo vgextend docker /dev/xvdg</span><br><span class="line"></span><br><span class="line">Physical volume <span class="string">"/dev/xvdg"</span> successfully created.</span><br><span class="line">Volume group <span class="string">"docker"</span> successfully extended</span><br></pre></td></tr></table></figure>
+<ol start="3">
+<li>使用下列命令扩充<code>docker/thinpool</code> LV（逻辑卷）。下面的命令会使用所以100%的可用空间。如果要扩充元数据 thin pool, 使用<code>docker/thinpool_tmeta</code>代替<code>docker/thinpool</code>：</li>
+</ol>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">$ sudo lvextend -l+100%FREE -n docker/thinpool</span><br><span class="line"></span><br><span class="line">Size of logical volume docker/thinpool_tdata changed from 95.00 GiB (24319 extents) to 198.00 GiB (50688 extents).</span><br><span class="line">Logical volume docker/thinpool_tdata successfully resized.</span><br></pre></td></tr></table></figure>
+<ol start="4">
+<li>查看<code>docker info</code>输出中的<code>Data Space Available</code>域确认扩容完成：</li>
+</ol>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line">Storage Driver: devicemapper</span><br><span class="line"> Pool Name: docker-thinpool</span><br><span class="line"> Pool Blocksize: 524.3 kB</span><br><span class="line"> Base Device Size: 10.74 GB</span><br><span class="line"> Backing Filesystem: xfs</span><br><span class="line"> Data file:</span><br><span class="line"> Metadata file:</span><br><span class="line"> Data Space Used: 212.3 MB</span><br><span class="line"> Data Space Total: 212.6 GB</span><br><span class="line"> Data Space Available: 212.4 GB</span><br><span class="line"> Metadata Space Used: 286.7 kB</span><br><span class="line"> Metadata Space Total: 1.07 GB</span><br><span class="line"> Metadata Space Available: 1.069 GB</span><br><span class="line">&lt;output truncated&gt;</span><br></pre></td></tr></table></figure>
+<blockquote>
+<p>如果重启主机后发现Docker服务启动失败，然后报错：”Non existing device“，需要调用命令<code>sudo lvchange -ay docker/thinpool</code>来重新激活逻辑卷</p>
+</blockquote>
+<p><br></p>
+<h2 id="devicemapper如何工作"><a href="#devicemapper如何工作" class="headerlink" title="devicemapper如何工作"></a>devicemapper如何工作</h2><p>使用 <code>lsblk</code> 命令查看设备和 thin pool ：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">$ sudo lsblk</span><br><span class="line"></span><br><span class="line">NAME                    MAJ:MIN RM  SIZE RO TYPE MOUNTPOINT</span><br><span class="line">xvda                    202:0    0    8G  0 disk</span><br><span class="line">└─xvda1                 202:1    0    8G  0 part /</span><br><span class="line">xvdf                    202:80   0  100G  0 disk</span><br><span class="line">├─docker-thinpool_tmeta 253:0    0 1020M  0 lvm</span><br><span class="line">│ └─docker-thinpool     253:2    0   95G  0 lvm</span><br><span class="line">└─docker-thinpool_tdata 253:1    0   95G  0 lvm</span><br><span class="line">  └─docker-thinpool     253:2    0   95G  0 lvm</span><br></pre></td></tr></table></figure>
+<p>使用 <code>mount</code> 命令查看容器使用的挂载点：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">$ mount | grep devicemapper</span><br><span class="line">/dev/xvda1 on /var/lib/docker/devicemapper <span class="built_in">type</span> xfs (rw,relatime,seclabel,attr2,inode64,noquota)</span><br></pre></td></tr></table></figure>
+<p>当使用devicemapper存储驱动时，Docker将镜像和层数据存储在 thinpool 中，然后通过将它们挂载在<code>/var/lib/docker/devicemapper/</code>的子目录下来暴露给容器</p>
+<h3 id="磁盘中的镜像和容器层"><a href="#磁盘中的镜像和容器层" class="headerlink" title="磁盘中的镜像和容器层"></a>磁盘中的镜像和容器层</h3><ul>
+<li><code>/var/lib/docker/devicemapper/metadata/</code>目录包含 devicemapper 配置的元数据以及每个镜像和容器层的元数据。devicemapper 使用快照，这些元数据包含这些快照的信息，文件格式为JSON</li>
+<li><code>/var/lib/docker/devicemapper/mnt/</code>目录为每个镜像和容器层创建了一个挂载点。镜像层的挂载点为空，而容器层的挂载点展示了容器的文件系统</li>
+</ul>
+<h3 id="镜像的分层与共享"><a href="#镜像的分层与共享" class="headerlink" title="镜像的分层与共享"></a>镜像的分层与共享</h3><p>devicemapper 存储驱动使用专用的块设备，而不是格式化的文件系统。块级操作可以为CoW操作带来最大的性能</p>
+<h3 id="快照"><a href="#快照" class="headerlink" title="快照"></a>快照</h3><p>devicemapper 的另一个特征是快照。它将每一层引入的差异存储为非常小的，轻量级的 thin pools。快照提供很快好处：</p>
+<ul>
+<li>多个容器共享的层只在磁盘中存储一次，除非它们可写</li>
+<li>快照是CoW机制的一种实现。这意味着当一个文件或者目录被修改时，它们会被拷贝到容器的可写层然后再修改</li>
+<li>因为操作是块级，所以可写层的多个块的修改可同时进行</li>
+<li>快照能用OS级的备份工具来备份：拷贝<code>/var/lib/docker/devicemapper/</code></li>
+</ul>
+<h3 id="工作流"><a href="#工作流" class="headerlink" title="工作流"></a>工作流</h3><p>当使用 devicemapper 存储驱动时，所有和镜像及容器有关的对象被存储在<code>/var/lib/docker/devicemapper/</code>中，这个目录的后端是一个或多个块设备，如 loopback 设备或物理磁盘</p>
+<ul>
+<li>基础设备是最底层的对象，也就是 thin pool。可以使用<code>docker info</code>查看，它包含了1个文件系统。这个基础设备是每个镜像和容器层的起点。这个基础设备是一个Device Mapper的详细实现，而不是一个Docker的层</li>
+<li>关于基础设备和镜像及容器层的元数据以JSON格式存储在<code>/var/lib/docker/devicemapper/metadata/metadata/</code>中，它们都是CoW快照，意味着在和父层表现出差异之前，它们都是空</li>
+<li>每个容器的可写层挂载在<code>/var/lib/docker/devicemapper/mnt/</code>目录中的一个挂载点上。每个镜像层和停止的容器在<code>/var/lib/docker/devicemapper/mnt/</code>中有一个空目录</li>
+</ul>
+<p>每个镜像层是它下层的一个快照。每个镜像的最底层是pool中基础设备的一个快照。当运行一个容器时，会根据容器使用的镜像创建1个快照</p>
+<div align="center"> <img src="/img/in-post/post-docker-filesystem/two_dm_container.jpg"> </div>
+
+<p><br></p>
+<h2 id="容器中的读写"><a href="#容器中的读写" class="headerlink" title="容器中的读写"></a>容器中的读写</h2><h3 id="读文件"><a href="#读文件" class="headerlink" title="读文件"></a>读文件</h3><p>读为块级。下图展示了读一个块(0x44f)的处理流程：</p>
+<div align="center"> <img src="/img/in-post/post-docker-filesystem/dm_container.jpg"> </div>
+
+<p>一个应用发起一个对块0x44f的读请求，因为容器是镜像的一个 thin snapshot，它并没有这个块，但是它有一个指向最近父镜像中这个块的指针，所以会从父镜像中读取这个块。这个块现在存在于容器的内存中</p>
+<h3 id="写文件"><a href="#写文件" class="headerlink" title="写文件"></a>写文件</h3><ul>
+<li><strong>写一个新文件</strong>：将新数据写入容器是通过按需分配操作完成的。新文件的每个块都分配在容器的可写层中，然后对可写层中的块进行写</li>
+<li><strong>更新一个已有文件</strong>：文件相关的块从存有该文件的最近层读取。当容器写这个文件时，只有修改的块会被写到容器的可写层</li>
+<li><strong>删除一个文件或目录</strong>：当删除容器可写层中的文件或目录时，或者当镜像层删除1个位于父镜像层中的文件时，devicemapper存储驱动会拦截以后对该文件或目录的读取操作并响应”此文件不存在“</li>
+<li><strong>写然后删除一个文件</strong>：如果容器先写一个文件，然后删除它，所以这些操作发生在容器的可写层。这种情况下，如果使用 direct-lvm 模式，块会被释放。如果使用 loop-lvm 模式，块不会被释放。这是不在生产环境中使用 loop-lvm 模式的另一个原因</li>
+</ul>
+<p><br></p>
+<h2 id="性能与最佳实践"><a href="#性能与最佳实践" class="headerlink" title="性能与最佳实践"></a>性能与最佳实践</h2><h3 id="性能"><a href="#性能" class="headerlink" title="性能"></a>性能</h3><ul>
+<li><strong>allocate-on demand（按需分配）</strong>：devicemapper存储驱动使用按需分配操作从 thin pool 中分配新的块。每个块64KB，因此这是一个写使用的最小的空间</li>
+<li><strong>CoW性能影响</strong>：容器第一次修改1个特定块时，块被写入容器的可写层。因为这些写为块级而不是文件级，所以性能影响最小化。然而，写大量的块仍会对性能产生消极影响，此时，devicemapper可能比其他存储驱动表现出更差的性能。对于写密集的负载，应该使用数据卷</li>
+</ul>
+<h3 id="最佳实践"><a href="#最佳实践" class="headerlink" title="最佳实践"></a>最佳实践</h3><ul>
+<li><strong>使用 direct-lvm 模式</strong>：loop-lvm模式不适用与生产环境</li>
+<li><strong>使用更快的存储介质</strong>：SSD提供更好的读写性能</li>
+<li><strong>内存使用</strong>：devicemapper比其他存储驱动使用更多的内存。每个启动的容器将一份或多份文件的拷贝装载到内存中，取决于相同文件中有多少个块在同一时刻被修改。由于内存压力，devicemapper存储驱动可能不适应与高密集型负载的使用场景</li>
+<li><strong>在写繁重的场景中使用数据卷</strong>：卷 bypass（旁路）了存储驱动，不会引入由 thin provisioning（自动精简配置）和 CoW 带来的潜在性能开销</li>
+</ul>
+
+      
+    </div>
+    
+  </div>
+  
+    
+    <div class="copyright">
+        <p><span>本文标题:</span><a href="/2017/07/03/2017-07-03-docker-filesystem-devicemapper/">Docker存储驱动—Device Mapper「译」</a></p>
+        <p><span>文章作者:</span><a href="/" title="回到主页">Arking</a></p>
+        <p><span>发布时间:</span>2017-07-03, 12:57:00</p>
+        <p><span>最后更新:</span>2018-12-14, 18:07:40</p>
+        <p>
+            <span>原始链接:</span><a class="post-url" href="/2017/07/03/2017-07-03-docker-filesystem-devicemapper/" title="Docker存储驱动—Device Mapper「译」">https://arkingc.github.io/2017/07/03/2017-07-03-docker-filesystem-devicemapper/</a>
+            <span class="copy-path" data-clipboard-text="原文: https://arkingc.github.io/2017/07/03/2017-07-03-docker-filesystem-devicemapper/　　作者: Arking" title="点击复制文章链接"><i class="fa fa-clipboard"></i></span>
+            <script> var clipboard = new Clipboard('.copy-path'); </script>
+        </p>
+        <p>
+            <span>许可协议:</span><i class="fa fa-creative-commons"></i> <a rel="license" href="http://creativecommons.org/licenses/by-nc-sa/4.0/" title="CC BY-NC-SA 4.0 International" target="_blank">"署名-非商用-相同方式共享 4.0"</a> 转载请保留原文链接及作者。
+        </p>
+    </div>
+
+
+
+    <nav id="article-nav">
+        
+            <div id="article-nav-newer" class="article-nav-title">
+                <a href="/2017/08/18/2017-08-18-linux-code-vfs/">
+                    Linux虚拟文件系统(VFS)
+                </a>
+            </div>
+        
+        
+            <div id="article-nav-older" class="article-nav-title">
+                <a href="/2017/05/05/2017-05-05-docker-filesystem-overlay/">
+                     Docker存储驱动—Overlay/Overlay2「译」
+                </a>
+            </div>
+        
+    </nav>
+
+  
+</article>
+
+    <div id="toc" class="toc-article">
+        <strong class="toc-title">文章目录</strong>
+        
+            <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#配置使用devicemapper"><span class="toc-number">1.</span> <span class="toc-text">配置使用devicemapper</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#loop-lvm-模式"><span class="toc-number">1.1.</span> <span class="toc-text">loop-lvm 模式</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#direct-lvm-模式"><span class="toc-number">1.2.</span> <span class="toc-text">direct-lvm 模式</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#1）让Docker来配置-direct-lvm-模式"><span class="toc-number">1.2.1.</span> <span class="toc-text">1）让Docker来配置 direct-lvm 模式</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#2）手动配置-direct-lvm-模式"><span class="toc-number">1.2.2.</span> <span class="toc-text">2）手动配置 direct-lvm 模式</span></a></li></ol></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#为运行中的设备扩容"><span class="toc-number">2.</span> <span class="toc-text">为运行中的设备扩容</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#改变-loop-lvm-模式设备的大小"><span class="toc-number">2.1.</span> <span class="toc-text">改变 loop-lvm 模式设备的大小</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#改变-direct-lvm-模式设备的大小"><span class="toc-number">2.2.</span> <span class="toc-text">改变 direct-lvm 模式设备的大小</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#devicemapper如何工作"><span class="toc-number">3.</span> <span class="toc-text">devicemapper如何工作</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#磁盘中的镜像和容器层"><span class="toc-number">3.1.</span> <span class="toc-text">磁盘中的镜像和容器层</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#镜像的分层与共享"><span class="toc-number">3.2.</span> <span class="toc-text">镜像的分层与共享</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#快照"><span class="toc-number">3.3.</span> <span class="toc-text">快照</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#工作流"><span class="toc-number">3.4.</span> <span class="toc-text">工作流</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#容器中的读写"><span class="toc-number">4.</span> <span class="toc-text">容器中的读写</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#读文件"><span class="toc-number">4.1.</span> <span class="toc-text">读文件</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#写文件"><span class="toc-number">4.2.</span> <span class="toc-text">写文件</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#性能与最佳实践"><span class="toc-number">5.</span> <span class="toc-text">性能与最佳实践</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#性能"><span class="toc-number">5.1.</span> <span class="toc-text">性能</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#最佳实践"><span class="toc-number">5.2.</span> <span class="toc-text">最佳实践</span></a></li></ol></li></ol>
+        
+    </div>
+    <style>
+        .left-col .switch-btn,
+        .left-col .switch-area {
+            display: none;
+        }
+        .toc-level-3 i,
+        .toc-level-3 ol {
+            display: none !important;
+        }
+    </style>
+
+    <input type="button" id="tocButton" value="隐藏目录" title="点击按钮隐藏或者显示文章目录">
+
+    <script>
+        yiliaConfig.toc = ["隐藏目录", "显示目录", !!"false"];
+    </script>
+
+
+
+    
+<div class="share">
+    
+        <div class="bdsharebuttonbox">
+            <a href="#" class="fa fa-twitter bds_twi" data-cmd="twi" title="分享到推特"></a>
+            <a href="#" class="fa fa-weibo bds_tsina" data-cmd="tsina" title="分享到新浪微博"></a>
+            <a href="#" class="fa fa-qq bds_sqq" data-cmd="sqq" title="分享给 QQ 好友"></a>
+            <a href="#" class="fa fa-files-o bds_copy" data-cmd="copy" title="复制网址"></a>
+            <a href="#" class="fa fa fa-envelope-o bds_mail" data-cmd="mail" title="通过邮件分享"></a>
+            <a href="#" class="fa fa-weixin bds_weixin" data-cmd="weixin" title="生成文章二维码"></a>
+            <a href="#" class="fa fa-share-alt bds_more" data-cmd="more"></a>
+        </div>
+        <script>
+            window._bd_share_config={
+                "common":{"bdSnsKey":{},"bdText":"Docker存储驱动—Device Mapper「译」　| Arking　","bdMini":"2","bdMiniList":false,"bdPic":"","bdStyle":"0","bdSize":"24"},"share":{}};with(document)0[(getElementsByTagName('head')[0]||body).appendChild(createElement('script')).src='http://bdimg.share.baidu.com/static/api/js/share.js?v=89860593.js?cdnversion='+~(-new Date()/36e5)];
+        </script>
+    
+
+    
+</div>
+
+
+
+
+
+
+
+    
+
+
+
+
+    <div class="scroll" id="post-nav-button">
+        
+            <a href="/2017/08/18/2017-08-18-linux-code-vfs/" title="上一篇: Linux虚拟文件系统(VFS)">
+                <i class="fa fa-angle-left"></i>
+            </a>
+        
+
+        <a title="文章列表"><i class="fa fa-bars"></i><i class="fa fa-times"></i></a>
+
+        
+            <a href="/2017/05/05/2017-05-05-docker-filesystem-overlay/" title="下一篇:  Docker存储驱动—Overlay/Overlay2「译」">
+                <i class="fa fa-angle-right"></i>
+            </a>
+        
+    </div>
+
+    <ul class="post-list"><li class="post-list-item"><a class="post-list-link" href="/2018/12/13/2018-12-13-linux-lvm/">Linux Device Mapper</a></li><li class="post-list-item"><a class="post-list-link" href="/2018/12/11/2018-12-11-docker-storage-persist/"> Docker容器数据持久化 </a></li><li class="post-list-item"><a class="post-list-link" href="/2018/12/08/2018-12-08-linux-benchmark-fxmark/">使用FXMARK测试文件系统的多核可扩展性</a></li><li class="post-list-item"><a class="post-list-link" href="/2018/09/05/2018-09-05-linux-kernel/">Ubuntu下内核与内核模块的编译过程</a></li><li class="post-list-item"><a class="post-list-link" href="/2018/01/19/2018-01-19-docker-imagestore/"> Docker源码分析—镜像存储 </a></li><li class="post-list-item"><a class="post-list-link" href="/2018/01/15/2018-01-15-docker-storage-overlay2/"> Docker源码分析—存储驱动 </a></li><li class="post-list-item"><a class="post-list-link" href="/2018/01/14/2018-01-14-docker-layerstore/"> Docker源码分析—层存储 </a></li><li class="post-list-item"><a class="post-list-link" href="/2018/01/12/2018-01-10-c-stack_frame/"> C函数栈帧 </a></li><li class="post-list-item"><a class="post-list-link" href="/2017/12/26/2017-12-26-linux-code-overlayfs-read_write/">内核OverlayFS—文件读写</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/12/22/2017-12-22-linux-code-overlayfs-create_delete/">内核OverlayFS—创建与删除文件</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/11/30/2017-11-30-linux-du/"> Linux查看目录大小</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/11/10/2017-11-10-linux-code-overlayfs-dir-op1/">内核OverlayFS—目录搜索</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/10/12/2017-10-12-linux-code-overlayfs-mnt/">内核OverlayFS—注册与挂载</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/09/20/2017-09-20-linux-code-overlayfs-layerinfo/">内核OverlayFS—文件层次信息</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/08/18/2017-08-18-linux-code-vfs/">Linux虚拟文件系统(VFS)</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/07/03/2017-07-03-docker-filesystem-devicemapper/">Docker存储驱动—Device Mapper「译」</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/05/05/2017-05-05-docker-filesystem-overlay/"> Docker存储驱动—Overlay/Overlay2「译」</a></li><li class="post-list-item"><a class="post-list-link" href="/2017/04/13/2017-04-13-docker-filesystem-aufs/"> Docker存储驱动—Aufs </a></li><li class="post-list-item"><a class="post-list-link" href="/2017/04/09/2017-04-09-linux-uuid/"> Linux存储设备的UUID</a></li></ul>
+
+
+
+
+    <script>
+        
+    </script>
+</div>
+      <footer id="footer">
+    <div class="outer">
+        <div id="footer-info">
+            <div class="footer-left">
+                <i class="fa fa-copyright"></i> 
+                2017-2018 Arking
+            </div>
+            <div class="footer-right">
+                <a href="http://hexo.io/" target="_blank" title="快速、简洁且高效的博客框架">Hexo</a>  Theme <a href="https://github.com/MOxFIVE/hexo-theme-yelee" target="_blank" title="简而不减 Hexo 双栏博客主题  v3.5">Yelee</a> by MOxFIVE <i class="fa fa-heart animated infinite pulse"></i>
+            </div>
+        </div>
+        
+            <div class="visit">
+                
+                    <span id="busuanzi_container_site_pv" style="display:none">
+                        <span id="site-visit" title="本站到访数"><i class="fa fa-user" aria-hidden="true"></i><span id="busuanzi_value_site_uv"></span>
+                        </span>
+                    </span>
+                
+                
+                    <span>| </span>
+                
+                
+                    <span id="busuanzi_container_page_pv" style="display:none">
+                        <span id="page-visit" title="本页阅读量"><i class="fa fa-eye animated infinite pulse" aria-hidden="true"></i><span id="busuanzi_value_page_pv"></span>
+                        </span>
+                    </span>
+                
+            </div>
+        
+    </div>
+</footer>
+
+<script async src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js">
+</script>
+    </div>
+    
+<script data-main="/js/main.js" src="//cdn.bootcss.com/require.js/2.2.0/require.min.js"></script>
+
+
+
+<!-- Google Analytics -->
+<script type="text/javascript">
+(function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+(i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+})(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+ga('create', 'UA-130420706-1', 'auto');
+ga('send', 'pageview');
+
+</script>
+<!-- End Google Analytics -->
+
+
+
+<div class="scroll" id="scroll">
+    <a href="#" title="返回顶部"><i class="fa fa-arrow-up"></i></a>
+    <a href="#comments" onclick="load$hide();" title="查看评论"><i class="fa fa-comments-o"></i></a>
+    <a href="#footer" title="转到底部"><i class="fa fa-arrow-down"></i></a>
+</div>
+<script>
+    // Open in New Window
+    
+        var oOpenInNew = {
+            
+            
+            
+            
+            
+            
+             archives: ".archive-article-title", 
+             miniArchives: "a.post-list-link", 
+            
+             friends: "#js-friends a", 
+             socail: ".social a" 
+        }
+        for (var x in oOpenInNew) {
+            $(oOpenInNew[x]).attr("target", "_blank");
+        }
+    
+</script>
+
+<script async src="https://dn-lbstatics.qbox.me/busuanzi/2.3/busuanzi.pure.mini.js">
+</script>
+  </div>
+</body>
+</html>

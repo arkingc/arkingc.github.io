@@ -1,8 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
+    <loc>https://arkingc.github.io/2017/07/03/2017-07-03-docker-filesystem-devicemapper/</loc>
+    <lastmod>2018-12-14T10:07:40.000Z</lastmod>
+  </url>  <url>
     <loc>https://arkingc.github.io/2018/12/13/2018-12-13-linux-lvm/</loc>
-    <lastmod>2018-12-13T13:50:18.000Z</lastmod>
+    <lastmod>2018-12-14T01:27:56.000Z</lastmod>
   </url>  <url>
     <loc>https://arkingc.github.io/2018/12/11/2018-12-11-docker-storage-persist/</loc>
     <lastmod>2018-12-11T03:41:50.000Z</lastmod>

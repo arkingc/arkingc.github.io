@@ -633,6 +633,76 @@
 
 
   
+    <article id="post-2017-07-03-docker-filesystem-devicemapper" class="article article-type-post" itemscope="" itemprop="blogPost">
+  
+    <div class="article-meta">
+      <a href="/2017/07/03/2017-07-03-docker-filesystem-devicemapper/" class="article-date">
+      <time datetime="2017-07-03T04:57:00.000Z" itemprop="datePublished">2017-07-03</time>
+</a>
+
+
+    </div>
+  
+  <div class="article-inner">
+    
+      <input type="hidden" class="isFancy">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 itemprop="name">
+      <a class="article-title" href="/2017/07/03/2017-07-03-docker-filesystem-devicemapper/">Docker存储驱动—Device Mapper「译」</a>
+    </h1>
+  
+
+      </header>
+      
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+          
+              <p>Docker 的 devicemapper 存储驱动利用了内核 device mapper 的 <a href="https://baike.baidu.com/item/%E8%87%AA%E5%8A%A8%E7%B2%BE%E7%AE%80%E9%85%8D%E7%BD%AE" target="_blank" rel="noopener">thin provisioning（自动精简配置）</a>和 snapshotting（快照）的能力来管理镜像和容器</p>
+<p>devicemapper使用Docker专用的块设备，操作为块级而不是文件级。可以通过为Docker主机添加物理存储来扩充这些设备</p>
+<p>这篇文章是对<a href="https://docs.docker.com/storage/storagedriver/device-mapper-driver/#device-mapper-and-docker-performance" target="_blank" rel="noopener">Docker官网中 devicemapper 存储驱动使用文档</a>的翻译</p>
+          
+      
+    </div>
+    
+    <div class="article-info article-info-index">
+      
+      
+    <div class="article-category tagcloud">
+    <a class="article-category-link" href="/categories/Docker使用/">Docker使用</a>
+    </div>
+
+
+      
+    <div class="article-tag tagcloud">
+        <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/docker/">docker</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/storage/">storage</a></li></ul>
+    </div>
+
+      
+        <p class="article-more-link">
+          <a href="/2017/07/03/2017-07-03-docker-filesystem-devicemapper/#more">more >></a>
+        </p>
+      
+      <div class="clearfix"></div>
+    </div>
+    
+  </div>
+  
+</article>
+
+
+
+
+
+
+
+
+
+  
     <article id="post-2017-05-05-docker-filesystem-overlay" class="article article-type-post" itemscope="" itemprop="blogPost">
   
     <div class="article-meta">
