@@ -16,7 +16,7 @@
 
 
 <meta name="description" content="在Linux中，VFS为上层应用提供了访问下层文件系统的统一接口，它将文件相关的概念进行了抽象，同时提供了对这些抽象概念的操作接口">
-<meta name="keywords" content="filesystem">
+<meta name="keywords" content="filesystem,kernel,vfs">
 <meta property="og:type" content="article">
 <meta property="og:title" content="Linux虚拟文件系统(VFS)">
 <meta property="og:url" content="https://arkingc.github.io/2017/08/18/2017-08-18-linux-code-vfs/index.html">
@@ -29,7 +29,7 @@
 <meta property="og:image" content="https://arkingc.github.io/img/in-post/post-linux-vfs/super_block-1.png">
 <meta property="og:image" content="https://arkingc.github.io/img/in-post/post-linux-vfs/super_block-2.png">
 <meta property="og:image" content="https://arkingc.github.io/img/in-post/post-linux-vfs/dentry-tree.png">
-<meta property="og:updated_time" content="2018-12-04T10:03:44.000Z">
+<meta property="og:updated_time" content="2018-12-17T12:22:53.000Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="Linux虚拟文件系统(VFS)">
 <meta name="twitter:description" content="在Linux中，VFS为上层应用提供了访问下层文件系统的统一接口，它将文件相关的概念进行了抽象，同时提供了对这些抽象概念的操作接口">
@@ -200,7 +200,7 @@
                 
                 <section class="switch-part switch-part2">
                     <div class="widget tagcloud" id="js-tagcloud">
-                        <ul class="tag-list"><li class="tag-list-item"><a class="tag-list-link" href="/tags/c/">c</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/docker/">docker</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/filesystem/">filesystem</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/linux/">linux</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/overlayfs/">overlayfs</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/storage/">storage</a></li></ul>
+                        <ul class="tag-list"><li class="tag-list-item"><a class="tag-list-link" href="/tags/aufs/">aufs</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/c/">c</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/device-mapper/">device mapper</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/docker-storage/">docker storage</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/filesystem/">filesystem</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/kernel/">kernel</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/lvm/">lvm</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/overlay-overlay2/">overlay/overlay2</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/overlayfs/">overlayfs</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/vfs/">vfs</a></li></ul>
                     </div>
                 </section>
                 
@@ -309,13 +309,13 @@
       <div class="article-info article-info-post">
         
     <div class="article-category tagcloud">
-    <a class="article-category-link" href="/categories/Linux内核/">Linux内核</a>
+    <a class="article-category-link" href="/categories/Linux/">Linux</a>
     </div>
 
 
         
     <div class="article-tag tagcloud">
-        <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/filesystem/">filesystem</a></li></ul>
+        <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/filesystem/">filesystem</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/kernel/">kernel</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/vfs/">vfs</a></li></ul>
     </div>
 
         <div class="clearfix"></div>
@@ -740,7 +740,7 @@
         <p><span>本文标题:</span><a href="/2017/08/18/2017-08-18-linux-code-vfs/">Linux虚拟文件系统(VFS)</a></p>
         <p><span>文章作者:</span><a href="/" title="回到主页">Arking</a></p>
         <p><span>发布时间:</span>2017-08-18, 02:51:00</p>
-        <p><span>最后更新:</span>2018-12-04, 18:03:44</p>
+        <p><span>最后更新:</span>2018-12-17, 20:22:53</p>
         <p>
             <span>原始链接:</span><a class="post-url" href="/2017/08/18/2017-08-18-linux-code-vfs/" title="Linux虚拟文件系统(VFS)">https://arkingc.github.io/2017/08/18/2017-08-18-linux-code-vfs/</a>
             <span class="copy-path" data-clipboard-text="原文: https://arkingc.github.io/2017/08/18/2017-08-18-linux-code-vfs/　　作者: Arking" title="点击复制文章链接"><i class="fa fa-clipboard"></i></span>

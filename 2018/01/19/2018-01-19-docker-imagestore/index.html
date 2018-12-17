@@ -16,7 +16,7 @@
 
 
 <meta name="description" content="基于Docker 17.05.x  Docker使用层存储来管理容器和镜像的层，那么如何知道哪些层属于某一个镜像？也就说如果现在系统上有很多个镜像，每个镜像又包括很多层，如果使用Overlay2，你可以在存储驱动目录下看到一大堆目录，如何知道哪些层是属于某个镜像？也就是说一个镜像如何和镜像层之间建立起关系？ 这篇文章主要通过分析Docker源码，介绍镜像存储的创建过程">
-<meta name="keywords" content="docker,storage">
+<meta name="keywords" content="docker storage">
 <meta property="og:type" content="article">
 <meta property="og:title" content=" Docker源码分析—镜像存储 ">
 <meta property="og:url" content="https://arkingc.github.io/2018/01/19/2018-01-19-docker-imagestore/index.html">
@@ -24,7 +24,7 @@
 <meta property="og:description" content="基于Docker 17.05.x  Docker使用层存储来管理容器和镜像的层，那么如何知道哪些层属于某一个镜像？也就说如果现在系统上有很多个镜像，每个镜像又包括很多层，如果使用Overlay2，你可以在存储驱动目录下看到一大堆目录，如何知道哪些层是属于某个镜像？也就是说一个镜像如何和镜像层之间建立起关系？ 这篇文章主要通过分析Docker源码，介绍镜像存储的创建过程">
 <meta property="og:locale" content="default">
 <meta property="og:image" content="https://arkingc.github.io/img/in-post/post-docker-imagestore/imagestore.png">
-<meta property="og:updated_time" content="2018-12-11T03:31:32.000Z">
+<meta property="og:updated_time" content="2018-12-17T12:27:53.000Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content=" Docker源码分析—镜像存储 ">
 <meta name="twitter:description" content="基于Docker 17.05.x  Docker使用层存储来管理容器和镜像的层，那么如何知道哪些层属于某一个镜像？也就说如果现在系统上有很多个镜像，每个镜像又包括很多层，如果使用Overlay2，你可以在存储驱动目录下看到一大堆目录，如何知道哪些层是属于某个镜像？也就是说一个镜像如何和镜像层之间建立起关系？ 这篇文章主要通过分析Docker源码，介绍镜像存储的创建过程">
@@ -195,7 +195,7 @@
                 
                 <section class="switch-part switch-part2">
                     <div class="widget tagcloud" id="js-tagcloud">
-                        <ul class="tag-list"><li class="tag-list-item"><a class="tag-list-link" href="/tags/c/">c</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/docker/">docker</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/filesystem/">filesystem</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/linux/">linux</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/overlayfs/">overlayfs</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/storage/">storage</a></li></ul>
+                        <ul class="tag-list"><li class="tag-list-item"><a class="tag-list-link" href="/tags/aufs/">aufs</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/c/">c</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/device-mapper/">device mapper</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/docker-storage/">docker storage</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/filesystem/">filesystem</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/kernel/">kernel</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/lvm/">lvm</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/overlay-overlay2/">overlay/overlay2</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/overlayfs/">overlayfs</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/vfs/">vfs</a></li></ul>
                     </div>
                 </section>
                 
@@ -304,13 +304,13 @@
       <div class="article-info article-info-post">
         
     <div class="article-category tagcloud">
-    <a class="article-category-link" href="/categories/Docker源码/">Docker源码</a>
+    <a class="article-category-link" href="/categories/Docker/">Docker</a>
     </div>
 
 
         
     <div class="article-tag tagcloud">
-        <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/docker/">docker</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/storage/">storage</a></li></ul>
+        <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/docker-storage/">docker storage</a></li></ul>
     </div>
 
         <div class="clearfix"></div>
@@ -436,7 +436,7 @@
         <p><span>本文标题:</span><a href="/2018/01/19/2018-01-19-docker-imagestore/"> Docker源码分析—镜像存储 </a></p>
         <p><span>文章作者:</span><a href="/" title="回到主页">Arking</a></p>
         <p><span>发布时间:</span>2018-01-19, 02:57:00</p>
-        <p><span>最后更新:</span>2018-12-11, 11:31:32</p>
+        <p><span>最后更新:</span>2018-12-17, 20:27:53</p>
         <p>
             <span>原始链接:</span><a class="post-url" href="/2018/01/19/2018-01-19-docker-imagestore/" title=" Docker源码分析—镜像存储 ">https://arkingc.github.io/2018/01/19/2018-01-19-docker-imagestore/</a>
             <span class="copy-path" data-clipboard-text="原文: https://arkingc.github.io/2018/01/19/2018-01-19-docker-imagestore/　　作者: Arking" title="点击复制文章链接"><i class="fa fa-clipboard"></i></span>

@@ -16,7 +16,7 @@
 
 
 <meta name="description" content="内核版本4.4.68  在OverlayFS联合挂载目录下，使用命令ls看到的文件实际上来自联合挂载的upper层和lower层。前面的博文中有提到过，OverlayFS的本质在于实现操作转化，因此在对OverlayFS中的一个目录进行搜索时（使用命令ls时），实际上会搜索目录对应upper层和lower层的目录，然后对搜索结果进行处理、展示。最终得到我们在OverlayFS下ls dir看到的">
-<meta name="keywords" content="filesystem,overlayfs">
+<meta name="keywords" content="filesystem,overlayfs,kernel">
 <meta property="og:type" content="article">
 <meta property="og:title" content="内核OverlayFS—目录搜索">
 <meta property="og:url" content="https://arkingc.github.io/2017/11/10/2017-11-10-linux-code-overlayfs-dir-op1/index.html">
@@ -27,7 +27,7 @@
 <meta property="og:image" content="https://arkingc.github.io/img/in-post/post-kernel-overlayfs/dir-op1-strace.png">
 <meta property="og:image" content="https://arkingc.github.io/img/in-post/post-kernel-overlayfs/dir-op1-open.png">
 <meta property="og:image" content="https://arkingc.github.io/img/in-post/post-kernel-overlayfs/dir-op1-iterator.png">
-<meta property="og:updated_time" content="2018-12-04T09:46:01.000Z">
+<meta property="og:updated_time" content="2018-12-17T12:23:21.000Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="内核OverlayFS—目录搜索">
 <meta name="twitter:description" content="内核版本4.4.68  在OverlayFS联合挂载目录下，使用命令ls看到的文件实际上来自联合挂载的upper层和lower层。前面的博文中有提到过，OverlayFS的本质在于实现操作转化，因此在对OverlayFS中的一个目录进行搜索时（使用命令ls时），实际上会搜索目录对应upper层和lower层的目录，然后对搜索结果进行处理、展示。最终得到我们在OverlayFS下ls dir看到的">
@@ -198,7 +198,7 @@
                 
                 <section class="switch-part switch-part2">
                     <div class="widget tagcloud" id="js-tagcloud">
-                        <ul class="tag-list"><li class="tag-list-item"><a class="tag-list-link" href="/tags/c/">c</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/docker/">docker</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/filesystem/">filesystem</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/linux/">linux</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/overlayfs/">overlayfs</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/storage/">storage</a></li></ul>
+                        <ul class="tag-list"><li class="tag-list-item"><a class="tag-list-link" href="/tags/aufs/">aufs</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/c/">c</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/device-mapper/">device mapper</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/docker-storage/">docker storage</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/filesystem/">filesystem</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/kernel/">kernel</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/lvm/">lvm</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/overlay-overlay2/">overlay/overlay2</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/overlayfs/">overlayfs</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/vfs/">vfs</a></li></ul>
                     </div>
                 </section>
                 
@@ -307,13 +307,13 @@
       <div class="article-info article-info-post">
         
     <div class="article-category tagcloud">
-    <a class="article-category-link" href="/categories/Linux内核/">Linux内核</a>
+    <a class="article-category-link" href="/categories/Linux/">Linux</a>
     </div>
 
 
         
     <div class="article-tag tagcloud">
-        <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/filesystem/">filesystem</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/overlayfs/">overlayfs</a></li></ul>
+        <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/filesystem/">filesystem</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/kernel/">kernel</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/overlayfs/">overlayfs</a></li></ul>
     </div>
 
         <div class="clearfix"></div>
@@ -412,7 +412,7 @@
         <p><span>本文标题:</span><a href="/2017/11/10/2017-11-10-linux-code-overlayfs-dir-op1/">内核OverlayFS—目录搜索</a></p>
         <p><span>文章作者:</span><a href="/" title="回到主页">Arking</a></p>
         <p><span>发布时间:</span>2017-11-10, 02:51:00</p>
-        <p><span>最后更新:</span>2018-12-04, 17:46:01</p>
+        <p><span>最后更新:</span>2018-12-17, 20:23:21</p>
         <p>
             <span>原始链接:</span><a class="post-url" href="/2017/11/10/2017-11-10-linux-code-overlayfs-dir-op1/" title="内核OverlayFS—目录搜索">https://arkingc.github.io/2017/11/10/2017-11-10-linux-code-overlayfs-dir-op1/</a>
             <span class="copy-path" data-clipboard-text="原文: https://arkingc.github.io/2017/11/10/2017-11-10-linux-code-overlayfs-dir-op1/　　作者: Arking" title="点击复制文章链接"><i class="fa fa-clipboard"></i></span>

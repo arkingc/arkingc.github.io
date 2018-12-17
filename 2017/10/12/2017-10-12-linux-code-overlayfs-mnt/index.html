@@ -16,7 +16,7 @@
 
 
 <meta name="description" content="内核版本为4.4.68  这篇文章通过内核源码分析OverlayFS的注册与挂载过程 假设你对OverlayFS的层次关系已经有一个基本的了解。如果对OverlayFS的层以及联合挂载没有概念，建议先补充下相关知识，因为挂载OverlayFS时会使用到层 分析会尽可能避开公有部分(每种文件系统注册和挂载过程中都会涉及的内容)，而更多的关注OverlayFS独有部分">
-<meta name="keywords" content="filesystem,overlayfs">
+<meta name="keywords" content="filesystem,overlayfs,kernel">
 <meta property="og:type" content="article">
 <meta property="og:title" content="内核OverlayFS—注册与挂载">
 <meta property="og:url" content="https://arkingc.github.io/2017/10/12/2017-10-12-linux-code-overlayfs-mnt/index.html">
@@ -28,7 +28,7 @@
 <meta property="og:image" content="https://arkingc.github.io/img/in-post/post-kernel-overlayfs/dir-op1-dir_tree.png">
 <meta property="og:image" content="https://arkingc.github.io/img/in-post/post-kernel-overlayfs/fill_1.png">
 <meta property="og:image" content="https://arkingc.github.io/img/in-post/post-kernel-overlayfs/fill_2.png">
-<meta property="og:updated_time" content="2018-12-04T09:50:11.000Z">
+<meta property="og:updated_time" content="2018-12-17T12:23:34.000Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="内核OverlayFS—注册与挂载">
 <meta name="twitter:description" content="内核版本为4.4.68  这篇文章通过内核源码分析OverlayFS的注册与挂载过程 假设你对OverlayFS的层次关系已经有一个基本的了解。如果对OverlayFS的层以及联合挂载没有概念，建议先补充下相关知识，因为挂载OverlayFS时会使用到层 分析会尽可能避开公有部分(每种文件系统注册和挂载过程中都会涉及的内容)，而更多的关注OverlayFS独有部分">
@@ -199,7 +199,7 @@
                 
                 <section class="switch-part switch-part2">
                     <div class="widget tagcloud" id="js-tagcloud">
-                        <ul class="tag-list"><li class="tag-list-item"><a class="tag-list-link" href="/tags/c/">c</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/docker/">docker</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/filesystem/">filesystem</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/linux/">linux</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/overlayfs/">overlayfs</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/storage/">storage</a></li></ul>
+                        <ul class="tag-list"><li class="tag-list-item"><a class="tag-list-link" href="/tags/aufs/">aufs</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/c/">c</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/device-mapper/">device mapper</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/docker-storage/">docker storage</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/filesystem/">filesystem</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/kernel/">kernel</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/lvm/">lvm</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/overlay-overlay2/">overlay/overlay2</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/overlayfs/">overlayfs</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/vfs/">vfs</a></li></ul>
                     </div>
                 </section>
                 
@@ -308,13 +308,13 @@
       <div class="article-info article-info-post">
         
     <div class="article-category tagcloud">
-    <a class="article-category-link" href="/categories/Linux内核/">Linux内核</a>
+    <a class="article-category-link" href="/categories/Linux/">Linux</a>
     </div>
 
 
         
     <div class="article-tag tagcloud">
-        <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/filesystem/">filesystem</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/overlayfs/">overlayfs</a></li></ul>
+        <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/filesystem/">filesystem</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/kernel/">kernel</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/overlayfs/">overlayfs</a></li></ul>
     </div>
 
         <div class="clearfix"></div>
@@ -426,7 +426,7 @@
         <p><span>本文标题:</span><a href="/2017/10/12/2017-10-12-linux-code-overlayfs-mnt/">内核OverlayFS—注册与挂载</a></p>
         <p><span>文章作者:</span><a href="/" title="回到主页">Arking</a></p>
         <p><span>发布时间:</span>2017-10-12, 02:51:00</p>
-        <p><span>最后更新:</span>2018-12-04, 17:50:11</p>
+        <p><span>最后更新:</span>2018-12-17, 20:23:34</p>
         <p>
             <span>原始链接:</span><a class="post-url" href="/2017/10/12/2017-10-12-linux-code-overlayfs-mnt/" title="内核OverlayFS—注册与挂载">https://arkingc.github.io/2017/10/12/2017-10-12-linux-code-overlayfs-mnt/</a>
             <span class="copy-path" data-clipboard-text="原文: https://arkingc.github.io/2017/10/12/2017-10-12-linux-code-overlayfs-mnt/　　作者: Arking" title="点击复制文章链接"><i class="fa fa-clipboard"></i></span>

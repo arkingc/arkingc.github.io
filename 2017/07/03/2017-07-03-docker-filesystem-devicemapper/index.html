@@ -16,7 +16,7 @@
 
 
 <meta name="description" content="Docker 的 devicemapper 存储驱动利用了内核 device mapper 的 thin provisioning（自动精简配置）和 snapshotting（快照）的能力来管理镜像和容器 devicemapper使用Docker专用的块设备，操作为块级而不是文件级。可以通过为Docker主机添加物理存储来扩充这些设备 这篇文章是对Docker官网中 devicemapper 存储">
-<meta name="keywords" content="docker,storage">
+<meta name="keywords" content="docker storage,device mapper">
 <meta property="og:type" content="article">
 <meta property="og:title" content="Docker存储驱动—Device Mapper「译」">
 <meta property="og:url" content="https://arkingc.github.io/2017/07/03/2017-07-03-docker-filesystem-devicemapper/index.html">
@@ -25,7 +25,7 @@
 <meta property="og:locale" content="default">
 <meta property="og:image" content="https://arkingc.github.io/img/in-post/post-docker-filesystem/two_dm_container.jpg">
 <meta property="og:image" content="https://arkingc.github.io/img/in-post/post-docker-filesystem/dm_container.jpg">
-<meta property="og:updated_time" content="2018-12-14T10:07:40.000Z">
+<meta property="og:updated_time" content="2018-12-17T12:28:14.000Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="Docker存储驱动—Device Mapper「译」">
 <meta name="twitter:description" content="Docker 的 devicemapper 存储驱动利用了内核 device mapper 的 thin provisioning（自动精简配置）和 snapshotting（快照）的能力来管理镜像和容器 devicemapper使用Docker专用的块设备，操作为块级而不是文件级。可以通过为Docker主机添加物理存储来扩充这些设备 这篇文章是对Docker官网中 devicemapper 存储">
@@ -196,7 +196,7 @@
                 
                 <section class="switch-part switch-part2">
                     <div class="widget tagcloud" id="js-tagcloud">
-                        <ul class="tag-list"><li class="tag-list-item"><a class="tag-list-link" href="/tags/c/">c</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/docker/">docker</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/filesystem/">filesystem</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/linux/">linux</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/overlayfs/">overlayfs</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/storage/">storage</a></li></ul>
+                        <ul class="tag-list"><li class="tag-list-item"><a class="tag-list-link" href="/tags/aufs/">aufs</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/c/">c</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/device-mapper/">device mapper</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/docker-storage/">docker storage</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/filesystem/">filesystem</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/kernel/">kernel</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/lvm/">lvm</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/overlay-overlay2/">overlay/overlay2</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/overlayfs/">overlayfs</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/vfs/">vfs</a></li></ul>
                     </div>
                 </section>
                 
@@ -305,13 +305,13 @@
       <div class="article-info article-info-post">
         
     <div class="article-category tagcloud">
-    <a class="article-category-link" href="/categories/Docker使用/">Docker使用</a>
+    <a class="article-category-link" href="/categories/Docker/">Docker</a>
     </div>
 
 
         
     <div class="article-tag tagcloud">
-        <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/docker/">docker</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/storage/">storage</a></li></ul>
+        <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/device-mapper/">device mapper</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/docker-storage/">docker storage</a></li></ul>
     </div>
 
         <div class="clearfix"></div>
@@ -323,7 +323,7 @@
           
         <p>Docker 的 devicemapper 存储驱动利用了内核 device mapper 的 <a href="https://baike.baidu.com/item/%E8%87%AA%E5%8A%A8%E7%B2%BE%E7%AE%80%E9%85%8D%E7%BD%AE" target="_blank" rel="noopener">thin provisioning（自动精简配置）</a>和 snapshotting（快照）的能力来管理镜像和容器</p>
 <p>devicemapper使用Docker专用的块设备，操作为块级而不是文件级。可以通过为Docker主机添加物理存储来扩充这些设备</p>
-<p>这篇文章是对<a href="https://docs.docker.com/storage/storagedriver/device-mapper-driver/#device-mapper-and-docker-performance" target="_blank" rel="noopener">Docker官网中 devicemapper 存储驱动使用文档</a>的翻译</p>
+<p>这篇文章是对<a href="https://docs.docker.com/storage/storagedriver/device-mapper-driver/" target="_blank" rel="noopener">Docker官网中 devicemapper 存储驱动使用文档</a>的翻译</p>
 <a id="more"></a>
 <p><br></p>
 <h2 id="配置使用devicemapper"><a href="#配置使用devicemapper" class="headerlink" title="配置使用devicemapper"></a>配置使用devicemapper</h2><h3 id="loop-lvm-模式"><a href="#loop-lvm-模式" class="headerlink" title="loop-lvm 模式"></a>loop-lvm 模式</h3><p>这个模式仅仅适用于测试。loopback（回路）设备非常慢并且资源敏感，他们在磁盘中创建的文件需要有固定大小，他们还会引入竞争。配置这种模式的步骤十分简单：</p>
@@ -510,7 +510,7 @@
 <li><code>/var/lib/docker/devicemapper/mnt/</code>目录为每个镜像和容器层创建了一个挂载点。镜像层的挂载点为空，而容器层的挂载点展示了容器的文件系统</li>
 </ul>
 <h3 id="镜像的分层与共享"><a href="#镜像的分层与共享" class="headerlink" title="镜像的分层与共享"></a>镜像的分层与共享</h3><p>devicemapper 存储驱动使用专用的块设备，而不是格式化的文件系统。块级操作可以为CoW操作带来最大的性能</p>
-<h3 id="快照"><a href="#快照" class="headerlink" title="快照"></a>快照</h3><p>devicemapper 的另一个特征是快照。它将每一层引入的差异存储为非常小的，轻量级的 thin pools。快照提供很快好处：</p>
+<h3 id="快照"><a href="#快照" class="headerlink" title="快照"></a>快照</h3><p>devicemapper 的另一个特征是快照。它将每一层引入的差异存储为非常小的，轻量级的 thin pools。快照提供很多好处：</p>
 <ul>
 <li>多个容器共享的层只在磁盘中存储一次，除非它们可写</li>
 <li>快照是CoW机制的一种实现。这意味着当一个文件或者目录被修改时，它们会被拷贝到容器的可写层然后再修改</li>
@@ -520,7 +520,7 @@
 <h3 id="工作流"><a href="#工作流" class="headerlink" title="工作流"></a>工作流</h3><p>当使用 devicemapper 存储驱动时，所有和镜像及容器有关的对象被存储在<code>/var/lib/docker/devicemapper/</code>中，这个目录的后端是一个或多个块设备，如 loopback 设备或物理磁盘</p>
 <ul>
 <li>基础设备是最底层的对象，也就是 thin pool。可以使用<code>docker info</code>查看，它包含了1个文件系统。这个基础设备是每个镜像和容器层的起点。这个基础设备是一个Device Mapper的详细实现，而不是一个Docker的层</li>
-<li>关于基础设备和镜像及容器层的元数据以JSON格式存储在<code>/var/lib/docker/devicemapper/metadata/metadata/</code>中，它们都是CoW快照，意味着在和父层表现出差异之前，它们都是空</li>
+<li>关于基础设备和镜像及容器层的元数据以JSON格式存储在<code>/var/lib/docker/devicemapper/metadata/</code>中，它们都是CoW快照，意味着在和父层表现出差异之前，它们都是空</li>
 <li>每个容器的可写层挂载在<code>/var/lib/docker/devicemapper/mnt/</code>目录中的一个挂载点上。每个镜像层和停止的容器在<code>/var/lib/docker/devicemapper/mnt/</code>中有一个空目录</li>
 </ul>
 <p>每个镜像层是它下层的一个快照。每个镜像的最底层是pool中基础设备的一个快照。当运行一个容器时，会根据容器使用的镜像创建1个快照</p>
@@ -559,7 +559,7 @@
         <p><span>本文标题:</span><a href="/2017/07/03/2017-07-03-docker-filesystem-devicemapper/">Docker存储驱动—Device Mapper「译」</a></p>
         <p><span>文章作者:</span><a href="/" title="回到主页">Arking</a></p>
         <p><span>发布时间:</span>2017-07-03, 12:57:00</p>
-        <p><span>最后更新:</span>2018-12-14, 18:07:40</p>
+        <p><span>最后更新:</span>2018-12-17, 20:28:14</p>
         <p>
             <span>原始链接:</span><a class="post-url" href="/2017/07/03/2017-07-03-docker-filesystem-devicemapper/" title="Docker存储驱动—Device Mapper「译」">https://arkingc.github.io/2017/07/03/2017-07-03-docker-filesystem-devicemapper/</a>
             <span class="copy-path" data-clipboard-text="原文: https://arkingc.github.io/2017/07/03/2017-07-03-docker-filesystem-devicemapper/　　作者: Arking" title="点击复制文章链接"><i class="fa fa-clipboard"></i></span>

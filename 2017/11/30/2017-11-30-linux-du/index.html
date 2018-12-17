@@ -16,14 +16,13 @@
 
 
 <meta name="description" content="在Linux上，如果你想查看一个文件的大小，可以使用命令ls -l，但是如果你想查看一个目录的大小(包含目录下的文件)，ls无法做到，基本上用ls命令查看到的目录大小都是4K（假设块大小为4K）: 12345678910111213chenximing@chenximing-MS-7823:~$ ls -lh......-rw-rw-r--  1 chenximing chenximing  16">
-<meta name="keywords" content="linux,storage">
 <meta property="og:type" content="article">
 <meta property="og:title" content=" Linux查看目录大小">
 <meta property="og:url" content="https://arkingc.github.io/2017/11/30/2017-11-30-linux-du/index.html">
 <meta property="og:site_name" content="Arking">
 <meta property="og:description" content="在Linux上，如果你想查看一个文件的大小，可以使用命令ls -l，但是如果你想查看一个目录的大小(包含目录下的文件)，ls无法做到，基本上用ls命令查看到的目录大小都是4K（假设块大小为4K）: 12345678910111213chenximing@chenximing-MS-7823:~$ ls -lh......-rw-rw-r--  1 chenximing chenximing  16">
 <meta property="og:locale" content="default">
-<meta property="og:updated_time" content="2018-12-04T08:52:52.000Z">
+<meta property="og:updated_time" content="2018-12-17T12:24:29.000Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content=" Linux查看目录大小">
 <meta name="twitter:description" content="在Linux上，如果你想查看一个文件的大小，可以使用命令ls -l，但是如果你想查看一个目录的大小(包含目录下的文件)，ls无法做到，基本上用ls命令查看到的目录大小都是4K（假设块大小为4K）: 12345678910111213chenximing@chenximing-MS-7823:~$ ls -lh......-rw-rw-r--  1 chenximing chenximing  16">
@@ -193,7 +192,7 @@
                 
                 <section class="switch-part switch-part2">
                     <div class="widget tagcloud" id="js-tagcloud">
-                        <ul class="tag-list"><li class="tag-list-item"><a class="tag-list-link" href="/tags/c/">c</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/docker/">docker</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/filesystem/">filesystem</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/linux/">linux</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/overlayfs/">overlayfs</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/storage/">storage</a></li></ul>
+                        <ul class="tag-list"><li class="tag-list-item"><a class="tag-list-link" href="/tags/aufs/">aufs</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/c/">c</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/device-mapper/">device mapper</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/docker-storage/">docker storage</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/filesystem/">filesystem</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/kernel/">kernel</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/lvm/">lvm</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/overlay-overlay2/">overlay/overlay2</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/overlayfs/">overlayfs</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/vfs/">vfs</a></li></ul>
                     </div>
                 </section>
                 
@@ -302,15 +301,11 @@
       <div class="article-info article-info-post">
         
     <div class="article-category tagcloud">
-    <a class="article-category-link" href="/categories/Linux管理/">Linux管理</a>
+    <a class="article-category-link" href="/categories/Linux/">Linux</a>
     </div>
 
 
         
-    <div class="article-tag tagcloud">
-        <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/linux/">linux</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/storage/">storage</a></li></ul>
-    </div>
-
         <div class="clearfix"></div>
       </div>
       
@@ -362,7 +357,7 @@
         <p><span>本文标题:</span><a href="/2017/11/30/2017-11-30-linux-du/"> Linux查看目录大小</a></p>
         <p><span>文章作者:</span><a href="/" title="回到主页">Arking</a></p>
         <p><span>发布时间:</span>2017-11-30, 10:51:00</p>
-        <p><span>最后更新:</span>2018-12-04, 16:52:52</p>
+        <p><span>最后更新:</span>2018-12-17, 20:24:29</p>
         <p>
             <span>原始链接:</span><a class="post-url" href="/2017/11/30/2017-11-30-linux-du/" title=" Linux查看目录大小">https://arkingc.github.io/2017/11/30/2017-11-30-linux-du/</a>
             <span class="copy-path" data-clipboard-text="原文: https://arkingc.github.io/2017/11/30/2017-11-30-linux-du/　　作者: Arking" title="点击复制文章链接"><i class="fa fa-clipboard"></i></span>
