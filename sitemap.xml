@@ -2,6 +2,13 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   
   <url>
+    <loc>https://arkingc.github.io/2018/12/13/2018-12-13-linux-lvm/</loc>
+    
+    <lastmod>2018-12-17T12:49:09.000Z</lastmod>
+    
+  </url>
+  
+  <url>
     <loc>https://arkingc.github.io/2018/12/08/2018-12-08-linux-benchmark-fxmark/</loc>
     
     <lastmod>2018-12-17T12:33:30.000Z</lastmod>
@@ -33,13 +40,6 @@
     <loc>https://arkingc.github.io/2018/01/19/2018-01-19-docker-imagestore/</loc>
     
     <lastmod>2018-12-17T12:27:53.000Z</lastmod>
-    
-  </url>
-  
-  <url>
-    <loc>https://arkingc.github.io/2018/12/13/2018-12-13-linux-lvm/</loc>
-    
-    <lastmod>2018-12-17T12:27:27.000Z</lastmod>
     
   </url>
   

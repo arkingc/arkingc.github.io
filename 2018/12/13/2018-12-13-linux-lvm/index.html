@@ -31,7 +31,7 @@
 <meta property="og:image" content="https://arkingc.github.io/img/in-post/post-linux-lvm/relation.png">
 <meta property="og:image" content="https://arkingc.github.io/img/in-post/post-linux-lvm/step.png">
 <meta property="og:image" content="https://arkingc.github.io/img/in-post/post-linux-lvm/snapshot.png">
-<meta property="og:updated_time" content="2018-12-17T12:27:27.000Z">
+<meta property="og:updated_time" content="2018-12-17T12:49:09.000Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="Linux Device Mapper">
 <meta name="twitter:description" content="Device Mapper 是 Linux2.6 内核中支持逻辑卷管理的通用设备映射机制，它为实现用于存储资源管理的块设备驱动提供了一个高度模块化的内核架构">
@@ -356,7 +356,7 @@
 <div align="center"> <img src="/img/in-post/post-linux-lvm/struct.png" width="40%" height="40%"> </div>
 
 <h3 id="I-O流"><a href="#I-O流" class="headerlink" title="I/O流"></a>I/O流</h3><p>Device mapper本质功能就是根据映射关系和target driver描述的I/O处理规则，将I/O请求从逻辑设备mapped device转发相应的target device上</p>
-<p>Device mapper处理所有从内核中块级I/O子系统的generic_make_request和submit_bio接口中定向到mapped device的所有块读写I/O请求。I/O请求在device mapper的设备树中通过请求转发从上到下地进行处理</p>
+<p>Device mapper处理所有从generic_make_request和submit_bio接口中定向到mapped device的所有块读写I/O请求。I/O请求在device mapper的设备树中通过请求转发从上到下地进行处理</p>
 <div align="center"> <img src="/img/in-post/post-linux-lvm/stack.png" width="25%" height="25%"> </div>
 
 <p><strong>向下转发</strong>：当一个bio请求在设备树中的mapped deivce向下层转发时，一个或者多个bio的克隆被创建并发送给下层target device。然后相同的过程在设备树的每一个层次上重复，只要设备树足够大理论上这种转发过程可以无限进行下去</p>
@@ -478,7 +478,7 @@
         <p><span>本文标题:</span><a href="/2018/12/13/2018-12-13-linux-lvm/">Linux Device Mapper</a></p>
         <p><span>文章作者:</span><a href="/" title="回到主页">Arking</a></p>
         <p><span>发布时间:</span>2018-12-13, 20:51:00</p>
-        <p><span>最后更新:</span>2018-12-17, 20:27:27</p>
+        <p><span>最后更新:</span>2018-12-17, 20:49:09</p>
         <p>
             <span>原始链接:</span><a class="post-url" href="/2018/12/13/2018-12-13-linux-lvm/" title="Linux Device Mapper">https://arkingc.github.io/2018/12/13/2018-12-13-linux-lvm/</a>
             <span class="copy-path" data-clipboard-text="原文: https://arkingc.github.io/2018/12/13/2018-12-13-linux-lvm/　　作者: Arking" title="点击复制文章链接"><i class="fa fa-clipboard"></i></span>
