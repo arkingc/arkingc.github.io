@@ -25,7 +25,7 @@
 <meta property="og:locale" content="default">
 <meta property="og:image" content="https://arkingc.github.io/img/in-post/post-docker-filesystem/two_dm_container.jpg">
 <meta property="og:image" content="https://arkingc.github.io/img/in-post/post-docker-filesystem/dm_container.jpg">
-<meta property="og:updated_time" content="2018-12-18T12:44:47.000Z">
+<meta property="og:updated_time" content="2018-12-18T13:31:07.000Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="Docker存储驱动—Device Mapper「译」">
 <meta name="twitter:description" content="Docker 的 devicemapper 存储驱动利用了内核 device mapper 的 thin provisioning（自动精简配置）和 snapshotting（快照）的能力来管理镜像和容器 devicemapper使用Docker专用的块设备，操作为块级而不是文件级。可以通过为Docker主机添加物理存储来扩充这些设备 这篇文章是对Docker官网中 devicemapper 存储">
@@ -550,7 +550,8 @@
 </ul>
 <p><br></p>
 <h2 id="其它资料"><a href="#其它资料" class="headerlink" title="其它资料"></a>其它资料</h2><ul>
-<li><a href="https://coolshell.cn/articles/17200.html" target="_blank" rel="noopener">Docker基础技术：Devicemapper</a></li>
+<li><a href="https://coolshell.cn/articles/17200.html" target="_blank" rel="noopener">Docker基础技术：Devicemapper</a>（可以使用命令模拟容器和镜像的分层结构）</li>
+<li><a href="https://www.lijiaocn.com/%E6%8A%80%E5%B7%A7/2017/07/07/linux-tool-devicemapper.html#%E5%88%A0%E9%99%A4thin" target="_blank" rel="noopener">linux device mapper 原理与使用</a>（介绍怎么删除 thin pool 中的设备）</li>
 </ul>
 
       
@@ -563,7 +564,7 @@
         <p><span>本文标题:</span><a href="/2017/07/03/2017-07-03-docker-filesystem-devicemapper/">Docker存储驱动—Device Mapper「译」</a></p>
         <p><span>文章作者:</span><a href="/" title="回到主页">Arking</a></p>
         <p><span>发布时间:</span>2017-07-03, 12:57:00</p>
-        <p><span>最后更新:</span>2018-12-18, 20:44:47</p>
+        <p><span>最后更新:</span>2018-12-18, 21:31:07</p>
         <p>
             <span>原始链接:</span><a class="post-url" href="/2017/07/03/2017-07-03-docker-filesystem-devicemapper/" title="Docker存储驱动—Device Mapper「译」">https://arkingc.github.io/2017/07/03/2017-07-03-docker-filesystem-devicemapper/</a>
             <span class="copy-path" data-clipboard-text="原文: https://arkingc.github.io/2017/07/03/2017-07-03-docker-filesystem-devicemapper/　　作者: Arking" title="点击复制文章链接"><i class="fa fa-clipboard"></i></span>
