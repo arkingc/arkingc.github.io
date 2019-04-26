@@ -15,23 +15,23 @@
 
 
 
-<meta name="description" content="docker支持的存储驱动有aufs、overlayFS、devicemapper、btrfs、zfs和vfs; 这篇文章主要谈谈btrfs；">
+<meta name="description" content="Btrfs是下一代copy-on-write文件系统，它支持很多先进存储技术，这使得它能很好的适用与Docker。Btrfs已经引入了内核主线 Docker的btrfs存储驱动利用了很多Btrfs的特征来管理容器和镜像。这些特征有块级操作，瘦供给(thin provisioning)，copy-on-write快照，以及管理轻便性。你可以很容易的将多个物理块设备结合成一个单一的Btrfs文件系统">
 <meta name="keywords" content="docker storage,btrfs">
 <meta property="og:type" content="article">
 <meta property="og:title" content=" Docker存储驱动—Btrfs ">
 <meta property="og:url" content="https://arkingc.github.io/2019/04/24/2019-04-24-docker-filesystem-btrfs/index.html">
 <meta property="og:site_name" content="Arking">
-<meta property="og:description" content="docker支持的存储驱动有aufs、overlayFS、devicemapper、btrfs、zfs和vfs; 这篇文章主要谈谈btrfs；">
+<meta property="og:description" content="Btrfs是下一代copy-on-write文件系统，它支持很多先进存储技术，这使得它能很好的适用与Docker。Btrfs已经引入了内核主线 Docker的btrfs存储驱动利用了很多Btrfs的特征来管理容器和镜像。这些特征有块级操作，瘦供给(thin provisioning)，copy-on-write快照，以及管理轻便性。你可以很容易的将多个物理块设备结合成一个单一的Btrfs文件系统">
 <meta property="og:locale" content="default">
-<meta property="og:image" content="https://arkingc.github.io/img/in-post/post-docker-filesystem/btrfs_subvolume.jpg">
-<meta property="og:image" content="https://arkingc.github.io/img/in-post/post-docker-filesystem/btrfs_snapshots.jpg">
-<meta property="og:image" content="https://arkingc.github.io/img/in-post/post-docker-filesystem/btrfs_pools.jpg">
-<meta property="og:image" content="https://arkingc.github.io/img/in-post/post-docker-filesystem/btrfs_container_layer.jpg">
-<meta property="og:updated_time" content="2019-04-26T08:24:16.000Z">
+<meta property="og:image" content="https://arkingc.github.io/img/in-post/post-docker-filesystem/btfs_subvolume.jpg">
+<meta property="og:image" content="https://arkingc.github.io/img/in-post/post-docker-filesystem/btfs_snapshots.jpg">
+<meta property="og:image" content="https://arkingc.github.io/img/in-post/post-docker-filesystem/btfs_pools.jpg">
+<meta property="og:image" content="https://arkingc.github.io/img/in-post/post-docker-filesystem/btfs_container_layer.jpg">
+<meta property="og:updated_time" content="2019-04-26T09:27:42.000Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content=" Docker存储驱动—Btrfs ">
-<meta name="twitter:description" content="docker支持的存储驱动有aufs、overlayFS、devicemapper、btrfs、zfs和vfs; 这篇文章主要谈谈btrfs；">
-<meta name="twitter:image" content="https://arkingc.github.io/img/in-post/post-docker-filesystem/btrfs_subvolume.jpg">
+<meta name="twitter:description" content="Btrfs是下一代copy-on-write文件系统，它支持很多先进存储技术，这使得它能很好的适用与Docker。Btrfs已经引入了内核主线 Docker的btrfs存储驱动利用了很多Btrfs的特征来管理容器和镜像。这些特征有块级操作，瘦供给(thin provisioning)，copy-on-write快照，以及管理轻便性。你可以很容易的将多个物理块设备结合成一个单一的Btrfs文件系统">
+<meta name="twitter:image" content="https://arkingc.github.io/img/in-post/post-docker-filesystem/btfs_subvolume.jpg">
 
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 
@@ -323,16 +323,12 @@
     <div class="article-entry" itemprop="articleBody">
       
           
-        <blockquote>
-<p>docker支持的存储驱动有aufs、overlayFS、devicemapper、btrfs、zfs和vfs;</p>
-<p>这篇文章主要谈谈btrfs；</p>
-</blockquote>
-<a id="more"></a>
-<p>Btrfs是下一代copy-on-write文件系统，它支持很多先进存储技术，这使得它能很好的适用与Docker。Btrfs已经引入了内核主线</p>
+        <p>Btrfs是下一代copy-on-write文件系统，它支持很多先进存储技术，这使得它能很好的适用与Docker。Btrfs已经引入了内核主线</p>
 <p>Docker的btrfs存储驱动利用了很多Btrfs的特征来管理容器和镜像。这些特征有块级操作，瘦供给(thin provisioning)，copy-on-write快照，以及管理轻便性。你可以很容易的将多个物理块设备结合成一个单一的Btrfs文件系统</p>
 <blockquote>
 <p>这篇文章中使用“btrfs”代表Docker的Btrfs存储驱动，使用“Btrfs”表示Btrfs文件系统。注意在Ubuntu或者Debian上只有Docker CE支持btrfs存储驱动，在SLES上，只有Docker EE / CS 支持btrfs存储驱动</p>
 </blockquote>
+<a id="more"></a>
 <h2 id="基本条件"><a href="#基本条件" class="headerlink" title="基本条件"></a>基本条件</h2><p>为了支持btrfs，必须满足下列条件：</p>
 <ul>
 <li>Docker CE：只有Ubuntu或Debian中支持btrfs</li>
@@ -340,7 +336,7 @@
 <li>改变存储驱动会使你本地系统创建的所有容器都无法访问。在改变存储驱动前记得使用保存容器，然后推送到Docker hub或者私有仓库</li>
 <li>btrfs需要一个专用的块设备（如物理磁盘）。这个块设备必须格式化为Btrfs然后挂载到<code>/var/lib/docker</code>。下面的配置流程会指导你完成这些步骤。对于SLES来说，根文件系统默认情况下就是Btrfs，所以无需另外的专用块设备，但出于性能方面的考虑，你可以选择使用另外一个专用块设备</li>
 <li><p>内核必须支持btrfs，可以运行下面的命令检测：</p>
-  <figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">$ sudo cat /proc/filesystems | grep btrfs</span><br><span class="line"></span><br><span class="line">btrfs</span><br></pre></td></tr></table></figure>
+  <figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">$ sudo cat /proc/filesystems | grep btrfs</span><br><span class="line">btrfs</span><br></pre></td></tr></table></figure>
 </li>
 <li><p>在操作系统层管理Btrfs文件系统需要使用btrfs命令。如果系统中还未安装，安装btrfsprogs包（SLES）或btrfs-tools包（Ubuntu）</p>
 </li>
@@ -385,14 +381,14 @@
 <p><br></p>
 <h2 id="btrfs存储驱动如何工作"><a href="#btrfs存储驱动如何工作" class="headerlink" title="btrfs存储驱动如何工作"></a>btrfs存储驱动如何工作</h2><p>btrfs和其它存储驱动不同，整个<code>/var/lib/docker</code>目录都被存储为Btrfs卷</p>
 <h3 id="镜像和容器的磁盘结构"><a href="#镜像和容器的磁盘结构" class="headerlink" title="镜像和容器的磁盘结构"></a>镜像和容器的磁盘结构</h3><p>镜像层和可写的容器层的信息存储在<code>/var/lib/docker/btrfs/subvolumes/</code>中。每个容器层或镜像层在这个目录下都有一个相应的目录, with the unified filesystem built from a layer plus all its parent layers。子卷具有copt-on-write的特性它们的空间由一个底层存储池来按需分配。它们也能被嵌套和快照。下图展示了4个子卷。‘Subvolume 2’和’Subvolume 3’是嵌套的。而’Subvolume 4’展示了自身的内部目录树</p>
-<p><img src="/img/in-post/post-docker-filesystem/btrfs_subvolume.jpg" alt=""></p>
+<p><img src="/img/in-post/post-docker-filesystem/btfs_subvolume.jpg" alt=""></p>
 <p>一个镜像只有基层会被存储为一个真实的子卷。所有其它的层被存储为快照，它们只包含那一层的改变。如下图所示，可以创建快照的快照：</p>
-<p><img src="/img/in-post/post-docker-filesystem/btrfs_snapshots.jpg" alt=""></p>
+<p><img src="/img/in-post/post-docker-filesystem/btfs_snapshots.jpg" alt=""></p>
 <p>在磁盘上快照看起来就像子卷，但是事实上它们更小。copy-on-write的使用可以获得最大的存储效益以及最小的层大小，容器层写为块级。下面中镜像和它的块组共享数据：</p>
-<p><img src="/img/in-post/post-docker-filesystem/btrfs_pools.jpg" alt=""></p>
+<p><img src="/img/in-post/post-docker-filesystem/btfs_pools.jpg" alt=""></p>
 <p>为了最大化效益，当一个容器需要更多空间时，会按1GB的大块进行分配</p>
 <p>Docker的btrfs存储驱动将每个镜像层和容器存储在自己的btrfs子卷或快照中。镜像的基层存储为一个子卷而孩子层以及容器层存储为快照。如下图所示：</p>
-<p><img src="/img/in-post/post-docker-filesystem/btrfs_container_layer.jpg" alt=""></p>
+<p><img src="/img/in-post/post-docker-filesystem/btfs_container_layer.jpg" alt=""></p>
 <p>在运行btrfs存储的Docker主机上创建镜像和容器的过程如下：</p>
 <ol>
 <li>镜像的基层存储在Btrfs子卷中<code>/var/lib/docker/btrfs/subvolumes</code></li>
@@ -433,7 +429,7 @@
         <p><span>本文标题:</span><a href="/2019/04/24/2019-04-24-docker-filesystem-btrfs/"> Docker存储驱动—Btrfs </a></p>
         <p><span>文章作者:</span><a href="/" title="回到主页">Arking</a></p>
         <p><span>发布时间:</span>2019-04-24, 10:51:00</p>
-        <p><span>最后更新:</span>2019-04-26, 16:24:16</p>
+        <p><span>最后更新:</span>2019-04-26, 17:27:42</p>
         <p>
             <span>原始链接:</span><a class="post-url" href="/2019/04/24/2019-04-24-docker-filesystem-btrfs/" title=" Docker存储驱动—Btrfs ">https://arkingc.github.io/2019/04/24/2019-04-24-docker-filesystem-btrfs/</a>
             <span class="copy-path" data-clipboard-text="原文: https://arkingc.github.io/2019/04/24/2019-04-24-docker-filesystem-btrfs/　　作者: Arking" title="点击复制文章链接"><i class="fa fa-clipboard"></i></span>
