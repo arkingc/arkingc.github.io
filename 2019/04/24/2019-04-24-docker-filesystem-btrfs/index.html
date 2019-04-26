@@ -15,21 +15,23 @@
 
 
 
-<meta name="description" content="内核版本为4.4.68  我们知道，在OverlayFS中，读写操作和文件所在的层息息相关。尤其是写一个只读层的文件时，由于只读层不能修改，因此会触发copy-up操作。那么内核怎么知道一个文件到底是一个upper层（读写层）的文件还是一个lower（只读层）的文件？也就是说，在OverlayFS中如何记录文件的层次信息？">
-<meta name="keywords" content="filesystem,overlayfs,kernel">
+<meta name="description" content="docker支持的存储驱动有aufs、overlayFS、devicemapper、btrfs、zfs和vfs; 这篇文章主要谈谈btrfs；">
+<meta name="keywords" content="docker storage,btrfs">
 <meta property="og:type" content="article">
-<meta property="og:title" content="内核OverlayFS—文件层次信息">
-<meta property="og:url" content="https://arkingc.github.io/2017/09/20/2017-09-20-linux-code-overlayfs-layerinfo/index.html">
+<meta property="og:title" content=" Docker存储驱动—Btrfs ">
+<meta property="og:url" content="https://arkingc.github.io/2019/04/24/2019-04-24-docker-filesystem-btrfs/index.html">
 <meta property="og:site_name" content="Arking">
-<meta property="og:description" content="内核版本为4.4.68  我们知道，在OverlayFS中，读写操作和文件所在的层息息相关。尤其是写一个只读层的文件时，由于只读层不能修改，因此会触发copy-up操作。那么内核怎么知道一个文件到底是一个upper层（读写层）的文件还是一个lower（只读层）的文件？也就是说，在OverlayFS中如何记录文件的层次信息？">
+<meta property="og:description" content="docker支持的存储驱动有aufs、overlayFS、devicemapper、btrfs、zfs和vfs; 这篇文章主要谈谈btrfs；">
 <meta property="og:locale" content="default">
-<meta property="og:image" content="https://arkingc.github.io/img/in-post/post-kernel-overlayfs/file_layer_info.png">
-<meta property="og:image" content="https://arkingc.github.io/img/in-post/post-kernel-overlayfs/mount_tree.png">
-<meta property="og:updated_time" content="2019-04-25T08:31:01.000Z">
+<meta property="og:image" content="https://arkingc.github.io/img/in-post/post-docker-filesystem/btrfs_subvolume.jpg">
+<meta property="og:image" content="https://arkingc.github.io/img/in-post/post-docker-filesystem/btrfs_snapshots.jpg">
+<meta property="og:image" content="https://arkingc.github.io/img/in-post/post-docker-filesystem/btrfs_pools.jpg">
+<meta property="og:image" content="https://arkingc.github.io/img/in-post/post-docker-filesystem/btrfs_container_layer.jpg">
+<meta property="og:updated_time" content="2019-04-26T08:24:16.000Z">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:title" content="内核OverlayFS—文件层次信息">
-<meta name="twitter:description" content="内核版本为4.4.68  我们知道，在OverlayFS中，读写操作和文件所在的层息息相关。尤其是写一个只读层的文件时，由于只读层不能修改，因此会触发copy-up操作。那么内核怎么知道一个文件到底是一个upper层（读写层）的文件还是一个lower（只读层）的文件？也就是说，在OverlayFS中如何记录文件的层次信息？">
-<meta name="twitter:image" content="https://arkingc.github.io/img/in-post/post-kernel-overlayfs/file_layer_info.png">
+<meta name="twitter:title" content=" Docker存储驱动—Btrfs ">
+<meta name="twitter:description" content="docker支持的存储驱动有aufs、overlayFS、devicemapper、btrfs、zfs和vfs; 这篇文章主要谈谈btrfs；">
+<meta name="twitter:image" content="https://arkingc.github.io/img/in-post/post-docker-filesystem/btrfs_subvolume.jpg">
 
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 
@@ -61,7 +63,7 @@
 <link href="//cdn.bootcss.com/font-awesome/4.6.3/css/font-awesome.min.css" rel="stylesheet">
 
 
-<title>内核OverlayFS—文件层次信息 | Arking</title>
+<title> Docker存储驱动—Btrfs  | Arking</title>
 
 <script src="//cdn.bootcss.com/jquery/2.2.4/jquery.min.js"></script>
 <script src="//cdn.bootcss.com/clipboard.js/1.5.10/clipboard.min.js"></script>
@@ -277,11 +279,11 @@
     </div>
     <link class="menu-list" tags="标签" friends="友情链接" about="关于我">
 </nav>
-      <div class="body-wrap"><article id="post-2017-09-20-linux-code-overlayfs-layerinfo" class="article article-type-post" itemscope="" itemprop="blogPost">
+      <div class="body-wrap"><article id="post-2019-04-24-docker-filesystem-btrfs" class="article article-type-post" itemscope="" itemprop="blogPost">
   
     <div class="article-meta">
-      <a href="/2017/09/20/2017-09-20-linux-code-overlayfs-layerinfo/" class="article-date">
-      <time datetime="2017-09-19T18:51:00.000Z" itemprop="datePublished">2017-09-20</time>
+      <a href="/2019/04/24/2019-04-24-docker-filesystem-btrfs/" class="article-date">
+      <time datetime="2019-04-24T02:51:00.000Z" itemprop="datePublished">2019-04-24</time>
 </a>
 
 
@@ -296,7 +298,7 @@
         
   
     <h1 class="article-title" itemprop="name">
-      内核OverlayFS—文件层次信息
+       Docker存储驱动—Btrfs 
     </h1>
   
 
@@ -305,13 +307,13 @@
       <div class="article-info article-info-post">
         
     <div class="article-category tagcloud">
-    <a class="article-category-link" href="/categories/Linux/">Linux</a>
+    <a class="article-category-link" href="/categories/Docker/">Docker</a>
     </div>
 
 
         
     <div class="article-tag tagcloud">
-        <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/filesystem/">filesystem</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/kernel/">kernel</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/overlayfs/">overlayfs</a></li></ul>
+        <ul class="article-tag-list"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/btrfs/">btrfs</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/docker-storage/">docker storage</a></li></ul>
     </div>
 
         <div class="clearfix"></div>
@@ -322,82 +324,104 @@
       
           
         <blockquote>
-<p><strong>内核版本为4.4.68</strong></p>
+<p>docker支持的存储驱动有aufs、overlayFS、devicemapper、btrfs、zfs和vfs;</p>
+<p>这篇文章主要谈谈btrfs；</p>
 </blockquote>
-<p>我们知道，在OverlayFS中，读写操作和文件所在的层息息相关。尤其是写一个只读层的文件时，由于只读层不能修改，因此会触发copy-up操作。那么内核怎么知道一个文件到底是一个upper层（读写层）的文件还是一个lower（只读层）的文件？也就是说，在OverlayFS中如何记录文件的层次信息？</p>
 <a id="more"></a>
-<p><strong>OverlayFS通过一个名为ovl_entry的结构体来记录文件的层次信息</strong>。在OverlayFS中，会为每个文件分配一个ovl_entry变量，通过<strong>文件dentry的d_fsdata字段</strong>指向这个分配的ovl_entry变量。d_fsdata是一个void类型的指针，记录文件系统特有的信息:</p>
-<div align="left"> <img src="/img/in-post/post-kernel-overlayfs/file_layer_info.png" width="40%" height="40%"> </div>
-
-<p>对于OverlayFS中的每个文件，内核首先得到它的dentry，然后通过下面的方式访问文件的层次信息：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">ovl_entry</span> *<span class="title">oe</span> = <span class="title">dentry</span>-&gt;<span class="title">d_fsdata</span>;</span></span><br></pre></td></tr></table></figure>
-<p>因此，<strong>只要知道了文件的dentry，就能得到文件的层次信息</strong></p>
-<p><br></p>
-<h2 id="OverlayFS的本质"><a href="#OverlayFS的本质" class="headerlink" title="OverlayFS的本质"></a>OverlayFS的本质</h2><p>OverlayFS之所以需要一个结构来记录文件的层次信息是因为<strong>OverlayFS下的文件（联合挂载目录下的文件）并不是upper层或者lower层文件的拷贝。在OverlayFS下访问一个文件，实际上都会转化成对upper层或者lower层真实文件的访问。</strong>因此，就需要一个结构来记录每个文件到底源自哪层</p>
-<p><br></p>
-<h2 id="文件层次信息"><a href="#文件层次信息" class="headerlink" title="文件层次信息"></a>文件层次信息</h2><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">ovl_entry</span> &#123;</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">dentry</span> *__<span class="title">upperdentry</span>;</span><span class="comment">//记录upper层dentry</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">ovl_dir_cache</span> *<span class="title">cache</span>;</span></span><br><span class="line">	<span class="keyword">union</span> &#123;</span><br><span class="line">		<span class="class"><span class="keyword">struct</span> &#123;</span></span><br><span class="line">			u64 version;</span><br><span class="line">			<span class="keyword">bool</span> opaque;</span><br><span class="line">		&#125;;</span><br><span class="line">		<span class="class"><span class="keyword">struct</span> <span class="title">rcu_head</span> <span class="title">rcu</span>;</span></span><br><span class="line">	&#125;;</span><br><span class="line">	<span class="keyword">unsigned</span> numlower;<span class="comment">//lower层数</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">path</span> <span class="title">lowerstack</span>[];</span><span class="comment">//记录lower层路径</span></span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
-<p>ovl_entry结构中的__upperdentry记录了upper层信息，lowerstack字段记录了lower层信息。由于可以有多个lower层，所以lower层信息使用一个数组记录，数组的每个元素对应每一层lower层的信息：</p>
+<p>Btrfs是下一代copy-on-write文件系统，它支持很多先进存储技术，这使得它能很好的适用与Docker。Btrfs已经引入了内核主线</p>
+<p>Docker的btrfs存储驱动利用了很多Btrfs的特征来管理容器和镜像。这些特征有块级操作，瘦供给(thin provisioning)，copy-on-write快照，以及管理轻便性。你可以很容易的将多个物理块设备结合成一个单一的Btrfs文件系统</p>
+<blockquote>
+<p>这篇文章中使用“btrfs”代表Docker的Btrfs存储驱动，使用“Btrfs”表示Btrfs文件系统。注意在Ubuntu或者Debian上只有Docker CE支持btrfs存储驱动，在SLES上，只有Docker EE / CS 支持btrfs存储驱动</p>
+</blockquote>
+<h2 id="基本条件"><a href="#基本条件" class="headerlink" title="基本条件"></a>基本条件</h2><p>为了支持btrfs，必须满足下列条件：</p>
 <ul>
-<li>如果一个文件只存在upper层，则lower层信息为空</li>
-<li>如果一个文件只存在lower层，则__upperdentry字段为NULL</li>
-<li>如果文件同时存在upper层和lower层，则两个字段都不为空</li>
-</ul>
-<p>因此，只要得到了文件的dentry，就可以通过ovl_entry访问upper层或lower层文件的dentry，通过upper层或lower层文件的dentry可以进一步访问upper层或lower层文件的inode，实现对upper层和lower层的访问</p>
-<p>比如说在下图中，upper目录作为upper层，lowerdir_1-3目录作为lower层，联合挂载到merged目录下：</p>
-<div align="left"> <img src="/img/in-post/post-kernel-overlayfs/mount_tree.png" width="40%" height="40%"> </div>
-
-<ul>
-<li>对于OverlayFS中的file1，其dentry对应的ovl_entry结构的lowerstack[0].dentry，就指向lowerdir_3/file1文件的dentry</li>
-<li>对于OverlayFS中的file2，其dentry对应的ovl_entry结构的lowerstack[0].dentry，就指向lowerdir_2/file2文件的dentry</li>
-<li>对于OverlayFS中的file3，其dentry对应的ovl_entry结构的__upperdentry字段就指向upper/file3文件的dentry。对应的ovl_entry结构的lowerstack[0].dentry，就指向lowerdir_1/file3文件的dentry</li>
-<li>对于OverlayFS中的file4，其dentry对应的ovl_entry结构的__upperdentry字段就指向upper/file4文件的dentry。对应的ovl_entry结构的lowerstack[0].dentry，就指向lowerdir_1/file4文件的dentry。对应的ovl_entry结构的lowerstack[1].dentry，就指向lowerdir_2/file4文件的dentry。对应的ovl_entry结构的lowerstack[2].dentry，就指向lowerdir_3/file4文件的dentry</li>
-<li><strong>对于OverlayFS的根目录/，其dentry对应的ovl_entry结构的__upperdentry字段就指向upper目录的dentry。对应的ovl_entry结构的lowerstack[0].dentry，就指向lowerdir_1目录的dentry。对应的ovl_entry结构的lowerstack[1].dentry，就指向lowerdir_2目录的dentry。对应的ovl_entry结构的lowerstack[2].dentry，就指向lowerdir_3目录的dentry</strong></li>
+<li>Docker CE：只有Ubuntu或Debian中支持btrfs</li>
+<li>Docker EE：只有SLES中支持btrfs</li>
+<li>改变存储驱动会使你本地系统创建的所有容器都无法访问。在改变存储驱动前记得使用保存容器，然后推送到Docker hub或者私有仓库</li>
+<li>btrfs需要一个专用的块设备（如物理磁盘）。这个块设备必须格式化为Btrfs然后挂载到<code>/var/lib/docker</code>。下面的配置流程会指导你完成这些步骤。对于SLES来说，根文件系统默认情况下就是Btrfs，所以无需另外的专用块设备，但出于性能方面的考虑，你可以选择使用另外一个专用块设备</li>
+<li><p>内核必须支持btrfs，可以运行下面的命令检测：</p>
+  <figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">$ sudo cat /proc/filesystems | grep btrfs</span><br><span class="line"></span><br><span class="line">btrfs</span><br></pre></td></tr></table></figure>
+</li>
+<li><p>在操作系统层管理Btrfs文件系统需要使用btrfs命令。如果系统中还未安装，安装btrfsprogs包（SLES）或btrfs-tools包（Ubuntu）</p>
+</li>
 </ul>
 <p><br></p>
-<h2 id="文件路径类型"><a href="#文件路径类型" class="headerlink" title="文件路径类型"></a>文件路径类型</h2><p>文件路径类型也是OverlayFS中文件层次信息的反应，通过文件的路径类型，你可以知道一个文件：</p>
-<ul>
-<li>1）只存在于upper层</li>
-<li>2）只存在于lower层</li>
-<li>3）同时存在于lower层和upper层</li>
-</ul>
-<p>文件路径在访问文件相关的代码中经常出现。在OverlayFS中，通常访问一个文件之前，都要先判断文件的路径类型，然后根据路径类型访问ovl_entry结构中记录有upper层或lower层信息的字段，最后进一步访问upper层或lower层中的实际文件。OverlayFS中文件路径类型由枚举类型ovl_path_type表示:</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">enum</span> ovl_path_type &#123;</span><br><span class="line">	__OVL_PATH_PURE		= (<span class="number">1</span> &lt;&lt; <span class="number">0</span>),<span class="comment">//1</span></span><br><span class="line">	__OVL_PATH_UPPER	= (<span class="number">1</span> &lt;&lt; <span class="number">1</span>),<span class="comment">//2</span></span><br><span class="line">	__OVL_PATH_MERGE	= (<span class="number">1</span> &lt;&lt; <span class="number">2</span>),<span class="comment">//4</span></span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
-<p>根据文件的dentry，可以调用函数ovl_path_type()得到文件路径类型：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">enum</span> ovl_path_type <span class="title">ovl_path_type</span><span class="params">(struct dentry *dentry)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">ovl_entry</span> *<span class="title">oe</span> = <span class="title">dentry</span>-&gt;<span class="title">d_fsdata</span>;</span></span><br><span class="line">	<span class="keyword">enum</span> ovl_path_type type = <span class="number">0</span>;</span><br><span class="line"></span><br><span class="line">	<span class="keyword">if</span> (oe-&gt;__upperdentry) &#123;<span class="comment">//说明这个文件存在upper层</span></span><br><span class="line">		type = __OVL_PATH_UPPER;<span class="comment">//__OVL_PATH_UPPER (2)</span></span><br><span class="line">		<span class="comment">/*</span></span><br><span class="line"><span class="comment">		 * Non-dir dentry can hold lower dentry from previous</span></span><br><span class="line"><span class="comment">		 * location. Its purity depends only on opaque flag.</span></span><br><span class="line"><span class="comment">		 */</span></span><br><span class="line">		<span class="keyword">if</span> (oe-&gt;numlower &amp;&amp; S_ISDIR(dentry-&gt;d_inode-&gt;i_mode))</span><br><span class="line">			<span class="comment">//__OVL_PATH_UPPER |  __OVL_PATH_MERGE (6)</span></span><br><span class="line">			type |= __OVL_PATH_MERGE;</span><br><span class="line">		<span class="keyword">else</span> <span class="keyword">if</span> (!oe-&gt;opaque)</span><br><span class="line">			<span class="comment">//__OVL_PATH_UPPER | __OVL_PATH_PURE (3)</span></span><br><span class="line">			type |= __OVL_PATH_PURE;</span><br><span class="line">	&#125; <span class="keyword">else</span> &#123;</span><br><span class="line">		<span class="keyword">if</span> (oe-&gt;numlower &gt; <span class="number">1</span>)</span><br><span class="line">			<span class="comment">//__OVL_PATH_MERGE (4)</span></span><br><span class="line">			type |= __OVL_PATH_MERGE;</span><br><span class="line">	&#125;</span><br><span class="line">	<span class="keyword">return</span> type;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>从函数中可以看到，整个路径类型的判断都是围绕ovl_entry结构中记录的upper层和lower层信息进行。有了这个函数，内核就可以知道一个文件的分布，<strong>这一切都是借助了ovl_entry结构</strong></p>
-<p>这里<strong>假设只有1层lower层</strong>，给出下列几种常见文件及其文件路径类型：</p>
-<table>
-<thead>
-<tr>
-<th style="text-align:center">描述</th>
-<th style="text-align:center">文件路径类型(值)</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align:center">只在lower层中存在的<strong>一般文件或目录</strong></td>
-<td style="text-align:center">(0)</td>
-</tr>
-<tr>
-<td style="text-align:center">只在upper层中存在的<strong>一般文件或目录</strong></td>
-<td style="text-align:center">__OVL_PATH_UPPER \</td>
-<td>__OVL_PATH_PURE (3)</td>
-</tr>
-<tr>
-<td style="text-align:center">同时存在lower和upper层的<strong>一般文件</strong></td>
-<td style="text-align:center">__OVL_PATH_UPPER (2)</td>
-</tr>
-<tr>
-<td style="text-align:center">同时存在lower和upper层的<strong>目录</strong></td>
-<td style="text-align:center">__OVL_PATH_UPPER \</td>
-<td>__OVL_PATH_MERGE (6)</td>
-</tr>
-</tbody>
-</table>
-<p>同时存在lower和upper层的文件和目录的文件路径类型不一样的原因在于，同名文件上层会覆盖下层，而同名目录则是会进行合并</p>
-<p>所以文件层次信息中的opaque字段被设置时，可以理解成一种“覆盖隐藏”，也就是说由于下层信息被覆盖，不会展示在联合目录下，所以不需要再对下层的信息进行分析。删除文件和目录也是使用了whiteout文件实现这种“覆盖隐藏”</p>
+<h2 id="配置Docker使用btrfs存储驱动"><a href="#配置Docker使用btrfs存储驱动" class="headerlink" title="配置Docker使用btrfs存储驱动"></a>配置Docker使用btrfs存储驱动</h2><ol>
+<li>停止Docker；</li>
+<li>将<code>/var/lib/docker/</code>中的内容进行备份，然后清空该目录；</li>
+</ol>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">$ sudo cp -au /var/lib/docker /var/lib/docker.bk</span><br><span class="line">$ sudo rm -rf /var/lib/docker/*</span><br></pre></td></tr></table></figure>
+<ol start="3">
+<li>将你的专用块设备格式化成Btrfs。现在假设有2个分别名为<code>/dev/xvdf</code>和<code>/dev/xvdg</code>的块设备</li>
+</ol>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ sudo mkfs.btrfs -f /dev/xvdf /dev/xvdg</span><br></pre></td></tr></table></figure>
+<ol start="4">
+<li>将新的Btrfs文件系统挂载到<code>/var/lib/docker/</code></li>
+</ol>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ sudo mount -t btrfs /dev/xvdf /var/lib/docker</span><br></pre></td></tr></table></figure>
+<blockquote>
+<p>不要忘了在<code>/etc/fstab</code>中添加新的项使这个改变永久化</p>
+</blockquote>
+<ol start="5">
+<li>将<code>/var/lib/docker.bk</code>拷贝到<code>/var/lib/docker/</code></li>
+</ol>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ sudo cp -au /var/lib/docker.bk/* /var/lib/docker/</span><br></pre></td></tr></table></figure>
+<ol start="6">
+<li>配置Docker使用btrfs存储驱动。尽管现在<code>/var/lib/docker/</code>已经是Btrfs文件系统，但是这个配置步骤也是需要的。编辑文件<code>/etc/docker/daemon.json</code>。加入下列内容（如果下列内容不是在末尾，记得在最后一行后面加上逗号）</li>
+</ol>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">&#123;</span><br><span class="line">  <span class="string">"storage-driver"</span>: <span class="string">"btrfs"</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<ol start="7">
+<li>启动Docker，证实存储驱动已经是btrfs</li>
+</ol>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">$ docker info</span><br><span class="line"></span><br><span class="line">Containers: 0</span><br><span class="line"> Running: 0</span><br><span class="line"> Paused: 0</span><br><span class="line"> Stopped: 0</span><br><span class="line">Images: 0</span><br><span class="line">Server Version: 17.03.1-ce</span><br><span class="line">Storage Driver: btrfs</span><br><span class="line"> Build Version: Btrfs v4.4</span><br><span class="line"> Library Version: 101</span><br><span class="line">&lt;output truncated&gt;</span><br></pre></td></tr></table></figure>
+<ol start="8">
+<li>如果确认<code>/var/lib/docker.bk</code>将不再使用则将其删除</li>
+</ol>
 <p><br></p>
-<h2 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h2><p>结构体ovl_entry记录了OverlayFS中文件的层次信息，通过这个结构体，内核可以根据一个OverlayFS文件的dentry来实现对相应upper层和lower层的文件访问。由于OverlayFS的本质是将对文件的操作转化为对底层文件系统upper层或lower层文件的操作。因此在OverlayFS中，会大量涉及到对文件层次信息的访问。理解这个结构有助于理解OverlayFS如何实现操作转化。因此这个结构很重要</p>
+<h2 id="管理一个Btrfs卷"><a href="#管理一个Btrfs卷" class="headerlink" title="管理一个Btrfs卷"></a>管理一个Btrfs卷</h2><p>Btrfs的一个好处就是管理方便，不需要卸载文件系统或重启Docker就能对其进行管理</p>
+<p>当空间不足时，btrfs自动按大约1GB的块来扩充卷</p>
+<p>可以使用<code>btrfs device add</code>和<code>btrfs filesystem balance</code>将一个块设备添加到Btrfs卷</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">$ sudo btrfs device add /dev/svdh /var/lib/docker</span><br><span class="line"></span><br><span class="line">$ sudo btrfs filesystem balance /var/lib/docker</span><br></pre></td></tr></table></figure>
+<p><br></p>
+<h2 id="btrfs存储驱动如何工作"><a href="#btrfs存储驱动如何工作" class="headerlink" title="btrfs存储驱动如何工作"></a>btrfs存储驱动如何工作</h2><p>btrfs和其它存储驱动不同，整个<code>/var/lib/docker</code>目录都被存储为Btrfs卷</p>
+<h3 id="镜像和容器的磁盘结构"><a href="#镜像和容器的磁盘结构" class="headerlink" title="镜像和容器的磁盘结构"></a>镜像和容器的磁盘结构</h3><p>镜像层和可写的容器层的信息存储在<code>/var/lib/docker/btrfs/subvolumes/</code>中。每个容器层或镜像层在这个目录下都有一个相应的目录, with the unified filesystem built from a layer plus all its parent layers。子卷具有copt-on-write的特性它们的空间由一个底层存储池来按需分配。它们也能被嵌套和快照。下图展示了4个子卷。‘Subvolume 2’和’Subvolume 3’是嵌套的。而’Subvolume 4’展示了自身的内部目录树</p>
+<p><img src="/img/in-post/post-docker-filesystem/btrfs_subvolume.jpg" alt=""></p>
+<p>一个镜像只有基层会被存储为一个真实的子卷。所有其它的层被存储为快照，它们只包含那一层的改变。如下图所示，可以创建快照的快照：</p>
+<p><img src="/img/in-post/post-docker-filesystem/btrfs_snapshots.jpg" alt=""></p>
+<p>在磁盘上快照看起来就像子卷，但是事实上它们更小。copy-on-write的使用可以获得最大的存储效益以及最小的层大小，容器层写为块级。下面中镜像和它的块组共享数据：</p>
+<p><img src="/img/in-post/post-docker-filesystem/btrfs_pools.jpg" alt=""></p>
+<p>为了最大化效益，当一个容器需要更多空间时，会按1GB的大块进行分配</p>
+<p>Docker的btrfs存储驱动将每个镜像层和容器存储在自己的btrfs子卷或快照中。镜像的基层存储为一个子卷而孩子层以及容器层存储为快照。如下图所示：</p>
+<p><img src="/img/in-post/post-docker-filesystem/btrfs_container_layer.jpg" alt=""></p>
+<p>在运行btrfs存储的Docker主机上创建镜像和容器的过程如下：</p>
+<ol>
+<li>镜像的基层存储在Btrfs子卷中<code>/var/lib/docker/btrfs/subvolumes</code></li>
+<li>随后的镜像层存储为父层子卷或快照的快照，但是这一层会引入改变。这些改变以块级为单位进行存储</li>
+<li>容器的可写层是最上层镜像层的快照，这一层会引入改变。这些改变以块级为单位进行存储</li>
+</ol>
+<p><br></p>
+<h2 id="容器的读写"><a href="#容器的读写" class="headerlink" title="容器的读写"></a>容器的读写</h2><h3 id="读文件"><a href="#读文件" class="headerlink" title="读文件"></a>读文件</h3><p>容器是一个镜像的快照。快照中的元数据指向存储池中的实际数据块。这和一个子卷一样。因此，对快照执行读基本上与对子卷执行的读相同</p>
+<h3 id="写文件"><a href="#写文件" class="headerlink" title="写文件"></a>写文件</h3><ul>
+<li><strong>写新文件</strong>：写一个新文件到容器会触发一个按需分配操作来将新的数据块分配到容器的快照。然后文件会被写入这个新的空间。这和写新的数据到一个子卷一样。写新文件到容器的快照可以获得原始Btrfs的速度</li>
+<li><strong>修改存在的文件</strong>：修改一个已存在文件是一个copy-on-write操作。会从文件所在的层读取原始数据，只有修改的块会被写入容器层。接着，btrfs驱动更新快照中文件系统的元数据以指向新的数据。这些行为开销很低</li>
+<li><strong>删除文件或目录</strong>：如果一个容器删除镜像层中的文件或者目录，Btrfs屏蔽了下层中文件或目录的存在。如果容器创建了一个文件，然后将其删除，则此操作将在btrfs文件系统本身中执行，并回收空间</li>
+</ul>
+<p>使用btrfs，写入和更新大量小文件会导致低性能。</p>
+<h2 id="Btrfs和Docker的性能"><a href="#Btrfs和Docker的性能" class="headerlink" title="Btrfs和Docker的性能"></a>Btrfs和Docker的性能</h2><p>使用btrfs存储驱动时，有几个因素会影响Docker的性能</p>
+<blockquote>
+<p>注意：很多这些因素可以依靠使用Docker卷来缓解，而不是依赖于容器可写层来存储数据。但是，就Btrfs来说，Docker卷仍然可能受到影响，除非<code>/var/lib/docker/volumes/</code>并不是挂载在Btrfs下</p>
+</blockquote>
+<ul>
+<li><strong>页缓存</strong>：Btrfs不支持页缓存共享。这意味着访问相同文件的进程都会将文件拷贝到内存中。因此btrfs驱动可能不是高密集使用场景（如PaaS）的最好选择</li>
+<li><strong>小文件</strong>：容器执行大量的小的写（比如当短时间内启动和停止大量容器）会影响Btrfs大块的使用。这会持续消耗Btrfs文件系统的空间。可以使用<code>btrfs filesys show</code>来监控Btrfs设备的空间信息</li>
+<li><strong>顺序写</strong>：当写入磁盘时，Btrfs使用了日志技术。这会影响顺序写的性能，最多可能会减少50%的性能。</li>
+<li><strong>碎片</strong>：碎片是copy-on-write文件系统的副作用。当使用SSD时或者在使用旋转磁盘发生磁头摆动时，碎片可能表现为CPU峰值。这些问题中的任何一个都可能损害性能</li>
+<li><strong>SSD性能</strong>：Btrfs与生俱来具备对SSD介质的优化。为了使这些特征生效，使用<code>-o ssd</code>选项来挂载Btrfs文件系统。这些优化包括：通过避免寻道优化从而加强SSD的写性能</li>
+<li><strong>经常平衡Btrfs文件系统</strong>：在非高峰时段，使用操作系统实用程序（如cron作业）定期平衡btrfs文件系统。这将回收未分配的块，并有助于防止文件系统不必要地填充。除非向文件系统添加额外的物理块设备，否则无法重新平衡整个完整的btrfs文件系统</li>
+<li><strong>使用快存储</strong>：SSD提供更快的读写速度</li>
+<li><strong>为写密集的负载使用卷</strong>：对于写密集的负载，卷提供了最好和最可预测的性能。因为卷旁路了存储驱动从而避开了由瘦供给(thin provisioning)和copy-on-write引入的潜在开销。卷还具有其它好处，比如允许你在容器间共享数据以及持久化数据</li>
+</ul>
+<h2 id="相关资料"><a href="#相关资料" class="headerlink" title="相关资料"></a>相关资料</h2><p><a href="https://www.ibm.com/developerworks/cn/linux/l-cn-btrfs/" target="_blank" rel="noopener">新一代 Linux 文件系统 btrfs 简介</a></p>
 
       
     </div>
@@ -406,13 +430,13 @@
   
     
     <div class="copyright">
-        <p><span>本文标题:</span><a href="/2017/09/20/2017-09-20-linux-code-overlayfs-layerinfo/">内核OverlayFS—文件层次信息</a></p>
+        <p><span>本文标题:</span><a href="/2019/04/24/2019-04-24-docker-filesystem-btrfs/"> Docker存储驱动—Btrfs </a></p>
         <p><span>文章作者:</span><a href="/" title="回到主页">Arking</a></p>
-        <p><span>发布时间:</span>2017-09-20, 02:51:00</p>
-        <p><span>最后更新:</span>2019-04-25, 16:31:01</p>
+        <p><span>发布时间:</span>2019-04-24, 10:51:00</p>
+        <p><span>最后更新:</span>2019-04-26, 16:24:16</p>
         <p>
-            <span>原始链接:</span><a class="post-url" href="/2017/09/20/2017-09-20-linux-code-overlayfs-layerinfo/" title="内核OverlayFS—文件层次信息">https://arkingc.github.io/2017/09/20/2017-09-20-linux-code-overlayfs-layerinfo/</a>
-            <span class="copy-path" data-clipboard-text="原文: https://arkingc.github.io/2017/09/20/2017-09-20-linux-code-overlayfs-layerinfo/　　作者: Arking" title="点击复制文章链接"><i class="fa fa-clipboard"></i></span>
+            <span>原始链接:</span><a class="post-url" href="/2019/04/24/2019-04-24-docker-filesystem-btrfs/" title=" Docker存储驱动—Btrfs ">https://arkingc.github.io/2019/04/24/2019-04-24-docker-filesystem-btrfs/</a>
+            <span class="copy-path" data-clipboard-text="原文: https://arkingc.github.io/2019/04/24/2019-04-24-docker-filesystem-btrfs/　　作者: Arking" title="点击复制文章链接"><i class="fa fa-clipboard"></i></span>
             <script> var clipboard = new Clipboard('.copy-path'); </script>
         </p>
         <p>
@@ -424,16 +448,10 @@
 
     <nav id="article-nav">
         
-            <div id="article-nav-newer" class="article-nav-title">
-                <a href="/2017/10/12/2017-10-12-linux-code-overlayfs-mnt/">
-                    内核OverlayFS—注册与挂载
-                </a>
-            </div>
-        
         
             <div id="article-nav-older" class="article-nav-title">
-                <a href="/2017/08/18/2017-08-18-linux-code-vfs/">
-                    Linux虚拟文件系统(VFS)
+                <a href="/2018/12/13/2018-12-13-linux-lvm/">
+                    Linux Device Mapper
                 </a>
             </div>
         
@@ -445,7 +463,7 @@
     <div id="toc" class="toc-article">
         <strong class="toc-title">文章目录</strong>
         
-            <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#OverlayFS的本质"><span class="toc-number">1.</span> <span class="toc-text">OverlayFS的本质</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#文件层次信息"><span class="toc-number">2.</span> <span class="toc-text">文件层次信息</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#文件路径类型"><span class="toc-number">3.</span> <span class="toc-text">文件路径类型</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#总结"><span class="toc-number">4.</span> <span class="toc-text">总结</span></a></li></ol>
+            <ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#基本条件"><span class="toc-number">1.</span> <span class="toc-text">基本条件</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#配置Docker使用btrfs存储驱动"><span class="toc-number">2.</span> <span class="toc-text">配置Docker使用btrfs存储驱动</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#管理一个Btrfs卷"><span class="toc-number">3.</span> <span class="toc-text">管理一个Btrfs卷</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#btrfs存储驱动如何工作"><span class="toc-number">4.</span> <span class="toc-text">btrfs存储驱动如何工作</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#镜像和容器的磁盘结构"><span class="toc-number">4.1.</span> <span class="toc-text">镜像和容器的磁盘结构</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#容器的读写"><span class="toc-number">5.</span> <span class="toc-text">容器的读写</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#读文件"><span class="toc-number">5.1.</span> <span class="toc-text">读文件</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#写文件"><span class="toc-number">5.2.</span> <span class="toc-text">写文件</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#Btrfs和Docker的性能"><span class="toc-number">6.</span> <span class="toc-text">Btrfs和Docker的性能</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#相关资料"><span class="toc-number">7.</span> <span class="toc-text">相关资料</span></a></li></ol>
         
     </div>
     <style>
@@ -481,7 +499,7 @@
         </div>
         <script>
             window._bd_share_config={
-                "common":{"bdSnsKey":{},"bdText":"内核OverlayFS—文件层次信息　| Arking　","bdMini":"2","bdMiniList":false,"bdPic":"","bdStyle":"0","bdSize":"24"},"share":{}};with(document)0[(getElementsByTagName('head')[0]||body).appendChild(createElement('script')).src='http://bdimg.share.baidu.com/static/api/js/share.js?v=89860593.js?cdnversion='+~(-new Date()/36e5)];
+                "common":{"bdSnsKey":{},"bdText":" Docker存储驱动—Btrfs 　| Arking　","bdMini":"2","bdMiniList":false,"bdPic":"","bdStyle":"0","bdSize":"24"},"share":{}};with(document)0[(getElementsByTagName('head')[0]||body).appendChild(createElement('script')).src='http://bdimg.share.baidu.com/static/api/js/share.js?v=89860593.js?cdnversion='+~(-new Date()/36e5)];
         </script>
     
 
@@ -501,15 +519,13 @@
 
     <div class="scroll" id="post-nav-button">
         
-            <a href="/2017/10/12/2017-10-12-linux-code-overlayfs-mnt/" title="上一篇: 内核OverlayFS—注册与挂载">
-                <i class="fa fa-angle-left"></i>
-            </a>
+            <a href="/" title="回到主页"><i class="fa fa-home"></i></a>
         
 
         <a title="文章列表"><i class="fa fa-bars"></i><i class="fa fa-times"></i></a>
 
         
-            <a href="/2017/08/18/2017-08-18-linux-code-vfs/" title="下一篇: Linux虚拟文件系统(VFS)">
+            <a href="/2018/12/13/2018-12-13-linux-lvm/" title="下一篇: Linux Device Mapper">
                 <i class="fa fa-angle-right"></i>
             </a>
         
