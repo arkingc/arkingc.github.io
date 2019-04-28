@@ -27,7 +27,7 @@
 <meta property="og:image" content="https://arkingc.github.io/img/in-post/post-docker-filesystem/btfs_snapshots.jpg">
 <meta property="og:image" content="https://arkingc.github.io/img/in-post/post-docker-filesystem/btfs_pool.jpg">
 <meta property="og:image" content="https://arkingc.github.io/img/in-post/post-docker-filesystem/btfs_container_layer.jpg">
-<meta property="og:updated_time" content="2019-04-26T09:33:59.000Z">
+<meta property="og:updated_time" content="2019-04-28T09:31:10.000Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content=" Docker存储驱动—Btrfs「译」">
 <meta name="twitter:description" content="Btrfs是下一代copy-on-write文件系统，它支持很多先进存储技术，这使得它能很好的适用与Docker。Btrfs已经引入了内核主线 Docker的btrfs存储驱动利用了很多Btrfs的特征来管理容器和镜像。这些特征有块级操作，瘦供给(thin provisioning)，copy-on-write快照，以及管理轻便性。你可以很容易的将多个物理块设备结合成一个单一的Btrfs文件系统">
@@ -380,7 +380,7 @@
 <figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">$ sudo btrfs device add /dev/svdh /var/lib/docker</span><br><span class="line"></span><br><span class="line">$ sudo btrfs filesystem balance /var/lib/docker</span><br></pre></td></tr></table></figure>
 <p><br></p>
 <h2 id="btrfs存储驱动如何工作"><a href="#btrfs存储驱动如何工作" class="headerlink" title="btrfs存储驱动如何工作"></a>btrfs存储驱动如何工作</h2><p>btrfs和其它存储驱动不同，整个<code>/var/lib/docker</code>目录都被存储为Btrfs卷</p>
-<h3 id="镜像和容器的磁盘结构"><a href="#镜像和容器的磁盘结构" class="headerlink" title="镜像和容器的磁盘结构"></a>镜像和容器的磁盘结构</h3><p>镜像层和可写的容器层的信息存储在<code>/var/lib/docker/btrfs/subvolumes/</code>中。每个容器层或镜像层在这个目录下都有一个相应的目录, with the unified filesystem built from a layer plus all its parent layers。子卷具有copt-on-write的特性它们的空间由一个底层存储池来按需分配。它们也能被嵌套和快照。下图展示了4个子卷。‘Subvolume 2’和’Subvolume 3’是嵌套的。而’Subvolume 4’展示了自身的内部目录树</p>
+<h3 id="镜像和容器的磁盘结构"><a href="#镜像和容器的磁盘结构" class="headerlink" title="镜像和容器的磁盘结构"></a>镜像和容器的磁盘结构</h3><p>镜像层和可写的容器层的信息存储在<code>/var/lib/docker/btrfs/subvolumes/</code>中。每个容器层或镜像层在这个目录下都有一个相应的目录。子卷具有copt-on-write的特性它们的空间由一个底层存储池来按需分配。它们也能被嵌套和快照。下图展示了4个子卷。‘Subvolume 2’和’Subvolume 3’是嵌套的。而’Subvolume 4’展示了自身的内部目录树</p>
 <p><img src="/img/in-post/post-docker-filesystem/btfs_subvolume.jpg" alt=""></p>
 <p>一个镜像只有基层会被存储为一个真实的子卷。所有其它的层被存储为快照，它们只包含那一层的改变。如下图所示，可以创建快照的快照：</p>
 <p><img src="/img/in-post/post-docker-filesystem/btfs_snapshots.jpg" alt=""></p>
@@ -417,7 +417,10 @@
 <li><strong>使用快存储</strong>：SSD提供更快的读写速度</li>
 <li><strong>为写密集的负载使用卷</strong>：对于写密集的负载，卷提供了最好和最可预测的性能。因为卷旁路了存储驱动从而避开了由瘦供给(thin provisioning)和copy-on-write引入的潜在开销。卷还具有其它好处，比如允许你在容器间共享数据以及持久化数据</li>
 </ul>
-<h2 id="相关资料"><a href="#相关资料" class="headerlink" title="相关资料"></a>相关资料</h2><p><a href="https://www.ibm.com/developerworks/cn/linux/l-cn-btrfs/" target="_blank" rel="noopener">新一代 Linux 文件系统 btrfs 简介</a></p>
+<h2 id="相关资料"><a href="#相关资料" class="headerlink" title="相关资料"></a>相关资料</h2><ul>
+<li><a href="https://www.ibm.com/developerworks/cn/linux/l-cn-btrfs/" target="_blank" rel="noopener">新一代 Linux 文件系统 btrfs 简介</a></li>
+<li><a href="https://cnfczn.com/notes/linux/btrfs" target="_blank" rel="noopener">高级文件系统-btrfs</a></li>
+</ul>
 
       
     </div>
@@ -429,7 +432,7 @@
         <p><span>本文标题:</span><a href="/2017/07/15/2017-07-15-docker-filesystem-btrfs/"> Docker存储驱动—Btrfs「译」</a></p>
         <p><span>文章作者:</span><a href="/" title="回到主页">Arking</a></p>
         <p><span>发布时间:</span>2017-07-15, 10:51:00</p>
-        <p><span>最后更新:</span>2019-04-26, 17:33:59</p>
+        <p><span>最后更新:</span>2019-04-28, 17:31:10</p>
         <p>
             <span>原始链接:</span><a class="post-url" href="/2017/07/15/2017-07-15-docker-filesystem-btrfs/" title=" Docker存储驱动—Btrfs「译」">https://arkingc.github.io/2017/07/15/2017-07-15-docker-filesystem-btrfs/</a>
             <span class="copy-path" data-clipboard-text="原文: https://arkingc.github.io/2017/07/15/2017-07-15-docker-filesystem-btrfs/　　作者: Arking" title="点击复制文章链接"><i class="fa fa-clipboard"></i></span>
